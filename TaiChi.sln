@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.SocketKit", "TaiChi.SocketKit\TaiChi.SocketKit.csproj", "{169A1BF4-3F6A-4AC7-AE5F-2FA363A710E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.Core", "TaiChi.Core\TaiChi.Core.csproj", "{EE3773A7-36C9-4F41-9529-C5DBA2AB0BB6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.Security", "TaiChi.Security\TaiChi.Security.csproj", "{C3A82DDF-889E-45B7-B442-E62876A6D70A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.IO", "TaiChi.IO\TaiChi.IO.csproj", "{3C6EE7E2-1AAB-4DC1-9C42-F11DF2526983}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{F8A46F07-1CC6-46BC-BA34-E6F6E735E7A1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{169A1BF4-3F6A-4AC7-AE5F-2FA363A710E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{169A1BF4-3F6A-4AC7-AE5F-2FA363A710E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{169A1BF4-3F6A-4AC7-AE5F-2FA363A710E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{169A1BF4-3F6A-4AC7-AE5F-2FA363A710E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE3773A7-36C9-4F41-9529-C5DBA2AB0BB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE3773A7-36C9-4F41-9529-C5DBA2AB0BB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE3773A7-36C9-4F41-9529-C5DBA2AB0BB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE3773A7-36C9-4F41-9529-C5DBA2AB0BB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3A82DDF-889E-45B7-B442-E62876A6D70A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3A82DDF-889E-45B7-B442-E62876A6D70A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3A82DDF-889E-45B7-B442-E62876A6D70A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3A82DDF-889E-45B7-B442-E62876A6D70A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C6EE7E2-1AAB-4DC1-9C42-F11DF2526983}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C6EE7E2-1AAB-4DC1-9C42-F11DF2526983}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C6EE7E2-1AAB-4DC1-9C42-F11DF2526983}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C6EE7E2-1AAB-4DC1-9C42-F11DF2526983}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,9 @@
+---
+description: Anything
+globs: *.cs
+---
+
+# 项目设置
+
+- 语言版本使用了C# 8.0,框架版本使用了netstandard2.1
+
