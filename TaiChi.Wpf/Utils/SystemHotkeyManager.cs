@@ -7,6 +7,9 @@ using System.Threading;
 
 namespace TaiChi.Wpf.Utils
 {
+    /// <summary>
+    /// 系统热键管理器
+    /// </summary>
     public static class SystemHotkeyManager
     {
         // Win32 API 导入
@@ -28,7 +31,7 @@ namespace TaiChi.Wpf.Utils
 
         // 线程同步锁对象
         private static readonly object _lockObject = new object();
-        
+
         // 存储已注册的热键
         private static readonly Dictionary<int, Action> _registeredHotkeys = new Dictionary<int, Action>();
         private static IntPtr _windowHandle;
@@ -61,22 +64,22 @@ namespace TaiChi.Wpf.Utils
                 {
                     _registeredWindow = window;
                     _windowHandle = new WindowInteropHelper(window).Handle;
-                    
+
                     if (_windowHandle == IntPtr.Zero)
                     {
                         throw new InvalidOperationException("无法获取窗口句柄");
                     }
-                    
+
                     _source = HwndSource.FromHwnd(_windowHandle);
-                    
+
                     if (_source == null)
                     {
                         throw new InvalidOperationException("无法创建 HwndSource");
                     }
-                    
+
                     _source.AddHook(HwndHook);
                     _isInitialized = true;
-                    
+
                     // 在窗口关闭时自动清理资源
                     window.Closed += (s, e) => Cleanup();
                 }
@@ -109,9 +112,9 @@ namespace TaiChi.Wpf.Utils
         /// <param name="modifiers">修饰键</param>
         /// <param name="key">键码</param>
         /// <param name="action">热键触发时执行的操作</param>
-        /// <returns>成功返回热键ID，失败返回-1</returns>
+        /// <returns>成功返回热键ID</returns>
         /// <exception cref="ArgumentNullException">action 为 null 时抛出</exception>
-        /// <exception cref="InvalidOperationException">未初始化时抛出</exception>
+        /// <exception cref="InvalidOperationException">未初始化时抛出；热键已被其他程序注册；或注册热键失败</exception>
         public static int RegisterHotKey(uint modifiers, uint key, Action action)
         {
             if (action == null)
@@ -124,7 +127,7 @@ namespace TaiChi.Wpf.Utils
             lock (_lockObject)
             {
                 int id = _currentId++;
-                
+
                 try
                 {
                     if (RegisterHotKey(_windowHandle, id, modifiers, key))
@@ -138,9 +141,9 @@ namespace TaiChi.Wpf.Utils
                         // 可能是热键已被注册
                         if (errorCode == 1409) // ERROR_HOTKEY_ALREADY_REGISTERED
                         {
-                            return -2; // 特定错误代码：热键已被注册
+                            throw new InvalidOperationException("热键已被其他程序注册");
                         }
-                        return -1; // 通用注册失败
+                        throw new InvalidOperationException($"注册热键失败，错误代码: {errorCode}");
                     }
                 }
                 catch (Exception)
@@ -190,7 +193,7 @@ namespace TaiChi.Wpf.Utils
                         return false;
                     }
                 }
-                
+
                 return false;
             }
         }
@@ -208,7 +211,7 @@ namespace TaiChi.Wpf.Utils
             lock (_lockObject)
             {
                 List<int> idsToRemove = new List<int>(_registeredHotkeys.Keys);
-                
+
                 foreach (int id in idsToRemove)
                 {
                     try
@@ -220,7 +223,7 @@ namespace TaiChi.Wpf.Utils
                         // 忽略单个热键注销失败，继续注销其他热键
                     }
                 }
-                
+
                 _registeredHotkeys.Clear();
             }
         }
@@ -240,13 +243,13 @@ namespace TaiChi.Wpf.Utils
                 try
                 {
                     UnregisterAllHotKeys();
-                    
+
                     if (_source != null)
                     {
                         _source.RemoveHook(HwndHook);
                         _source = null;
                     }
-                    
+
                     _windowHandle = IntPtr.Zero;
                     _registeredWindow = null;
                     _isInitialized = false;
@@ -284,10 +287,10 @@ namespace TaiChi.Wpf.Utils
             if (msg == WM_HOTKEY)
             {
                 int id = wParam.ToInt32();
-                
+
                 // 使用线程安全的方式获取委托
                 Action actionToInvoke = null;
-                
+
                 lock (_lockObject)
                 {
                     if (_registeredHotkeys.TryGetValue(id, out Action action))
@@ -295,7 +298,7 @@ namespace TaiChi.Wpf.Utils
                         actionToInvoke = action;
                     }
                 }
-                
+
                 // 在锁外执行委托，避免死锁
                 if (actionToInvoke != null)
                 {
@@ -311,7 +314,7 @@ namespace TaiChi.Wpf.Utils
                     }
                 }
             }
-            
+
             return IntPtr.Zero;
         }
     }
