@@ -16,7 +16,7 @@ namespace TaiChi.IO.File
         /// <exception cref="ArgumentNullException">文件路径为空</exception>
         /// <exception cref="FileNotFoundException">文件不存在</exception>
         /// <exception cref="IOException">读取文件失败</exception>
-        public static string ReadFile(string filePath, Encoding encoding = null)
+        public static string ReadFile(string filePath, Encoding? encoding = null)
         {
             if (string.IsNullOrEmpty(filePath))
             {
@@ -56,7 +56,7 @@ namespace TaiChi.IO.File
         /// <exception cref="ArgumentNullException">文件路径为空</exception>
         /// <exception cref="FileNotFoundException">文件不存在</exception>
         /// <exception cref="IOException">读取文件失败</exception>
-        public static async Task<string> ReadFileAsync(string filePath, Encoding encoding = null)
+        public static async Task<string> ReadFileAsync(string filePath, Encoding? encoding = null)
         {
             if (string.IsNullOrEmpty(filePath))
             {
@@ -96,7 +96,7 @@ namespace TaiChi.IO.File
         /// <param name="append">是否追加内容，默认为覆盖</param>
         /// <exception cref="ArgumentNullException">文件路径为空</exception>
         /// <exception cref="IOException">写入文件失败</exception>
-        public static void WriteFile(string filePath, string content, Encoding encoding = null, bool append = false)
+        public static void WriteFile(string filePath, string content, Encoding? encoding = null, bool append = false)
         {
             if (string.IsNullOrEmpty(filePath))
             {
@@ -134,7 +134,7 @@ namespace TaiChi.IO.File
         /// <param name="append">是否追加内容，默认为覆盖</param>
         /// <exception cref="ArgumentNullException">文件路径为空</exception>
         /// <exception cref="IOException">写入文件失败</exception>
-        public static async Task WriteFileAsync(string filePath, string content, Encoding encoding = null, bool append = false)
+        public static async Task WriteFileAsync(string filePath, string content, Encoding? encoding = null, bool append = false)
         {
             if (string.IsNullOrEmpty(filePath))
             {
