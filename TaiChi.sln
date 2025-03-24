@@ -14,6 +14,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.Mvvm", "TaiChi.Mvvm\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.Wpf", "TaiChi.Wpf\TaiChi.Wpf.csproj", "{B431642F-C86D-4753-A2E3-BE31AF63F56F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.IO.Ports", "TaiChi.IO.Ports\TaiChi.IO.Ports.csproj", "{AFB7BA29-C0FB-42FC-9DC4-3C308EB473F5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaiChi.MonoGame.UI", "TaiChi.MonoGame.UI\TaiChi.MonoGame.UI.csproj", "{378AC506-F52D-40BA-991D-700D036C0335}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +48,14 @@ Global
 		{B431642F-C86D-4753-A2E3-BE31AF63F56F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B431642F-C86D-4753-A2E3-BE31AF63F56F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B431642F-C86D-4753-A2E3-BE31AF63F56F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFB7BA29-C0FB-42FC-9DC4-3C308EB473F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFB7BA29-C0FB-42FC-9DC4-3C308EB473F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFB7BA29-C0FB-42FC-9DC4-3C308EB473F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFB7BA29-C0FB-42FC-9DC4-3C308EB473F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{378AC506-F52D-40BA-991D-700D036C0335}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{378AC506-F52D-40BA-991D-700D036C0335}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{378AC506-F52D-40BA-991D-700D036C0335}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{378AC506-F52D-40BA-991D-700D036C0335}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
