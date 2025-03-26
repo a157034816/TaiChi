@@ -18,6 +18,48 @@ namespace TaiChi.UpgradeKit.Client;
 public class UpgradeClientHelper
 {
     /// <summary>
+    /// 检查当前程序是否以管理员权限运行
+    /// </summary>
+    /// <returns>是否以管理员权限运行</returns>
+    public static bool IsRunningAsAdministrator()
+    {
+        var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        return principal.IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// 请求管理员权限重启当前应用
+    /// </summary>
+    /// <param name="arguments">启动参数</param>
+    /// <returns>是否成功启动提权进程</returns>
+    public static bool RestartWithAdminRights(string arguments = "")
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = Process.GetCurrentProcess().MainModule.FileName,
+                Arguments = arguments,
+                UseShellExecute = true,
+                Verb = "runas" // 使用 "runas" 请求管理员权限
+            };
+            
+            Process.Start(startInfo);
+            
+            // 退出当前进程
+            Environment.Exit(0);
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"请求管理员权限失败: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 检查目录权限
     /// </summary>
     /// <param name="directory">要检查的目录</param>
@@ -429,6 +471,20 @@ public class UpgradeClientHelper
         StringBuilder scriptContent = new StringBuilder();
         scriptContent.AppendLine("@echo off");
         scriptContent.AppendLine("setlocal enabledelayedexpansion");
+        scriptContent.AppendLine();
+        
+        // 添加管理员权限检查
+        scriptContent.AppendLine(":: 检查是否拥有管理员权限");
+        scriptContent.AppendLine("NET SESSION >nul 2>&1");
+        scriptContent.AppendLine("IF %ERRORLEVEL% NEQ 0 (");
+        scriptContent.AppendLine("    echo 需要管理员权限，正在请求提权...");
+        scriptContent.AppendLine("    powershell -Command \"Start-Process -Verb RunAs -FilePath '%~dpnx0' -ArgumentList 'ELEVATED'\"");
+        scriptContent.AppendLine("    exit /b");
+        scriptContent.AppendLine(")");
+        scriptContent.AppendLine();
+        scriptContent.AppendLine(":: 如果是通过提权重启的脚本，移除参数");
+        scriptContent.AppendLine("IF \"%~1\"==\"ELEVATED\" goto :continue");
+        scriptContent.AppendLine(":continue");
         scriptContent.AppendLine();
 
         // 等待主应用退出
