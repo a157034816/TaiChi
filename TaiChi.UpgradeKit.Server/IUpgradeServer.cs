@@ -55,5 +55,14 @@ namespace TaiChi.UpgradeKit.Server
         /// <param name="appId">应用ID</param>
         /// <returns>版本列表</returns>
         List<VersionInfo> GetAppVersions(string appId);
+
+        /// <summary>
+        /// 获取更新包数据流（支持断点续传）
+        /// </summary>
+        /// <param name="packageId">包ID</param>
+        /// <param name="startPosition">起始位置（字节）</param>
+        /// <param name="length">长度（字节，0表示到文件末尾）</param>
+        /// <returns>包含数据的内存流及相关信息</returns>
+        (System.IO.Stream DataStream, long TotalSize, bool SupportsResume, long StartPosition) GetPackageDataStream(string packageId, long startPosition = 0, long length = 0);
     }
 }

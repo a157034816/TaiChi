@@ -343,6 +343,42 @@ namespace TaiChi.UpgradeKit.Server
             if (string.IsNullOrWhiteSpace(request.AppId))
                 throw new ArgumentException("应用ID不能为空", nameof(request.AppId));
 
+            // 如果是断点续传请求（提供了PackageId和FileOffset）
+            if (!string.IsNullOrWhiteSpace(request.PackageId) && request.FileOffset >= 0)
+            {
+                Console.WriteLine($"收到断点续传请求：PackageId={request.PackageId}, Offset={request.FileOffset}");
+                
+                // 查找对应的更新包
+                UpdatePackageInfo packageInfo = null;
+                
+                foreach (var appId in _updatePackages.Keys)
+                {
+                    packageInfo = _updatePackages[appId].FirstOrDefault(p => p.PackageId == request.PackageId);
+                    if (packageInfo != null)
+                        break;
+                }
+                
+                if (packageInfo == null)
+                    return new UpdateResponse { HasUpdate = false };
+                    
+                // 检查文件是否存在及大小
+                if (!File.Exists(packageInfo.PackagePath))
+                    return new UpdateResponse { HasUpdate = false };
+                    
+                var fileInfo = new FileInfo(packageInfo.PackagePath);
+                
+                // 构建断点续传响应
+                return new UpdateResponse 
+                { 
+                    HasUpdate = true,
+                    SuggestedPackage = packageInfo,
+                    SupportResume = true,
+                    ConfirmedOffset = request.FileOffset < fileInfo.Length ? request.FileOffset : 0,
+                    TotalSize = fileInfo.Length
+                };
+            }
+
+            // 正常的更新检查流程
             if (!_appInfos.ContainsKey(request.AppId))
                 throw new ArgumentException($"应用 {request.AppId} 未注册");
 
@@ -370,7 +406,8 @@ namespace TaiChi.UpgradeKit.Server
             var response = new UpdateResponse
             {
                 HasUpdate = true,
-                LatestVersion = latestVersion
+                LatestVersion = latestVersion,
+                SupportResume = true
             };
 
             // 获取应用更新包列表
@@ -404,6 +441,12 @@ namespace TaiChi.UpgradeKit.Server
                 {
                     response.SuggestedPackage = incrementalPackage;
                     response.AvailablePackages.Add(incrementalPackage);
+                    
+                    // 设置增量包的总大小
+                    if (File.Exists(incrementalPackage.PackagePath))
+                    {
+                        response.TotalSize = new FileInfo(incrementalPackage.PackagePath).Length;
+                    }
                 }
             }
 
@@ -419,6 +462,12 @@ namespace TaiChi.UpgradeKit.Server
                 {
                     response.SuggestedPackage = fullPackage;
                     response.AvailablePackages.Add(fullPackage);
+                    
+                    // 设置完整包的总大小
+                    if (File.Exists(fullPackage.PackagePath))
+                    {
+                        response.TotalSize = new FileInfo(fullPackage.PackagePath).Length;
+                    }
                 }
             }
 
@@ -458,6 +507,90 @@ namespace TaiChi.UpgradeKit.Server
                 throw new ArgumentException($"应用 {appId} 未注册");
 
             return _appVersions[appId].ToList();
+        }
+
+        /// <summary>
+        /// 获取更新包数据流（支持断点续传）
+        /// </summary>
+        /// <param name="packageId">包ID</param>
+        /// <param name="startPosition">起始位置（字节）</param>
+        /// <param name="length">长度（字节，0表示到文件末尾）</param>
+        /// <returns>包含数据的内存流及相关信息</returns>
+        public (System.IO.Stream DataStream, long TotalSize, bool SupportsResume, long StartPosition) GetPackageDataStream(string packageId, long startPosition = 0, long length = 0)
+        {
+            if (string.IsNullOrWhiteSpace(packageId))
+                throw new ArgumentException("包ID不能为空", nameof(packageId));
+                
+            // 查找对应的更新包
+            UpdatePackageInfo packageInfo = null;
+            
+            foreach (var appId in _updatePackages.Keys)
+            {
+                packageInfo = _updatePackages[appId].FirstOrDefault(p => p.PackageId == packageId);
+                if (packageInfo != null)
+                    break;
+            }
+            
+            if (packageInfo == null)
+                throw new ArgumentException($"找不到ID为 {packageId} 的更新包");
+                
+            // 确认包文件存在
+            if (!File.Exists(packageInfo.PackagePath))
+                throw new FileNotFoundException($"更新包文件不存在: {packageInfo.PackagePath}");
+                
+            // 获取文件信息
+            var fileInfo = new FileInfo(packageInfo.PackagePath);
+            long fileSize = fileInfo.Length;
+            
+            // 检查起始位置是否有效
+            if (startPosition < 0)
+                startPosition = 0;
+                
+            if (startPosition > fileSize)
+                throw new ArgumentOutOfRangeException(nameof(startPosition), "起始位置超出文件大小");
+                
+            // 计算需要读取的长度
+            if (length <= 0 || startPosition + length > fileSize)
+                length = fileSize - startPosition;
+                
+            // 打开文件流
+            var fileStream = new FileStream(
+                packageInfo.PackagePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                4096,
+                true);
+                
+            // 如果需要，移动到指定位置
+            if (startPosition > 0)
+                fileStream.Seek(startPosition, SeekOrigin.Begin);
+                
+            // 创建内存流
+            var memoryStream = new MemoryStream();
+            
+            // 读取指定长度的数据
+            byte[] buffer = new byte[4096];
+            long bytesRemaining = length;
+            long bytesRead = 0;
+            int read;
+            
+            while (bytesRemaining > 0 && (read = fileStream.Read(buffer, 0, (int)Math.Min(buffer.Length, bytesRemaining))) > 0)
+            {
+                memoryStream.Write(buffer, 0, read);
+                bytesRemaining -= read;
+                bytesRead += read;
+            }
+            
+            // 重置内存流位置
+            memoryStream.Position = 0;
+            
+            // 关闭文件流
+            fileStream.Close();
+            
+            Console.WriteLine($"已读取更新包 {packageId} 的数据，起始位置: {startPosition}，长度: {bytesRead}，总大小: {fileSize}");
+            
+            return (memoryStream, fileSize, true, startPosition);
         }
     }
 }
