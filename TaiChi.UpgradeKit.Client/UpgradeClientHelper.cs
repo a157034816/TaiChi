@@ -6,6 +6,9 @@ using System.Text;
 using System.Diagnostics;
 using System.Threading;
 using System.Reflection;
+using System.Security.Principal;
+using System.Security.AccessControl;
+using System.Collections.Generic;
 
 namespace TaiChi.UpgradeKit.Client;
 
@@ -14,6 +17,85 @@ namespace TaiChi.UpgradeKit.Client;
 /// </summary>
 public class UpgradeClientHelper
 {
+    /// <summary>
+    /// 检查目录权限
+    /// </summary>
+    /// <param name="directory">要检查的目录</param>
+    /// <returns>权限检查结果，包含是否有权限和错误信息</returns>
+    public static (bool HasPermission, string ErrorMessage) CheckDirectoryPermission(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            return (false, "目录路径不能为空");
+
+        if (!Directory.Exists(directory))
+            return (false, $"目录不存在: {directory}");
+
+        try
+        {
+            // 创建临时文件测试写入权限
+            string testFile = Path.Combine(directory, $"permission_test_{Guid.NewGuid()}.tmp");
+            File.WriteAllText(testFile, "Test");
+            File.Delete(testFile);
+
+            // 创建临时目录测试创建目录权限
+            string testDir = Path.Combine(directory, $"permission_test_{Guid.NewGuid()}");
+            Directory.CreateDirectory(testDir);
+            Directory.Delete(testDir);
+
+            return (true, string.Empty);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return (false, $"权限不足: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            return (false, $"IO错误: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"未知错误: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 获取无法访问的文件列表
+    /// </summary>
+    /// <param name="directory">要检查的目录</param>
+    /// <returns>无法访问的文件列表</returns>
+    public static List<string> GetInaccessibleFiles(string directory)
+    {
+        List<string> inaccessibleFiles = new List<string>();
+        
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            return inaccessibleFiles;
+            
+        try
+        {
+            foreach (var file in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    // 尝试打开文件以测试访问权限
+                    using (var fs = File.Open(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    {
+                        // 如果能打开文件，则有访问权限
+                    }
+                }
+                catch (Exception)
+                {
+                    inaccessibleFiles.Add(file);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // 如果遍历目录时出错，忽略错误
+        }
+        
+        return inaccessibleFiles;
+    }
+
     /// <summary>
     /// 备份应用
     /// </summary>
@@ -29,6 +111,15 @@ public class UpgradeClientHelper
 
         if (!Directory.Exists(sourceDirectory))
             throw new DirectoryNotFoundException($"源目录不存在: {sourceDirectory}");
+
+        // 检查权限
+        var (hasPermission, errorMessage) = CheckDirectoryPermission(sourceDirectory);
+        if (!hasPermission)
+            throw new UnauthorizedAccessException($"备份应用失败，源目录权限不足: {errorMessage}");
+            
+        var (hasBackupPermission, backupErrorMessage) = CheckDirectoryPermission(Path.GetDirectoryName(backupDirectory));
+        if (!hasBackupPermission)
+            throw new UnauthorizedAccessException($"备份应用失败，备份目录权限不足: {backupErrorMessage}");
 
         // 确保备份目录存在
         Directory.CreateDirectory(backupDirectory);
@@ -49,7 +140,15 @@ public class UpgradeClientHelper
             if (filePath.Contains("\\Backups\\") || filePath.Contains("\\Downloads\\"))
                 continue;
 
-            File.Copy(filePath, filePath.Replace(sourceDirectory, backupDirectory), true);
+            try
+            {
+                File.Copy(filePath, filePath.Replace(sourceDirectory, backupDirectory), true);
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"警告: 无法复制文件 {filePath}: {ex.Message}");
+                // 不终止整个备份过程，继续尝试其他文件
+            }
         }
 
         Console.WriteLine($"已备份应用到: {backupDirectory}");
@@ -73,6 +172,23 @@ public class UpgradeClientHelper
 
         if (!Directory.Exists(targetDirectory))
             throw new DirectoryNotFoundException($"目标目录不存在: {targetDirectory}");
+            
+        // 检查权限
+        var (hasPermission, errorMessage) = CheckDirectoryPermission(targetDirectory);
+        if (!hasPermission)
+            throw new UnauthorizedAccessException($"应用更新失败，目标目录权限不足: {errorMessage}");
+            
+        // 检查是否有被锁定的文件
+        var inaccessibleFiles = GetInaccessibleFiles(targetDirectory);
+        if (inaccessibleFiles.Count > 0)
+        {
+            var message = $"发现{inaccessibleFiles.Count}个正在使用的文件，无法更新。请关闭相关程序后重试。";
+            if (inaccessibleFiles.Count <= 5)
+            {
+                message += $"\n被锁定的文件: {string.Join("\n", inaccessibleFiles)}";
+            }
+            throw new IOException(message);
+        }
 
         // 创建临时解压目录
         string tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -93,12 +209,26 @@ public class UpgradeClientHelper
                 if (Array.IndexOf(excludeDirs, dirName) >= 0)
                     continue;
 
-                Directory.Delete(dirPath, true);
+                try
+                {
+                    Directory.Delete(dirPath, true);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"警告: 无法删除目录 {dirPath}: {ex.Message}");
+                }
             }
 
             foreach (var filePath in Directory.GetFiles(targetDirectory))
             {
-                File.Delete(filePath);
+                try
+                {
+                    File.Delete(filePath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"警告: 无法删除文件 {filePath}: {ex.Message}");
+                }
             }
 
             // 复制更新内容到目标目录
@@ -109,7 +239,14 @@ public class UpgradeClientHelper
 
             foreach (var filePath in Directory.GetFiles(tempDirectory, "*", SearchOption.AllDirectories))
             {
-                File.Copy(filePath, filePath.Replace(tempDirectory, targetDirectory), true);
+                try
+                {
+                    File.Copy(filePath, filePath.Replace(tempDirectory, targetDirectory), true);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"警告: 无法复制文件 {filePath}: {ex.Message}");
+                }
             }
 
             Console.WriteLine("已成功应用完整更新");
@@ -140,6 +277,23 @@ public class UpgradeClientHelper
 
         if (!Directory.Exists(targetDirectory))
             throw new DirectoryNotFoundException($"目标目录不存在: {targetDirectory}");
+            
+        // 检查权限
+        var (hasPermission, errorMessage) = CheckDirectoryPermission(targetDirectory);
+        if (!hasPermission)
+            throw new UnauthorizedAccessException($"应用增量更新失败，目标目录权限不足: {errorMessage}");
+            
+        // 检查是否有被锁定的文件
+        var inaccessibleFiles = GetInaccessibleFiles(targetDirectory);
+        if (inaccessibleFiles.Count > 0)
+        {
+            var message = $"发现{inaccessibleFiles.Count}个正在使用的文件，无法更新。请关闭相关程序后重试。";
+            if (inaccessibleFiles.Count <= 5)
+            {
+                message += $"\n被锁定的文件: {string.Join("\n", inaccessibleFiles)}";
+            }
+            throw new IOException(message);
+        }
 
         // 创建临时解压目录
         string tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

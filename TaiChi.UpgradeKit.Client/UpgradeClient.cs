@@ -232,39 +232,218 @@ namespace TaiChi.UpgradeKit.Client
             {
                 Console.WriteLine($"开始应用更新，类型: {packageInfo.PackageType}");
 
+                // 在更新前检查应用目录的权限
+                var (hasPermission, errorMessage) = UpgradeClientHelper.CheckDirectoryPermission(_appDirectory);
+                if (!hasPermission)
+                {
+                    Console.WriteLine($"更新失败: {errorMessage}");
+                    Console.WriteLine("请确保应用程序有足够的权限访问应用目录，或尝试以管理员身份运行。");
+                    return false;
+                }
+
+                // 检查是否有被锁定的文件
+                var inaccessibleFiles = UpgradeClientHelper.GetInaccessibleFiles(_appDirectory);
+                if (inaccessibleFiles.Count > 0)
+                {
+                    Console.WriteLine($"更新失败: 发现{inaccessibleFiles.Count}个正在使用的文件，无法更新。");
+                    Console.WriteLine("请关闭所有可能使用这些文件的程序后重试。");
+                    
+                    // 如果锁定的文件不多，列出它们
+                    if (inaccessibleFiles.Count <= 5)
+                    {
+                        Console.WriteLine("被锁定的文件:");
+                        foreach (var file in inaccessibleFiles)
+                        {
+                            Console.WriteLine($"- {file}");
+                        }
+                    }
+                    
+                    return false;
+                }
+
                 // 创建备份目录
                 string backupDirName = $"Backup_{DateTime.Now:yyyyMMdd_HHmmss}";
                 string backupDir = Path.Combine(_backupDirectory, backupDirName);
-                Directory.CreateDirectory(backupDir);
+                
+                try
+                {
+                    Directory.CreateDirectory(backupDir);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"创建备份目录失败: {ex.Message}");
+                    Console.WriteLine("请确保应用程序有足够的权限创建备份目录，或清理备份目录腾出空间。");
+                    return false;
+                }
 
                 // 备份当前应用
-                await Task.Run(() => UpgradeClientHelper.BackupApplication(_appDirectory, backupDir));
+                try
+                {
+                    await Task.Run(() => UpgradeClientHelper.BackupApplication(_appDirectory, backupDir));
+                    Console.WriteLine($"已成功备份应用到: {backupDir}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Console.WriteLine($"备份应用失败，权限不足: {ex.Message}");
+                    Console.WriteLine("请确保应用程序有足够的权限访问和写入备份目录，或尝试以管理员身份运行。");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"备份应用失败: {ex.Message}");
+                    // 备份失败不一定要终止更新，但应告知用户风险
+                    Console.WriteLine("警告: 备份失败但将继续更新。如果更新出现问题，可能无法恢复到之前版本。");
+                }
 
                 // 根据包类型应用更新
-                if (packageInfo.PackageType == UpdatePackageType.Full)
+                try
                 {
-                    // 应用完整更新
-                    await Task.Run(() => UpgradeClientHelper.ApplyFullUpdate(packagePath, _appDirectory));
-                }
-                else if (packageInfo.PackageType == UpdatePackageType.Incremental)
-                {
-                    // 应用增量更新
-                    await Task.Run(() => UpgradeClientHelper.ApplyIncrementalUpdate(packagePath, _appDirectory));
-                }
-                else
-                {
-                    throw new InvalidOperationException($"不支持的更新包类型: {packageInfo.PackageType}");
-                }
+                    if (packageInfo.PackageType == UpdatePackageType.Full)
+                    {
+                        // 应用完整更新
+                        await Task.Run(() => UpgradeClientHelper.ApplyFullUpdate(packagePath, _appDirectory));
+                    }
+                    else if (packageInfo.PackageType == UpdatePackageType.Incremental)
+                    {
+                        // 应用增量更新
+                        await Task.Run(() => UpgradeClientHelper.ApplyIncrementalUpdate(packagePath, _appDirectory));
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"不支持的更新包类型: {packageInfo.PackageType}");
+                    }
 
-                Console.WriteLine("更新应用成功");
-                return true;
+                    Console.WriteLine("更新应用成功");
+                    return true;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Console.WriteLine($"应用更新失败，权限不足: {ex.Message}");
+                    Console.WriteLine("请确保应用程序有足够的权限访问和修改应用目录，或尝试以管理员身份运行。");
+                    
+                    // 尝试从备份恢复
+                    Console.WriteLine("正在尝试从备份恢复...");
+                    await TryRestoreFromBackupAsync(backupDir);
+                    
+                    return false;
+                }
+                catch (IOException ex)
+                {
+                    Console.WriteLine($"应用更新失败，IO错误: {ex.Message}");
+                    Console.WriteLine("可能是因为某些文件被占用或磁盘空间不足。请关闭可能使用这些文件的程序后重试。");
+                    
+                    // 尝试从备份恢复
+                    Console.WriteLine("正在尝试从备份恢复...");
+                    await TryRestoreFromBackupAsync(backupDir);
+                    
+                    return false;
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"应用更新失败: {ex.Message}");
-
                 // TODO: 实现回滚机制
 
+                // 如果有更详细的嵌套异常，显示它
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"详细错误: {ex.InnerException.Message}");
+                }
+                
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// 尝试从备份恢复
+        /// </summary>
+        /// <param name="backupDir">备份目录</param>
+        /// <returns>是否恢复成功</returns>
+        private async Task<bool> TryRestoreFromBackupAsync(string backupDir)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(backupDir) || !Directory.Exists(backupDir))
+                {
+                    Console.WriteLine("恢复失败: 备份目录不存在");
+                    return false;
+                }
+                
+                // 检查权限
+                var (hasPermission, errorMessage) = UpgradeClientHelper.CheckDirectoryPermission(_appDirectory);
+                if (!hasPermission)
+                {
+                    Console.WriteLine($"恢复失败: {errorMessage}");
+                    return false;
+                }
+                
+                await Task.Run(() => 
+                {
+                    // 排除的目录
+                    var excludeDirs = new[] { "Backups", "Downloads" };
+                    
+                    // 清理目标目录（保留备份和下载目录）
+                    foreach (var dirPath in Directory.GetDirectories(_appDirectory))
+                    {
+                        var dirName = new DirectoryInfo(dirPath).Name;
+                        if (Array.IndexOf(excludeDirs, dirName) >= 0)
+                            continue;
+                            
+                        try
+                        {
+                            Directory.Delete(dirPath, true);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"警告: 无法删除目录 {dirPath}: {ex.Message}");
+                        }
+                    }
+                    
+                    foreach (var filePath in Directory.GetFiles(_appDirectory))
+                    {
+                        try
+                        {
+                            File.Delete(filePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"警告: 无法删除文件 {filePath}: {ex.Message}");
+                        }
+                    }
+                    
+                    // 从备份恢复
+                    foreach (var dirPath in Directory.GetDirectories(backupDir, "*", SearchOption.AllDirectories))
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(dirPath.Replace(backupDir, _appDirectory));
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"警告: 无法创建目录 {dirPath}: {ex.Message}");
+                        }
+                    }
+                    
+                    foreach (var filePath in Directory.GetFiles(backupDir, "*", SearchOption.AllDirectories))
+                    {
+                        try
+                        {
+                            File.Copy(filePath, filePath.Replace(backupDir, _appDirectory), true);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"警告: 无法复制文件 {filePath}: {ex.Message}");
+                        }
+                    }
+                });
+                
+                Console.WriteLine("已从备份恢复应用");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"恢复失败: {ex.Message}");
+                Console.WriteLine("请手动从备份目录恢复应用。");
                 return false;
             }
         }
