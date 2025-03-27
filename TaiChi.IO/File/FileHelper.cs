@@ -48,6 +48,40 @@ namespace TaiChi.IO.File
         }
 
         /// <summary>
+        /// 读取文件内容为二进制数据
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <returns>文件内容字节数组</returns>
+        /// <exception cref="ArgumentNullException">文件路径为空</exception>
+        /// <exception cref="FileNotFoundException">文件不存在</exception>
+        /// <exception cref="IOException">读取文件失败</exception>
+        public static byte[] ReadFileBytes(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+            
+            if (!System.IO.File.Exists(filePath))
+            {
+                throw new FileNotFoundException("文件不存在", filePath);
+            }
+
+            try
+            {
+                return System.IO.File.ReadAllBytes(filePath);
+            }
+            catch (Exception ex)
+            {
+                if (ex is FileNotFoundException)
+                {
+                    throw;
+                }
+                throw new IOException($"读取文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// 异步读取文件内容
         /// </summary>
         /// <param name="filePath">文件路径</param>
@@ -76,6 +110,40 @@ namespace TaiChi.IO.File
                 {
                     return await sr.ReadToEndAsync();
                 }
+            }
+            catch (Exception ex)
+            {
+                if (ex is FileNotFoundException)
+                {
+                    throw;
+                }
+                throw new IOException($"读取文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 异步读取文件内容为二进制数据
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <returns>文件内容字节数组</returns>
+        /// <exception cref="ArgumentNullException">文件路径为空</exception>
+        /// <exception cref="FileNotFoundException">文件不存在</exception>
+        /// <exception cref="IOException">读取文件失败</exception>
+        public static async Task<byte[]> ReadFileBytesAsync(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+            
+            if (!System.IO.File.Exists(filePath))
+            {
+                throw new FileNotFoundException("文件不存在", filePath);
+            }
+
+            try
+            {
+                return await System.IO.File.ReadAllBytesAsync(filePath);
             }
             catch (Exception ex)
             {
