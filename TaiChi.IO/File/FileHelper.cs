@@ -126,6 +126,46 @@ namespace TaiChi.IO.File
         }
 
         /// <summary>
+        /// 写入二进制数据到文件
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <param name="data">要写入的二进制数据</param>
+        /// <param name="append">是否追加内容，默认为覆盖</param>
+        /// <exception cref="ArgumentNullException">文件路径为空或数据为null</exception>
+        /// <exception cref="IOException">写入文件失败</exception>
+        public static void WriteFile(string filePath, byte[] data, bool append = false)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data), "数据不能为null");
+            }
+
+            try
+            {
+                // 确保目录存在
+                string directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (FileStream fs = new FileStream(filePath, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                {
+                    fs.Write(data, 0, data.Length);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"写入文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// 异步写入文件内容
         /// </summary>
         /// <param name="filePath">文件路径</param>
@@ -155,6 +195,46 @@ namespace TaiChi.IO.File
                 using (StreamWriter sw = new StreamWriter(filePath, append, encoding))
                 {
                     await sw.WriteAsync(content ?? string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"写入文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 异步写入二进制数据到文件
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <param name="data">要写入的二进制数据</param>
+        /// <param name="append">是否追加内容，默认为覆盖</param>
+        /// <exception cref="ArgumentNullException">文件路径为空或数据为null</exception>
+        /// <exception cref="IOException">写入文件失败</exception>
+        public static async Task WriteFileAsync(string filePath, byte[] data, bool append = false)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data), "数据不能为null");
+            }
+
+            try
+            {
+                // 确保目录存在
+                string directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (FileStream fs = new FileStream(filePath, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                {
+                    await fs.WriteAsync(data, 0, data.Length);
                 }
             }
             catch (Exception ex)
