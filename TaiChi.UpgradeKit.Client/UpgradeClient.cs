@@ -56,7 +56,7 @@ namespace TaiChi.UpgradeKit.Client
         /// <summary>
         /// 启动升级客户端
         /// </summary>
-        public void Start()
+        public virtual void Start()
         {
             Console.WriteLine($"UpgradeClient 已启动，应用ID: {_appId}，当前版本: {_currentVersion}");
         }
@@ -77,22 +77,31 @@ namespace TaiChi.UpgradeKit.Client
 
                 Console.WriteLine($"检查应用 {_appId} 的更新，当前版本: {_currentVersion}");
 
-                // TODO: 实际项目中应该使用HTTP请求调用服务端API
-                // 这里示例使用直接调用的方式
-
-                // 模拟HTTP请求
-                // HttpResponseMessage response = await _httpClient.PostAsJsonAsync("api/upgrade/checkUpdate", request);
-                // response.EnsureSuccessStatusCode();
-                // UpdateResponse updateResponse = await response.Content.ReadFromJsonAsync<UpdateResponse>();
-
-                // 临时返回空响应
-                return new UpdateResponse { HasUpdate = false };
+                return await SendCheckUpdateRequestAsync(request);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"检查更新失败: {ex.Message}");
                 return new UpdateResponse { HasUpdate = false };
             }
+        }
+
+        /// <summary>
+        /// 发送检查更新请求
+        /// </summary>
+        /// <param name="request">更新请求</param>
+        /// <returns>更新响应</returns>
+        protected virtual async Task<UpdateResponse> SendCheckUpdateRequestAsync(UpdateRequest request)
+        {
+            // 默认实现，子类可以重写以提供自定义的API调用
+            // 示例实现（实际项目中应根据需求修改）
+            // HttpResponseMessage response = await _httpClient.PostAsJsonAsync("api/upgrade/checkUpdate", request);
+            // response.EnsureSuccessStatusCode();
+            // UpdateResponse updateResponse = await response.Content.ReadFromJsonAsync<UpdateResponse>();
+            
+            // 临时返回空响应，子类需要重写此方法提供实际实现
+            throw new NotImplementedException("警告：使用了默认的SendCheckUpdateRequestAsync实现，应在子类中重写此方法提供实际实现");
+            // return new UpdateResponse { HasUpdate = false };
         }
 
         /// <summary>
@@ -126,9 +135,6 @@ namespace TaiChi.UpgradeKit.Client
 
                 Console.WriteLine($"开始下载更新包: {packageInfo.PackagePath}，断点续传位置: {existingFileSize} 字节");
 
-                // TODO: 实际项目中应该使用HTTP请求下载文件
-                // 这里示例使用直接调用的方式，增加了断点续传支持
-                
                 // 构建断点续传请求
                 var request = new UpdateRequest
                 {
@@ -138,72 +144,9 @@ namespace TaiChi.UpgradeKit.Client
                     PackageId = packageInfo.PackageId
                 };
                 
-                /* 实际HTTP实现示例:
-                // 添加断点续传头
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Get, 
-                    $"api/upgrade/downloadPackage/{packageInfo.PackageId}");
+                // 调用实际的下载方法，子类可重写
+                await DownloadPackageFileAsync(request, packageInfo, downloadFilePath, existingFileSize, progressCallback);
                 
-                if (existingFileSize > 0)
-                {
-                    httpRequest.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingFileSize, null);
-                }
-                
-                using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
-                
-                // 检查是否支持断点续传
-                bool supportsResume = response.StatusCode == System.Net.HttpStatusCode.PartialContent;
-                
-                // 获取文件总大小
-                long totalSize = packageInfo.PackageSize;
-                if (response.Content.Headers.ContentRange != null)
-                {
-                    totalSize = response.Content.Headers.ContentRange.Length ?? packageInfo.PackageSize;
-                }
-                
-                response.EnsureSuccessStatusCode();
-                
-                // 打开文件流，如果是断点续传则追加写入
-                using var fileStream = new FileStream(
-                    downloadFilePath, 
-                    fileMode, 
-                    FileAccess.Write, 
-                    FileShare.None, 
-                    4096, 
-                    true);
-                
-                if (existingFileSize > 0 && supportsResume)
-                {
-                    fileStream.Seek(existingFileSize, SeekOrigin.Begin);
-                }
-                else
-                {
-                    // 如果服务器不支持断点续传，则从头开始下载
-                    fileStream.SetLength(0);
-                }
-                
-                // 下载数据
-                await using var contentStream = await response.Content.ReadAsStreamAsync();
-                byte[] buffer = new byte[8192];
-                long totalBytesRead = existingFileSize;
-                int bytesRead;
-                
-                while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer, 0, bytesRead);
-                    totalBytesRead += bytesRead;
-                    progressCallback?.Invoke(totalBytesRead, totalSize);
-                }
-                */
-
-                // 校验文件完整性
-                /* 实际实现:
-                string checksum = UpgradeClientHelper.CalculateChecksum(downloadFilePath);
-                if (!string.Equals(checksum, packageInfo.Checksum, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException($"文件校验失败，校验和不匹配。期望: {packageInfo.Checksum}, 实际: {checksum}");
-                }
-                */
-
                 Console.WriteLine($"更新包下载完成: {downloadFilePath}");
                 return downloadFilePath;
             }
@@ -212,6 +155,82 @@ namespace TaiChi.UpgradeKit.Client
                 Console.WriteLine($"下载更新包失败: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 下载更新包文件的具体实现
+        /// </summary>
+        /// <param name="request">更新请求</param>
+        /// <param name="packageInfo">更新包信息</param>
+        /// <param name="downloadFilePath">下载文件保存路径</param>
+        /// <param name="existingFileSize">已存在文件的大小</param>
+        /// <param name="progressCallback">进度回调函数</param>
+        /// <returns>异步任务</returns>
+        protected virtual async Task DownloadPackageFileAsync(
+            UpdateRequest request, 
+            UpdatePackageInfo packageInfo, 
+            string downloadFilePath, 
+            long existingFileSize,
+            Action<long, long> progressCallback)
+        {
+            // 默认实现，子类可以重写以提供自定义的下载逻辑
+            /* 实际HTTP实现示例:
+            // 添加断点续传头
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Get, 
+                $"api/upgrade/downloadPackage/{packageInfo.PackageId}");
+            
+            if (existingFileSize > 0)
+            {
+                httpRequest.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingFileSize, null);
+            }
+            
+            using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            
+            // 检查是否支持断点续传
+            bool supportsResume = response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+            
+            // 获取文件总大小
+            long totalSize = packageInfo.PackageSize;
+            if (response.Content.Headers.ContentRange != null)
+            {
+                totalSize = response.Content.Headers.ContentRange.Length ?? packageInfo.PackageSize;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            // 打开文件流，如果是断点续传则追加写入
+            using var fileStream = new FileStream(
+                downloadFilePath, 
+                existingFileSize > 0 && supportsResume ? FileMode.Append : FileMode.Create, 
+                FileAccess.Write, 
+                FileShare.None, 
+                4096, 
+                true);
+            
+            // 下载数据
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
+            byte[] buffer = new byte[8192];
+            long totalBytesRead = existingFileSize;
+            int bytesRead;
+            
+            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await fileStream.WriteAsync(buffer, 0, bytesRead);
+                totalBytesRead += bytesRead;
+                progressCallback?.Invoke(totalBytesRead, totalSize);
+            }
+            */
+            
+            throw new NotImplementedException("警告：使用了默认的DownloadPackageFileAsync实现，应在子类中重写此方法提供实际实现");
+            
+            // 校验文件完整性
+            /* 实际实现:
+            string checksum = UpgradeClientHelper.CalculateChecksum(downloadFilePath);
+            if (!string.Equals(checksum, packageInfo.Checksum, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"文件校验失败，校验和不匹配。期望: {packageInfo.Checksum}, 实际: {checksum}");
+            }
+            */
         }
 
         /// <summary>
@@ -517,5 +536,40 @@ namespace TaiChi.UpgradeKit.Client
                 return false;
             }
         }
+
+        /// <summary>
+        /// 获取应用ID
+        /// </summary>
+        protected string AppId => _appId;
+
+        /// <summary>
+        /// 获取应用目录
+        /// </summary>
+        protected string AppDirectory => _appDirectory;
+
+        /// <summary>
+        /// 获取升级服务器URL
+        /// </summary>
+        protected string UpgradeServerUrl => _upgradeServerUrl;
+
+        /// <summary>
+        /// 获取HttpClient实例
+        /// </summary>
+        protected HttpClient HttpClient => _httpClient;
+
+        /// <summary>
+        /// 获取当前版本
+        /// </summary>
+        protected Version CurrentVersion => _currentVersion;
+
+        /// <summary>
+        /// 获取下载目录
+        /// </summary>
+        protected string DownloadDirectory => _downloadDirectory;
+
+        /// <summary>
+        /// 获取备份目录
+        /// </summary>
+        protected string BackupDirectory => _backupDirectory;
     }
 }
