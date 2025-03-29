@@ -217,6 +217,15 @@ public class ExcelConverter
         }
     }
 
+    /// <summary>
+    /// 创建Excel工作簿对象
+    /// </summary>
+    /// <param name="stream">Excel文件流</param>
+    /// <param name="fileExtension">文件扩展名(.xls或.xlsx)</param>
+    /// <returns>创建的工作簿对象</returns>
+    /// <exception cref="ArgumentNullException">流或扩展名为空时抛出</exception>
+    /// <exception cref="ArgumentException">扩展名格式错误时抛出</exception>
+    /// <exception cref="InvalidOperationException">创建工作簿对象失败时抛出</exception>
     private IWorkbook CreateWorkbook(Stream stream, string fileExtension)
     {
         if (stream == null)
@@ -241,6 +250,15 @@ public class ExcelConverter
         }
     }
 
+    /// <summary>
+    /// 获取指定名称的工作表，如果名称为空则获取第一个工作表
+    /// </summary>
+    /// <param name="workbook">Excel工作簿对象</param>
+    /// <param name="sheetName">工作表名称，为空则获取第一个工作表</param>
+    /// <returns>获取到的工作表对象</returns>
+    /// <exception cref="ArgumentNullException">工作簿对象为空时抛出</exception>
+    /// <exception cref="InvalidOperationException">工作簿不包含任何工作表或获取工作表失败时抛出</exception>
+    /// <exception cref="ArgumentException">找不到指定名称的工作表时抛出</exception>
     private ISheet GetSheet(IWorkbook workbook, string? sheetName)
     {
         if (workbook == null)
@@ -273,6 +291,20 @@ public class ExcelConverter
         }
     }
 
+    /// <summary>
+    /// 处理Excel工作表并转换为DataTable
+    /// </summary>
+    /// <param name="sheet">要处理的工作表</param>
+    /// <param name="headerRowIndex">表头行索引，从0开始</param>
+    /// <param name="startColumnIndex">起始列索引，从0开始</param>
+    /// <returns>转换后的DataTable对象</returns>
+    /// <exception cref="ArgumentNullException">工作表对象为空时抛出</exception>
+    /// <exception cref="ArgumentException">表头行索引或起始列索引无效时抛出</exception>
+    /// <exception cref="InvalidOperationException">处理工作表数据失败时抛出</exception>
+    /// <remarks>
+    /// 该方法会读取工作表中的数据，将表头行转换为DataTable的列，并将数据行转换为DataTable的行。
+    /// 如果设置了字段转换器，会应用自定义的列名和数据类型转换规则。
+    /// </remarks>
     private DataTable ProcessSheet(
         ISheet sheet, 
         int headerRowIndex, 
@@ -436,7 +468,20 @@ public class ExcelConverter
     /// </summary>
     /// <param name="value">要转换的值</param>
     /// <param name="targetType">目标数据类型</param>
-    /// <returns>转换后的值</returns>
+    /// <returns>转换后的值，如果转换失败则返回该类型的默认值或DBNull</returns>
+    /// <remarks>
+    /// 该方法支持常见类型之间的转换，包括:
+    /// - 字符串 (string)
+    /// - 整数 (int/int?)
+    /// - 长整数 (long/long?)
+    /// - 浮点数 (double/double?)
+    /// - 十进制数 (decimal/decimal?)
+    /// - 日期时间 (DateTime/DateTime?)
+    /// - 布尔值 (bool/bool?)
+    /// 
+    /// 对于布尔值，字符串"true"、"yes"、"1"、"是"、"真"都会被转换为true。
+    /// 如果转换失败，对于值类型会返回该类型的默认值，对于引用类型会返回null或DBNull。
+    /// </remarks>
     private object ConvertValueToTargetType(object value, Type targetType)
     {
         if (value == null || value == DBNull.Value)
@@ -533,6 +578,16 @@ public class ExcelConverter
         }
     }
 
+    /// <summary>
+    /// 确保DataTable列名的唯一性
+    /// </summary>
+    /// <param name="dataTable">DataTable对象</param>
+    /// <param name="columnName">要检查的列名</param>
+    /// <returns>确保唯一性后的列名</returns>
+    /// <remarks>
+    /// 如果指定的列名已经存在于DataTable中，则会在列名后添加递增的数字后缀，
+    /// 例如：已存在"Column"，则返回"Column_1"，如果"Column_1"也存在，则返回"Column_2"，以此类推。
+    /// </remarks>
     private string EnsureUniqueColumnName(DataTable dataTable, string columnName)
     {
         string uniqueName = columnName;
@@ -546,6 +601,21 @@ public class ExcelConverter
         return uniqueName;
     }
 
+    /// <summary>
+    /// 获取Excel单元格的值并转换为对应的.NET类型
+    /// </summary>
+    /// <param name="cell">Excel单元格对象</param>
+    /// <returns>转换后的单元格值，如果单元格为空或转换失败则返回DBNull</returns>
+    /// <remarks>
+    /// 根据单元格的类型进行对应的值提取：
+    /// - 数值类型：返回数值或日期（如果是日期格式）
+    /// - 字符串类型：返回字符串值
+    /// - 布尔类型：返回布尔值
+    /// - 公式类型：尝试获取公式计算结果，如果失败则尝试返回公式字符串
+    /// - 空白或错误类型：返回DBNull
+    /// 
+    /// 该方法会捕获并处理单元格值获取过程中可能出现的异常，确保不会因单个单元格的问题影响整体处理。
+    /// </remarks>
     private object GetCellValue(ICell cell)
     {
         if (cell == null)
@@ -904,6 +974,16 @@ public class ExcelConverter
     /// <summary>
     /// 清理工作表名称，确保符合Excel工作表命名规则
     /// </summary>
+    /// <param name="sheetName">原始工作表名称</param>
+    /// <returns>处理后符合Excel命名规则的工作表名称</returns>
+    /// <remarks>
+    /// Excel工作表命名限制：
+    /// 1. 长度不能超过31个字符
+    /// 2. 不能包含以下特殊字符: [ ] / \ ? * :
+    /// 
+    /// 该方法会将不符合规则的字符替换为下划线，并截断超长的名称。
+    /// 如果输入为空字符串，则返回默认名称"Sheet1"。
+    /// </remarks>
     private string SanitizeSheetName(string sheetName)
     {
         // Excel工作表名称限制：
@@ -935,9 +1015,19 @@ public class ExcelConverter
     /// 将DataTable数据写入工作簿中的指定工作表
     /// </summary>
     /// <param name="dataTable">要转换的数据表</param>
-    /// <param name="workbook">工作簿</param>
-    /// <param name="sheet">工作表</param>
-    /// <exception cref="ArgumentNullException">参数为空时抛出</exception>
+    /// <param name="workbook">目标工作簿</param>
+    /// <param name="sheet">目标工作表</param>
+    /// <exception cref="ArgumentNullException">任一参数为空时抛出</exception>
+    /// <exception cref="InvalidOperationException">转换过程中出错时抛出</exception>
+    /// <remarks>
+    /// 该方法执行以下操作：
+    /// 1. 创建表头行，并应用粗体样式
+    /// 2. 如果存在字段转换器，应用列名的自定义转换规则
+    /// 3. 逐行写入数据内容
+    /// 4. 自动调整列宽以适应内容，并设置最大列宽限制
+    /// 
+    /// 该方法会捕获并处理列宽调整过程中可能出现的异常，确保整体转换过程不受影响。
+    /// </remarks>
     private void ConvertDataTableToWorkbook(DataTable dataTable, IWorkbook workbook, ISheet sheet)
     {
         if (dataTable == null)
@@ -1041,8 +1131,20 @@ public class ExcelConverter
     }
     
     /// <summary>
-    /// 根据值的类型设置单元格的值
+    /// 根据值的类型设置Excel单元格的值
     /// </summary>
+    /// <param name="cell">要设置的Excel单元格</param>
+    /// <param name="value">待设置的值</param>
+    /// <remarks>
+    /// 该方法根据值的类型选择合适的单元格赋值方法:
+    /// - 字符串类型：直接设置字符串值
+    /// - 日期时间类型：设置日期值并应用"yyyy-MM-dd"格式
+    /// - 布尔类型：设置布尔值
+    /// - 数值类型（double、decimal、float、int、long）：设置对应的数值
+    /// - 其他类型：尝试转换为字符串后设置
+    /// 
+    /// 如果值为null或DBNull，则设置为空字符串。
+    /// </remarks>
     private void SetCellValue(ICell cell, object value)
     {
         if (value == null || value == DBNull.Value)
