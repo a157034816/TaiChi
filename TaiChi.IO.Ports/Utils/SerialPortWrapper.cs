@@ -18,6 +18,8 @@ namespace TaiChi.IO.Ports.Utils
         private const int MaxReconnectAttempts = 3;
         private int _readTimeout = 1000;
         private int _writeTimeout = 1000;
+        private Timer? _connectionCheckTimer;
+        private const int ConnectionCheckInterval = 1000; // 心跳检测间隔（毫秒）
 
         /// <summary>
         /// 串口接收数据事件
@@ -28,6 +30,11 @@ namespace TaiChi.IO.Ports.Utils
         /// 串口错误事件
         /// </summary>
         public event EventHandler<PortErrorEventArgs>? ErrorOccurred;
+
+        /// <summary>
+        /// 串口连接状态变化事件
+        /// </summary>
+        public event EventHandler<PortStatusEventArgs>? StatusChanged;
 
         /// <summary>
         /// 获取串口是否已打开
@@ -112,6 +119,16 @@ namespace TaiChi.IO.Ports.Utils
         public string? LastError { get; private set; }
 
         /// <summary>
+        /// 获取当前串口状态
+        /// </summary>
+        public PortStatus Status { get; private set; } = PortStatus.Closed;
+
+        /// <summary>
+        /// 获取上一次的串口状态
+        /// </summary>
+        public PortStatus OldStatus { get; private set; } = PortStatus.Closed;
+
+        /// <summary>
         /// 构造函数
         /// </summary>
         public SerialPortWrapper()
@@ -133,11 +150,15 @@ namespace TaiChi.IO.Ports.Utils
             {
                 try
                 {
+                    // 更新状态
+                    UpdateStatus(PortStatus.Connecting);
+
                     // 参数验证
                     if (string.IsNullOrEmpty(portName))
                     {
                         LastError = "串口名称不能为空";
                         OnErrorOccurred(new PortErrorEventArgs(LastError));
+                        UpdateStatus(PortStatus.Closed);
                         return false;
                     }
 
@@ -148,6 +169,7 @@ namespace TaiChi.IO.Ports.Utils
                     {
                         LastError = $"串口 {portName} 不存在";
                         OnErrorOccurred(new PortErrorEventArgs(LastError));
+                        UpdateStatus(PortStatus.Closed);
                         return false;
                     }
 
@@ -163,8 +185,8 @@ namespace TaiChi.IO.Ports.Utils
                         Parity = parity,
                         ReadTimeout = _readTimeout,
                         WriteTimeout = _writeTimeout,
-                        DtrEnable = true,  // 启用DTR控制信号
-                        RtsEnable = true   // 启用RTS控制信号
+                        DtrEnable = true, // 启用DTR控制信号
+                        RtsEnable = true // 启用RTS控制信号
                     };
 
                     // 注册数据接收事件
@@ -174,24 +196,37 @@ namespace TaiChi.IO.Ports.Utils
                     // 打开串口
                     _serialPort.Open();
                     _reconnectAttempts = 0;
+
+                    // 更新状态为已连接
+                    UpdateStatus(PortStatus.Connected);
+
+                    // 注册到全局管理器
+                    SerialPortManager.RegisterPort(this);
+                    
+                    // 启动连接状态检测定时器
+                    StartConnectionCheck();
+
                     return true;
                 }
                 catch (UnauthorizedAccessException)
                 {
                     LastError = $"串口 {portName} 访问被拒绝，可能被其他程序占用";
                     OnErrorOccurred(new PortErrorEventArgs(LastError));
+                    UpdateStatus(PortStatus.Error);
                     return false;
                 }
                 catch (ArgumentException ex)
                 {
                     LastError = $"串口参数无效: {ex.Message}";
                     OnErrorOccurred(new PortErrorEventArgs(ex));
+                    UpdateStatus(PortStatus.Error);
                     return false;
                 }
                 catch (Exception ex)
                 {
                     LastError = $"打开串口失败: {ex.Message}";
                     OnErrorOccurred(new PortErrorEventArgs(ex));
+                    UpdateStatus(PortStatus.Error);
                     return false;
                 }
             }
@@ -204,10 +239,15 @@ namespace TaiChi.IO.Ports.Utils
         {
             lock (_lockObject)
             {
+                // 停止连接检测定时器
+                StopConnectionCheck();
+                
                 if (_serialPort != null)
                 {
                     try
                     {
+                        UpdateStatus(PortStatus.Closing);
+
                         if (_serialPort.IsOpen)
                         {
                             _serialPort.DiscardInBuffer();
@@ -216,13 +256,23 @@ namespace TaiChi.IO.Ports.Utils
                             _serialPort.ErrorReceived -= SerialPort_ErrorReceived;
                             _serialPort.Close();
                         }
+
+                        // 从全局管理器中注销
+                        if (!string.IsNullOrEmpty(_serialPort.PortName))
+                        {
+                            SerialPortManager.UnregisterPort(_serialPort.PortName);
+                        }
+
                         _serialPort.Dispose();
                         _serialPort = null;
+
+                        UpdateStatus(PortStatus.Closed);
                     }
                     catch (Exception ex)
                     {
                         LastError = $"关闭串口失败: {ex.Message}";
                         OnErrorOccurred(new PortErrorEventArgs(ex));
+                        UpdateStatus(PortStatus.Error);
                     }
                 }
             }
@@ -244,6 +294,8 @@ namespace TaiChi.IO.Ports.Utils
                 try
                 {
                     _reconnectAttempts++;
+                    UpdateStatus(PortStatus.Reconnecting);
+
                     string portName = _serialPort.PortName;
                     int baudRate = _serialPort.BaudRate;
                     int dataBits = _serialPort.DataBits;
@@ -263,6 +315,7 @@ namespace TaiChi.IO.Ports.Utils
                 {
                     LastError = $"重新连接失败: {ex.Message}";
                     OnErrorOccurred(new PortErrorEventArgs(ex));
+                    UpdateStatus(PortStatus.Error);
                     return false;
                 }
             }
@@ -299,13 +352,14 @@ namespace TaiChi.IO.Ports.Utils
                 {
                     LastError = "串口已关闭或无效";
                     OnErrorOccurred(new PortErrorEventArgs(LastError));
-                    
+
                     // 尝试重新连接
                     if (TryReconnect())
                     {
                         // 重新发送数据
                         return Send(data);
                     }
+
                     return false;
                 }
                 catch (Exception ex)
@@ -492,6 +546,20 @@ namespace TaiChi.IO.Ports.Utils
         }
 
         /// <summary>
+        /// 更新串口状态并触发状态变化事件
+        /// </summary>
+        /// <param name="newStatus">新状态</param>
+        protected virtual void UpdateStatus(PortStatus newStatus)
+        {
+            if (Status != newStatus)
+            {
+                OldStatus = Status;
+                Status = newStatus;
+                StatusChanged?.Invoke(this, new PortStatusEventArgs(OldStatus, newStatus));
+            }
+        }
+
+        /// <summary>
         /// 释放资源
         /// </summary>
         public void Dispose()
@@ -512,6 +580,7 @@ namespace TaiChi.IO.Ports.Utils
                 {
                     try
                     {
+                        StopConnectionCheck();
                         Close();
                     }
                     catch (Exception ex)
@@ -576,6 +645,69 @@ namespace TaiChi.IO.Ports.Utils
                 }
             }
         }
+
+        /// <summary>
+        /// 启动连接状态检测定时器
+        /// </summary>
+        private void StartConnectionCheck()
+        {
+            StopConnectionCheck();
+            _connectionCheckTimer = new Timer(CheckConnection, null, ConnectionCheckInterval, ConnectionCheckInterval);
+        }
+
+        /// <summary>
+        /// 停止连接状态检测定时器
+        /// </summary>
+        private void StopConnectionCheck()
+        {
+            if (_connectionCheckTimer != null)
+            {
+                _connectionCheckTimer.Dispose();
+                _connectionCheckTimer = null;
+            }
+        }
+
+        /// <summary>
+        /// 检查串口连接状态
+        /// </summary>
+        private void CheckConnection(object? state)
+        {
+            try
+            {
+                if (_serialPort == null)
+                {
+                    return;
+                }
+
+                lock (_lockObject)
+                {
+                    if (Status == PortStatus.Connected)
+                    {
+                        // 检查串口是否存在于系统中
+                        bool portExists = Array.Exists(SerialPort.GetPortNames(), 
+                            p => string.Equals(p, _serialPort.PortName, StringComparison.OrdinalIgnoreCase));
+
+                        // 如果串口不存在，或者串口已经关闭（可能是由于物理断开），则表示连接已断开
+                        if (!portExists || !_serialPort.IsOpen)
+                        {
+                            LastError = "串口设备已断开连接";
+                            OnErrorOccurred(new PortErrorEventArgs(LastError));
+                            
+                            // 标记为错误状态
+                            UpdateStatus(PortStatus.Error);
+                            
+                            // 尝试重连
+                            TryReconnect();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 忽略定时器回调中的异常，不影响主线程运行
+                LastError = $"连接检测出错: {ex.Message}";
+            }
+        }
     }
 
     /// <summary>
@@ -634,6 +766,7 @@ namespace TaiChi.IO.Ports.Utils
                     sb.Append(separator);
                 }
             }
+
             return sb.ToString();
         }
     }
@@ -670,6 +803,69 @@ namespace TaiChi.IO.Ports.Utils
         {
             Exception = exception;
             Message = exception.Message;
+        }
+    }
+
+    /// <summary>
+    /// 串口状态
+    /// </summary>
+    public enum PortStatus
+    {
+        /// <summary>
+        /// 已关闭
+        /// </summary>
+        Closed,
+
+        /// <summary>
+        /// 正在连接
+        /// </summary>
+        Connecting,
+
+        /// <summary>
+        /// 已连接
+        /// </summary>
+        Connected,
+
+        /// <summary>
+        /// 正在重新连接
+        /// </summary>
+        Reconnecting,
+
+        /// <summary>
+        /// 正在关闭
+        /// </summary>
+        Closing,
+
+        /// <summary>
+        /// 错误状态
+        /// </summary>
+        Error
+    }
+
+    /// <summary>
+    /// 串口状态变化事件参数
+    /// </summary>
+    public class PortStatusEventArgs : EventArgs
+    {
+        /// <summary>
+        /// 旧状态
+        /// </summary>
+        public PortStatus OldStatus { get; }
+
+        /// <summary>
+        /// 新状态
+        /// </summary>
+        public PortStatus NewStatus { get; }
+
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="oldStatus">旧状态</param>
+        /// <param name="newStatus">新状态</param>
+        public PortStatusEventArgs(PortStatus oldStatus, PortStatus newStatus)
+        {
+            OldStatus = oldStatus;
+            NewStatus = newStatus;
         }
     }
 }
