@@ -53,27 +53,27 @@ namespace TaiChi.IO.File
 
             encoding ??= Encoding.UTF8;
 
-            if (!System.IO.File.Exists(filePath))
+            if (System.IO.File.Exists(filePath))
             {
-                throw new FileNotFoundException("文件不存在", filePath);
-            }
-
-            try
-            {
-                using (StreamReader sr = new StreamReader(filePath, encoding))
+                try
                 {
-                    return sr.ReadToEnd();
+                    using (StreamReader sr = new StreamReader(filePath, encoding))
+                    {
+                        return sr.ReadToEnd();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (ex is FileNotFoundException)
+                    {
+                        throw;
+                    }
+
+                    throw new IOException($"读取文件失败: {ex.Message}", ex);
                 }
             }
-            catch (Exception ex)
-            {
-                if (ex is FileNotFoundException)
-                {
-                    throw;
-                }
 
-                throw new IOException($"读取文件失败: {ex.Message}", ex);
-            }
+            return string.Empty;
         }
 
         /// <summary>

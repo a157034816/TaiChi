@@ -20,6 +20,16 @@ namespace TaiChi.UpgradeKit.Client
         private readonly string _backupDirectory;
 
         /// <summary>
+        /// 是否在更新前备份应用
+        /// </summary>
+        public bool EnableBackup { get; set; } = true;
+
+        /// <summary>
+        /// 是否保留下载的更新包
+        /// </summary>
+        public bool KeepDownloadedPackage { get; set; } = true;
+
+        /// <summary>
         /// 应用可执行文件路径
         /// </summary>
         public string ExecutablePath { get; set; }
@@ -280,38 +290,48 @@ namespace TaiChi.UpgradeKit.Client
                     return false;
                 }
 
-                // 创建备份目录
-                string backupDirName = $"Backup_{DateTime.Now:yyyyMMdd_HHmmss}";
-                string backupDir = Path.Combine(_backupDirectory, backupDirName);
+                string backupDir = string.Empty;
                 
-                try
+                // 仅当启用备份时才执行备份操作
+                if (EnableBackup)
                 {
-                    Directory.CreateDirectory(backupDir);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"创建备份目录失败: {ex.Message}");
-                    Console.WriteLine("请确保应用程序有足够的权限创建备份目录，或清理备份目录腾出空间。");
-                    return false;
-                }
+                    // 创建备份目录
+                    string backupDirName = $"Backup_{DateTime.Now:yyyyMMdd_HHmmss}";
+                    backupDir = Path.Combine(_backupDirectory, backupDirName);
+                    
+                    try
+                    {
+                        Directory.CreateDirectory(backupDir);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"创建备份目录失败: {ex.Message}");
+                        Console.WriteLine("请确保应用程序有足够的权限创建备份目录，或清理备份目录腾出空间。");
+                        return false;
+                    }
 
-                // 备份当前应用
-                try
-                {
-                    await Task.Run(() => UpgradeClientHelper.BackupApplication(_appDirectory, backupDir));
-                    Console.WriteLine($"已成功备份应用到: {backupDir}");
+                    // 备份当前应用
+                    try
+                    {
+                        await Task.Run(() => UpgradeClientHelper.BackupApplication(_appDirectory, backupDir));
+                        Console.WriteLine($"已成功备份应用到: {backupDir}");
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        Console.WriteLine($"备份应用失败，权限不足: {ex.Message}");
+                        Console.WriteLine("请确保应用程序有足够的权限访问和写入备份目录，或尝试以管理员身份运行。");
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"备份应用失败: {ex.Message}");
+                        // 备份失败不一定要终止更新，但应告知用户风险
+                        Console.WriteLine("警告: 备份失败但将继续更新。如果更新出现问题，可能无法恢复到之前版本。");
+                    }
                 }
-                catch (UnauthorizedAccessException ex)
+                else
                 {
-                    Console.WriteLine($"备份应用失败，权限不足: {ex.Message}");
-                    Console.WriteLine("请确保应用程序有足够的权限访问和写入备份目录，或尝试以管理员身份运行。");
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"备份应用失败: {ex.Message}");
-                    // 备份失败不一定要终止更新，但应告知用户风险
-                    Console.WriteLine("警告: 备份失败但将继续更新。如果更新出现问题，可能无法恢复到之前版本。");
+                    Console.WriteLine("已禁用备份，将直接应用更新");
                 }
 
                 // 根据包类型应用更新
@@ -332,6 +352,20 @@ namespace TaiChi.UpgradeKit.Client
                         throw new InvalidOperationException($"不支持的更新包类型: {packageInfo.PackageType}");
                     }
 
+                    // 如果不保留下载包，则删除
+                    if (!KeepDownloadedPackage && File.Exists(packagePath))
+                    {
+                        try
+                        {
+                            File.Delete(packagePath);
+                            Console.WriteLine("已删除更新包");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"删除更新包失败: {ex.Message}");
+                        }
+                    }
+
                     Console.WriteLine("更新应用成功");
                     return true;
                 }
@@ -341,8 +375,11 @@ namespace TaiChi.UpgradeKit.Client
                     Console.WriteLine("请确保应用程序有足够的权限访问和修改应用目录，或尝试以管理员身份运行。");
                     
                     // 尝试从备份恢复
-                    Console.WriteLine("正在尝试从备份恢复...");
-                    await TryRestoreFromBackupAsync(backupDir);
+                    if (EnableBackup && !string.IsNullOrEmpty(backupDir))
+                    {
+                        Console.WriteLine("正在尝试从备份恢复...");
+                        await TryRestoreFromBackupAsync(backupDir);
+                    }
                     
                     return false;
                 }
@@ -352,8 +389,11 @@ namespace TaiChi.UpgradeKit.Client
                     Console.WriteLine("可能是因为某些文件被占用或磁盘空间不足。请关闭可能使用这些文件的程序后重试。");
                     
                     // 尝试从备份恢复
-                    Console.WriteLine("正在尝试从备份恢复...");
-                    await TryRestoreFromBackupAsync(backupDir);
+                    if (EnableBackup && !string.IsNullOrEmpty(backupDir))
+                    {
+                        Console.WriteLine("正在尝试从备份恢复...");
+                        await TryRestoreFromBackupAsync(backupDir);
+                    }
                     
                     return false;
                 }
@@ -361,7 +401,6 @@ namespace TaiChi.UpgradeKit.Client
             catch (Exception ex)
             {
                 Console.WriteLine($"应用更新失败: {ex.Message}");
-                // TODO: 实现回滚机制
 
                 // 如果有更详细的嵌套异常，显示它
                 if (ex.InnerException != null)
@@ -499,7 +538,10 @@ namespace TaiChi.UpgradeKit.Client
                     packagePath,
                     _appDirectory,
                     ExecutablePath,
-                    isIncremental
+                    isIncremental,
+                    3,
+                    EnableBackup,
+                    KeepDownloadedPackage
                 );
 
                 return result;
@@ -571,5 +613,16 @@ namespace TaiChi.UpgradeKit.Client
         /// 获取备份目录
         /// </summary>
         protected string BackupDirectory => _backupDirectory;
+
+        /// <summary>
+        /// 设置更新选项
+        /// </summary>
+        /// <param name="enableBackup">是否在更新前备份应用</param>
+        /// <param name="keepDownloadedPackage">是否保留下载的更新包</param>
+        public void SetUpdateOptions(bool enableBackup, bool keepDownloadedPackage)
+        {
+            EnableBackup = enableBackup;
+            KeepDownloadedPackage = keepDownloadedPackage;
+        }
     }
 }

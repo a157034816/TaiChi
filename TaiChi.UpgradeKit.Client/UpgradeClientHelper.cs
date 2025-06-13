@@ -1,3 +1,5 @@
+// #define New
+
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -413,8 +415,10 @@ public class UpgradeClientHelper
     /// <param name="executablePath">应用程序可执行文件路径</param>
     /// <param name="isIncremental">是否增量更新</param>
     /// <param name="waitTimeInSeconds">等待时间（秒）</param>
+    /// <param name="enableBackup">是否启用备份</param>
+    /// <param name="keepPackage">是否保留更新包</param>
     /// <returns>是否成功启动更新流程</returns>
-    public static bool StartSelfUpdate(string packagePath, string appDirectory, string executablePath, bool isIncremental = false, int waitTimeInSeconds = 3)
+    public static bool StartSelfUpdate(string packagePath, string appDirectory, string executablePath, bool isIncremental = false, int waitTimeInSeconds = 3, bool enableBackup = true, bool keepPackage = true)
     {
         try
         {
@@ -438,7 +442,7 @@ public class UpgradeClientHelper
             Directory.CreateDirectory(updaterDirectory);
 
             // 创建更新脚本
-            string updateScriptPath = CreateUpdateScript(updaterDirectory, packagePath, appDirectory, executablePath, isIncremental, waitTimeInSeconds);
+            string updateScriptPath = CreateUpdateScript(updaterDirectory, packagePath, appDirectory, executablePath, isIncremental, waitTimeInSeconds, enableBackup, keepPackage);
 
             // 启动更新脚本
             var startInfo = new ProcessStartInfo
@@ -464,8 +468,179 @@ public class UpgradeClientHelper
     /// <summary>
     /// 创建更新脚本
     /// </summary>
-    private static string CreateUpdateScript(string updaterDirectory, string packagePath, string appDirectory, string executablePath, bool isIncremental, int waitTimeInSeconds)
+    private static string CreateUpdateScript(string updaterDirectory, string packagePath, string appDirectory, string executablePath, bool isIncremental, int waitTimeInSeconds, bool enableBackup = true, bool keepPackage = true)
     {
+#if New
+        // 创建批处理脚本文件路径
+        string scriptPath = Path.Combine(updaterDirectory, "update.bat");
+
+        // 获取当前进程ID
+        int currentProcessId = Process.GetCurrentProcess().Id;
+
+        // 构建批处理脚本内容
+        var scriptBuilder = new StringBuilder();
+
+        // 设置编码和标题
+        scriptBuilder.AppendLine("@echo off");
+        scriptBuilder.AppendLine("chcp 65001 >nul"); // 设置UTF-8编码以支持中文
+        scriptBuilder.AppendLine("setlocal EnableDelayedExpansion"); // 启用延迟环境变量扩展
+        scriptBuilder.AppendLine("title 更新程序");
+
+        // 提权部分
+        scriptBuilder.AppendLine(">nul 2>&1 \"%SYSTEMROOT%\\system32\\cacls.exe\" \"%SYSTEMROOT%\\system32\\config\\system\"");
+        scriptBuilder.AppendLine("if '%errorlevel%' NEQ '0' (");
+        scriptBuilder.AppendLine("    echo 请求管理员权限...");
+        scriptBuilder.AppendLine("    goto UACPrompt");
+        scriptBuilder.AppendLine(") else (");
+        scriptBuilder.AppendLine("    goto gotAdmin");
+        scriptBuilder.AppendLine(")");
+        scriptBuilder.AppendLine(":UACPrompt");
+        scriptBuilder.AppendLine("    echo Set UAC = CreateObject^(\"Shell.Application\"^) > \"%temp%\\getadmin.vbs\"");
+        scriptBuilder.AppendLine("    echo UAC.ShellExecute \"%~s0\", \"\", \"\", \"runas\", 1 >> \"%temp%\\getadmin.vbs\"");
+        scriptBuilder.AppendLine("    \"%temp%\\getadmin.vbs\"");
+        scriptBuilder.AppendLine("    exit /B");
+        scriptBuilder.AppendLine(":gotAdmin");
+        scriptBuilder.AppendLine("    if exist \"%temp%\\getadmin.vbs\" ( del \"%temp%\\getadmin.vbs\" )");
+        scriptBuilder.AppendLine("    pushd \"%CD%\"");
+        scriptBuilder.AppendLine("    CD /D \"%~dp0\"");
+
+        // 创建日志文件
+        string logFile = Path.Combine(updaterDirectory, "update_log.txt");
+        scriptBuilder.AppendLine($"echo 更新开始时间: %date% %time% > \"{logFile}\"");
+
+        // 等待原进程结束
+        scriptBuilder.AppendLine($"echo 等待应用程序关闭 (PID: {currentProcessId})...");
+        scriptBuilder.AppendLine($"echo 等待应用程序关闭 (PID: {currentProcessId})... >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"timeout /t {waitTimeInSeconds} /nobreak > nul");
+
+        // 确保进程已经结束
+        scriptBuilder.AppendLine($"taskkill /F /PID {currentProcessId} /T 2>nul");
+        scriptBuilder.AppendLine($":CheckProcess");
+        scriptBuilder.AppendLine($"tasklist /FI \"PID eq {currentProcessId}\" 2>nul | find \"{currentProcessId}\" >nul");
+        scriptBuilder.AppendLine($"if not errorlevel 1 (");
+        scriptBuilder.AppendLine($"    echo 等待进程结束...");
+        scriptBuilder.AppendLine($"    echo 等待进程结束... >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"    timeout /t 1 /nobreak > nul");
+        scriptBuilder.AppendLine($"    goto CheckProcess");
+        scriptBuilder.AppendLine($")");
+
+        // 创建临时解压目录
+        string tempExtractDir = Path.Combine(updaterDirectory, "extract");
+        scriptBuilder.AppendLine($"echo 创建临时解压目录...");
+        scriptBuilder.AppendLine($"echo 创建临时解压目录... >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"mkdir \"{tempExtractDir}\" 2>nul");
+
+        // 解压更新包
+        scriptBuilder.AppendLine($"echo 解压更新包...");
+        scriptBuilder.AppendLine($"echo 解压更新包... >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"powershell -command \"Expand-Archive -Path '{packagePath.Replace("'", "''")}' -DestinationPath '{tempExtractDir.Replace("'", "''")}' -Force\" >> \"{logFile}\" 2>&1");
+
+        // 应用更新
+        scriptBuilder.AppendLine($"echo 应用更新...");
+        scriptBuilder.AppendLine($"echo 应用更新... >> \"{logFile}\"");
+
+        // 如果启用备份，添加备份逻辑
+        if (enableBackup)
+        {
+            // 创建备份目录
+            string backupDirName = $"Backup_{DateTime.Now:yyyyMMdd_HHmmss}";
+            string backupDir = Path.Combine(appDirectory, "Backups", backupDirName);
+            
+            scriptBuilder.AppendLine($"echo 创建备份目录...");
+            scriptBuilder.AppendLine($"echo 创建备份目录... >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"mkdir \"{backupDir}\" 2>nul");
+            
+            // 备份当前应用
+            scriptBuilder.AppendLine($"echo 备份当前应用...");
+            scriptBuilder.AppendLine($"echo 备份当前应用... >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"xcopy \"{appDirectory}\\*\" \"{backupDir}\\\" /E /Y /I /EXCLUDE:{appDirectory}\\Backups\\*,{appDirectory}\\Downloads\\* >> \"{logFile}\" 2>&1");
+            scriptBuilder.AppendLine($"if %ERRORLEVEL% NEQ 0 (");
+            scriptBuilder.AppendLine($"    echo 备份应用失败: %ERRORLEVEL% >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"    echo 备份应用失败，但将继续更新过程");
+            scriptBuilder.AppendLine($")");
+        }
+        else
+        {
+            scriptBuilder.AppendLine($"echo 已禁用备份，跳过备份步骤...");
+            scriptBuilder.AppendLine($"echo 已禁用备份，跳过备份步骤... >> \"{logFile}\"");
+        }
+
+        // 处理增量更新中的删除文件
+        if (isIncremental)
+        {
+            scriptBuilder.AppendLine($"if exist \"{tempExtractDir}\\deleted_files.txt\" (");
+            scriptBuilder.AppendLine($"    echo 处理需要删除的文件...");
+            scriptBuilder.AppendLine($"    echo 处理需要删除的文件... >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"    for /F \"usebackq tokens=* delims=\" %%f in (\"{tempExtractDir}\\deleted_files.txt\") do (");
+            scriptBuilder.AppendLine($"        if exist \"{appDirectory}\\%%f\" (");
+            scriptBuilder.AppendLine($"            echo 删除文件: %%f >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"            del /F /Q \"{appDirectory}\\%%f\" >> \"{logFile}\" 2>&1");
+            scriptBuilder.AppendLine($"        ) else (");
+            scriptBuilder.AppendLine($"            echo 文件不存在，跳过: %%f >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"        )");
+            scriptBuilder.AppendLine($"    )");
+            scriptBuilder.AppendLine($")");
+        }
+        else
+        {
+            // // 完整更新时清理目标目录（保留备份和下载目录）
+            // scriptBuilder.AppendLine($"echo 清理目标目录... >> \"{logFile}\"");
+            // scriptBuilder.AppendLine($"if exist \"{appDirectory}\" (");
+            // scriptBuilder.AppendLine($"    for /D %%d in (\"{appDirectory}\\*\") do (");
+            // scriptBuilder.AppendLine($"        set \"dirname=%%~nxd\"");
+            // scriptBuilder.AppendLine($"        if /I NOT \"!dirname!\"==\"Backups\" if /I NOT \"!dirname!\"==\"Downloads\" (");
+            // scriptBuilder.AppendLine($"            echo 删除目录: %%d >> \"{logFile}\"");
+            // scriptBuilder.AppendLine($"            rd /S /Q \"%%d\" >> \"{logFile}\" 2>&1");
+            // scriptBuilder.AppendLine($"        )");
+            // scriptBuilder.AppendLine($"    )");
+            // scriptBuilder.AppendLine($"    for %%f in (\"{appDirectory}\\*.*\") do (");
+            // scriptBuilder.AppendLine($"        echo 删除文件: %%f >> \"{logFile}\"");
+            // scriptBuilder.AppendLine($"        del /F /Q \"%%f\" >> \"{logFile}\" 2>&1");
+            // scriptBuilder.AppendLine($"    )");
+            // scriptBuilder.AppendLine($") else (");
+            // scriptBuilder.AppendLine($"    echo 目标目录不存在，将创建目录 >> \"{logFile}\"");
+            // scriptBuilder.AppendLine($"    mkdir \"{appDirectory}\" >> \"{logFile}\" 2>&1");
+            // scriptBuilder.AppendLine($")");
+        }
+
+        // 复制更新文件
+        scriptBuilder.AppendLine($"echo 复制更新文件... >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"xcopy \"{tempExtractDir}\\*\" \"{appDirectory}\\\" /E /Y /I /H >> \"{logFile}\" 2>&1");
+
+        // // 清理临时文件
+        // scriptBuilder.AppendLine($"echo 清理临时文件...");
+        // scriptBuilder.AppendLine($"echo 清理临时文件... >> \"{logFile}\"");
+        // scriptBuilder.AppendLine($"rd /S /Q \"{tempExtractDir}\" >> \"{logFile}\" 2>&1");
+
+        // 删除更新包（如果不保留）
+        if (!keepPackage)
+        {
+            scriptBuilder.AppendLine($"echo 删除更新包...");
+            scriptBuilder.AppendLine($"echo 删除更新包... >> \"{logFile}\"");
+            scriptBuilder.AppendLine($"del /F /Q \"{packagePath}\" >> \"{logFile}\" 2>&1");
+        }
+
+        // 启动应用程序
+        scriptBuilder.AppendLine($"echo 启动应用程序...");
+        scriptBuilder.AppendLine($"echo 启动应用程序... >> \"{logFile}\"");
+        scriptBuilder.AppendLine(Path.GetPathRoot(executablePath)?[..2]);
+        scriptBuilder.AppendLine($"cd \"{Path.GetDirectoryName(executablePath)}\"");
+        scriptBuilder.AppendLine($"start \"\" \"{executablePath}\"");
+
+        // 更新完成
+        scriptBuilder.AppendLine($"echo 更新完成时间: %date% %time% >> \"{logFile}\"");
+        scriptBuilder.AppendLine($"echo 更新完成！");
+        scriptBuilder.AppendLine($"timeout /t 3 /nobreak > nul");
+
+        // 自删除批处理
+        scriptBuilder.AppendLine($"echo 清理更新程序...");
+        // scriptBuilder.AppendLine($"(goto) 2>nul & del \"%~f0\" & exit");
+
+        // 写入批处理脚本
+        File.WriteAllText(scriptPath, scriptBuilder.ToString(), Encoding.UTF8);
+
+        return scriptPath;
+#else
         // 创建更新器临时目录
         string logDirectory = Path.Combine(Path.GetTempPath(), "TaiChiUpdater_Log");
         Directory.CreateDirectory(logDirectory);
@@ -530,11 +705,28 @@ public class UpgradeClientHelper
         scriptContent.AppendLine("echo 开始应用更新... >> %LOGFILE%");
 
         // 创建备份目录
-        string backupTimestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string backupDir = Path.Combine(appDirectory, "Backups", $"Backup_{backupTimestamp}");
-        scriptContent.AppendLine($"echo 创建备份目录: \"{backupDir}\" >> %LOGFILE%");
-        scriptContent.AppendLine($"mkdir \"{backupDir}\" >> %LOGFILE% 2>&1");
-        scriptContent.AppendLine($"if %ERRORLEVEL% NEQ 0 echo 创建备份目录失败: %ERRORLEVEL% >> %LOGFILE% 2>&1");
+        if (enableBackup)
+        {
+            string backupTimestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string backupDir = Path.Combine(appDirectory, "Backups", $"Backup_{backupTimestamp}");
+            scriptContent.AppendLine($"echo 创建备份目录: \"{backupDir}\" >> %LOGFILE%");
+            scriptContent.AppendLine($"mkdir \"{backupDir}\" >> %LOGFILE% 2>&1");
+            scriptContent.AppendLine($"if %ERRORLEVEL% NEQ 0 echo 创建备份目录失败: %ERRORLEVEL% >> %LOGFILE% 2>&1");
+
+            // 执行备份
+            scriptContent.AppendLine($"echo 备份当前应用...");
+            scriptContent.AppendLine($"echo 备份当前应用... >> %LOGFILE%");
+            scriptContent.AppendLine($"xcopy \"{appDirectory}\\*\" \"{backupDir}\\\" /E /Y /I /EXCLUDE:{appDirectory}\\Backups\\*,{appDirectory}\\Downloads\\* >> %LOGFILE% 2>&1");
+            scriptContent.AppendLine($"if %ERRORLEVEL% NEQ 0 (");
+            scriptContent.AppendLine($"  echo 备份应用失败: %ERRORLEVEL% >> %LOGFILE%");
+            scriptContent.AppendLine($"  echo 备份应用失败，但将继续更新过程");
+            scriptContent.AppendLine($")");
+        }
+        else
+        {
+            scriptContent.AppendLine($"echo 已禁用备份，跳过备份步骤...");
+            scriptContent.AppendLine($"echo 已禁用备份，跳过备份步骤... >> %LOGFILE%");
+        }
 
         // 执行更新操作
         if (isIncremental)
@@ -561,7 +753,7 @@ public class UpgradeClientHelper
             scriptContent.AppendLine($"if exist \"{tempExtractDir}\\deleted_files.txt\" (");
             scriptContent.AppendLine($"  echo 处理需要删除的文件... >> %LOGFILE%");
             scriptContent.AppendLine($"  echo 处理需要删除的文件...");
-            scriptContent.AppendLine($"  for /F \"tokens=*\" %%f in ('type \"{tempExtractDir}\\deleted_files.txt\"') do (");
+            scriptContent.AppendLine($"  for /F \"usebackq tokens=* delims=\" %%f in (\"{tempExtractDir}\\deleted_files.txt\") do (");
             scriptContent.AppendLine($"    if exist \"{appDirectory}\\%%f\" (");
             scriptContent.AppendLine($"      echo 删除文件: %%f >> %LOGFILE%");
             scriptContent.AppendLine($"      echo 删除文件: %%f");
@@ -587,15 +779,6 @@ public class UpgradeClientHelper
             // 完整更新操作
             scriptContent.AppendLine($"echo 应用完整更新...");
             scriptContent.AppendLine($"echo 应用完整更新... >> %LOGFILE%");
-
-            // 备份应用
-            scriptContent.AppendLine($"echo 备份当前应用...");
-            scriptContent.AppendLine($"echo 备份当前应用... >> %LOGFILE%");
-            scriptContent.AppendLine($"xcopy \"{appDirectory}\\*\" \"{backupDir}\\\" /E /Y /I /EXCLUDE:{appDirectory}\\Backups\\*,{appDirectory}\\Downloads\\* >> %LOGFILE% 2>&1");
-            scriptContent.AppendLine($"if %ERRORLEVEL% NEQ 0 (");
-            scriptContent.AppendLine($"  echo 备份应用失败: %ERRORLEVEL% >> %LOGFILE%");
-            scriptContent.AppendLine($"  echo 备份应用失败，但将继续更新过程");
-            scriptContent.AppendLine($")");
 
             // 解压到临时目录
             string tempExtractDir = Path.Combine(updaterDirectory, "temp_extract");
@@ -642,17 +825,20 @@ public class UpgradeClientHelper
             scriptContent.AppendLine($")");
         }
 
-        // 清理临时文件
-        scriptContent.AppendLine();
-        scriptContent.AppendLine("echo 清理临时文件...");
-        scriptContent.AppendLine("echo 清理临时文件... >> %LOGFILE%");
-        scriptContent.AppendLine($"rmdir /S /Q \"{updaterDirectory}\" >> %LOGFILE% 2>&1");
+        // 删除更新包（如果不保留）
+        if (!keepPackage)
+        {
+            scriptContent.AppendLine($"echo 删除更新包...");
+            scriptContent.AppendLine($"echo 删除更新包... >> %LOGFILE%");
+            scriptContent.AppendLine($"del /F /Q \"{packagePath}\" >> %LOGFILE% 2>&1");
+        }
 
         // 启动应用程序
         scriptContent.AppendLine();
         scriptContent.AppendLine("echo 更新完成，正在启动应用...");
         scriptContent.AppendLine("echo 更新完成，正在启动应用... >> %LOGFILE%");
-        scriptContent.AppendLine($"start \"\" \"{executablePath}\" >> %LOGFILE% 2>&1");
+        scriptContent.AppendLine($"cd \"{Path.GetDirectoryName(executablePath)}\"");
+        scriptContent.AppendLine($"start \"\" \"{executablePath}\"");
         scriptContent.AppendLine($"if %ERRORLEVEL% NEQ 0 (");
         scriptContent.AppendLine($"  echo 启动应用失败: %ERRORLEVEL% >> %LOGFILE%");
         scriptContent.AppendLine($"  echo 启动应用失败，请手动启动应用");
@@ -674,6 +860,13 @@ public class UpgradeClientHelper
         // 结束标签
         scriptContent.AppendLine(":end");
         scriptContent.AppendLine("echo 日志文件保存在: %LOGFILE%");
+
+        // 清理临时文件
+        scriptContent.AppendLine();
+        scriptContent.AppendLine("echo 清理临时文件...");
+        scriptContent.AppendLine("echo 清理临时文件... >> %LOGFILE%");
+        scriptContent.AppendLine($"rmdir /S /Q \"{updaterDirectory}\" >> %LOGFILE% 2>&1");
+
         // scriptContent.AppendLine("pause");
         scriptContent.AppendLine("exit");
 
@@ -681,5 +874,7 @@ public class UpgradeClientHelper
         File.WriteAllText(scriptPath, scriptContent.ToString(), new UTF8Encoding(false));
 
         return scriptPath;
+
+#endif
     }
 }
