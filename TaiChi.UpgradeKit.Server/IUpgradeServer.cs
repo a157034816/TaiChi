@@ -64,5 +64,25 @@ namespace TaiChi.UpgradeKit.Server
         /// <param name="length">长度（字节，0表示到文件末尾）</param>
         /// <returns>包含数据的内存流及相关信息</returns>
         (System.IO.Stream DataStream, long TotalSize, bool SupportsResume, long StartPosition) GetPackageDataStream(string packageId, long startPosition = 0, long length = 0);
+
+        /// <summary>
+        /// 删除版本
+        /// </summary>
+        /// <param name="appId">应用ID</param>
+        /// <param name="versionId">版本ID</param>
+        void DeleteVersion(string appId, string versionId);
+
+        /// <summary>
+        /// 删除更新包
+        /// </summary>
+        /// <param name="packageId">包ID</param>
+        void DeletePackage(string packageId);
+
+        /// <summary>
+        /// 获取应用的所有增量包
+        /// </summary>
+        /// <param name="appId">应用ID</param>
+        /// <returns>增量包列表</returns>
+        List<UpdatePackageInfo> GetAllIncrementalPackages(string appId);
     }
 }

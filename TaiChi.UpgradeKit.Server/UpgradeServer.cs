@@ -347,29 +347,29 @@ namespace TaiChi.UpgradeKit.Server
             if (!string.IsNullOrWhiteSpace(request.PackageId) && request.FileOffset >= 0)
             {
                 Console.WriteLine($"收到断点续传请求：PackageId={request.PackageId}, Offset={request.FileOffset}");
-                
+
                 // 查找对应的更新包
                 UpdatePackageInfo packageInfo = null;
-                
+
                 foreach (var appId in _updatePackages.Keys)
                 {
                     packageInfo = _updatePackages[appId].FirstOrDefault(p => p.PackageId == request.PackageId);
                     if (packageInfo != null)
                         break;
                 }
-                
+
                 if (packageInfo == null)
                     return new UpdateResponse { HasUpdate = false };
-                    
+
                 // 检查文件是否存在及大小
                 if (!File.Exists(packageInfo.PackagePath))
                     return new UpdateResponse { HasUpdate = false };
-                    
+
                 var fileInfo = new FileInfo(packageInfo.PackagePath);
-                
+
                 // 构建断点续传响应
-                return new UpdateResponse 
-                { 
+                return new UpdateResponse
+                {
                     HasUpdate = true,
                     SuggestedPackage = packageInfo,
                     SupportResume = true,
@@ -441,7 +441,7 @@ namespace TaiChi.UpgradeKit.Server
                 {
                     response.SuggestedPackage = incrementalPackage;
                     response.AvailablePackages.Add(incrementalPackage);
-                    
+
                     // 设置增量包的总大小
                     if (File.Exists(incrementalPackage.PackagePath))
                     {
@@ -462,7 +462,7 @@ namespace TaiChi.UpgradeKit.Server
                 {
                     response.SuggestedPackage = fullPackage;
                     response.AvailablePackages.Add(fullPackage);
-                    
+
                     // 设置完整包的总大小
                     if (File.Exists(fullPackage.PackagePath))
                     {
@@ -520,39 +520,39 @@ namespace TaiChi.UpgradeKit.Server
         {
             if (string.IsNullOrWhiteSpace(packageId))
                 throw new ArgumentException("包ID不能为空", nameof(packageId));
-                
+
             // 查找对应的更新包
             UpdatePackageInfo packageInfo = null;
-            
+
             foreach (var appId in _updatePackages.Keys)
             {
                 packageInfo = _updatePackages[appId].FirstOrDefault(p => p.PackageId == packageId);
                 if (packageInfo != null)
                     break;
             }
-            
+
             if (packageInfo == null)
                 throw new ArgumentException($"找不到ID为 {packageId} 的更新包");
-                
+
             // 确认包文件存在
             if (!File.Exists(packageInfo.PackagePath))
                 throw new FileNotFoundException($"更新包文件不存在: {packageInfo.PackagePath}");
-                
+
             // 获取文件信息
             var fileInfo = new FileInfo(packageInfo.PackagePath);
             long fileSize = fileInfo.Length;
-            
+
             // 检查起始位置是否有效
             if (startPosition < 0)
                 startPosition = 0;
-                
+
             if (startPosition > fileSize)
                 throw new ArgumentOutOfRangeException(nameof(startPosition), "起始位置超出文件大小");
-                
+
             // 计算需要读取的长度
             if (length <= 0 || startPosition + length > fileSize)
                 length = fileSize - startPosition;
-                
+
             // 打开文件流
             var fileStream = new FileStream(
                 packageInfo.PackagePath,
@@ -561,36 +561,181 @@ namespace TaiChi.UpgradeKit.Server
                 FileShare.Read,
                 4096,
                 true);
-                
+
             // 如果需要，移动到指定位置
             if (startPosition > 0)
                 fileStream.Seek(startPosition, SeekOrigin.Begin);
-                
+
             // 创建内存流
             var memoryStream = new MemoryStream();
-            
+
             // 读取指定长度的数据
             byte[] buffer = new byte[4096];
             long bytesRemaining = length;
             long bytesRead = 0;
             int read;
-            
+
             while (bytesRemaining > 0 && (read = fileStream.Read(buffer, 0, (int)Math.Min(buffer.Length, bytesRemaining))) > 0)
             {
                 memoryStream.Write(buffer, 0, read);
                 bytesRemaining -= read;
                 bytesRead += read;
             }
-            
+
             // 重置内存流位置
             memoryStream.Position = 0;
-            
+
             // 关闭文件流
             fileStream.Close();
-            
+
             Console.WriteLine($"已读取更新包 {packageId} 的数据，起始位置: {startPosition}，长度: {bytesRead}，总大小: {fileSize}");
-            
+
             return (memoryStream, fileSize, true, startPosition);
+        }
+
+        /// <summary>
+        /// 删除版本
+        /// </summary>
+        /// <param name="appId">应用ID</param>
+        /// <param name="versionId">版本ID</param>
+        public void DeleteVersion(string appId, string versionId)
+        {
+            if (string.IsNullOrWhiteSpace(appId))
+                throw new ArgumentException("应用ID不能为空", nameof(appId));
+
+            if (string.IsNullOrWhiteSpace(versionId))
+                throw new ArgumentException("版本ID不能为空", nameof(versionId));
+
+            // 检查应用是否存在
+            if (!_appInfos.ContainsKey(appId))
+                throw new InvalidOperationException($"应用 '{appId}' 不存在");
+
+            // 检查版本列表是否存在
+            if (!_appVersions.ContainsKey(appId))
+                throw new InvalidOperationException($"应用 '{appId}' 没有版本信息");
+
+            // 查找要删除的版本
+            var versionToDelete = _appVersions[appId].FirstOrDefault(v => v.VersionId == versionId);
+            if (versionToDelete == null)
+                throw new InvalidOperationException($"版本 '{versionId}' 不存在");
+
+            // 删除版本
+            _appVersions[appId].Remove(versionToDelete);
+
+            // 删除与此版本相关的所有更新包（作为源版本或目标版本）
+            if (_updatePackages.ContainsKey(appId))
+            {
+                var packagesToRemove = _updatePackages[appId]
+                    .Where(p => p.SourceVersionId == versionId || p.TargetVersionId == versionId)
+                    .ToList();
+
+                foreach (var package in packagesToRemove)
+                {
+                    _updatePackages[appId].Remove(package);
+
+                    // 删除物理文件
+                    string packagePath = Path.Combine(_upgradeRootPath, appId, package.PackageId);
+                    if (Directory.Exists(packagePath))
+                    {
+                        Directory.Delete(packagePath, true);
+                    }
+
+                    if (File.Exists(packagePath))
+                    {
+                        File.Delete(packagePath);
+                    }
+                }
+            }
+
+            // 删除版本的完整包文件
+            string fullPackagePath = Path.Combine(_upgradeRootPath, appId, versionId);
+            if (Directory.Exists(fullPackagePath))
+            {
+                Directory.Delete(fullPackagePath, true);
+            }
+
+            if (File.Exists(fullPackagePath))
+            {
+                File.Delete(fullPackagePath);
+            }
+
+            // 重设最新版本
+            foreach (var versionInfo in _appVersions[appId])
+                versionInfo.IsLatest = false;
+
+            _appVersions[appId].OrderBy(t => t.Version).Last().IsLatest = true;
+
+            // 保存数据
+            SaveData();
+
+            Console.WriteLine($"已删除版本: AppId={appId}, VersionId={versionId}");
+        }
+
+        /// <summary>
+        /// 删除更新包
+        /// </summary>
+        /// <param name="packageId">包ID</param>
+        public void DeletePackage(string packageId)
+        {
+            if (string.IsNullOrWhiteSpace(packageId))
+                throw new ArgumentException("包ID不能为空", nameof(packageId));
+
+            // 查找对应的更新包
+            UpdatePackageInfo packageInfo = null;
+            string foundAppId = null;
+
+            // 在所有应用中查找包
+            foreach (var appId in _updatePackages.Keys)
+            {
+                packageInfo = _updatePackages[appId].FirstOrDefault(p => p.PackageId == packageId);
+                if (packageInfo != null)
+                {
+                    foundAppId = appId;
+                    break;
+                }
+            }
+
+            if (packageInfo == null)
+                throw new ArgumentException($"找不到ID为 {packageId} 的更新包");
+
+            // 从集合中移除
+            _updatePackages[foundAppId].Remove(packageInfo);
+
+            // 删除物理文件
+            if (File.Exists(packageInfo.PackagePath))
+            {
+                File.Delete(packageInfo.PackagePath);
+                Console.WriteLine($"已删除更新包文件: {packageInfo.PackagePath}");
+            }
+
+            // 保存数据
+            SaveData();
+
+            Console.WriteLine($"已删除更新包: PackageId={packageId}, Type={packageInfo.PackageType}");
+        }
+
+        /// <summary>
+        /// 获取应用的所有增量包
+        /// </summary>
+        /// <param name="appId">应用ID</param>
+        /// <returns>增量包列表</returns>
+        public List<UpdatePackageInfo> GetAllIncrementalPackages(string appId)
+        {
+            if (string.IsNullOrWhiteSpace(appId))
+                throw new ArgumentException("应用ID不能为空", nameof(appId));
+
+            // 检查应用是否存在
+            if (!_appInfos.ContainsKey(appId))
+                throw new InvalidOperationException($"应用 '{appId}' 不存在");
+
+            // 如果没有更新包记录，返回空列表
+            if (!_updatePackages.ContainsKey(appId))
+                return new List<UpdatePackageInfo>();
+
+            // 获取并筛选出所有增量包
+            return _updatePackages[appId]
+                .Where(p => p.PackageType == UpdatePackageType.Incremental)
+                .ToList();
         }
     }
 }
