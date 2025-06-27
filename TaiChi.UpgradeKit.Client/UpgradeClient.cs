@@ -1,8 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Tasks;
-using TaiChi.Upgrade.Shared;
+﻿using TaiChi.Upgrade.Shared;
 
 namespace TaiChi.UpgradeKit.Client
 {
@@ -11,13 +7,13 @@ namespace TaiChi.UpgradeKit.Client
     /// </summary>
     public class UpgradeClient
     {
-        private readonly string _appId;
-        private readonly string _appDirectory;
-        private readonly string _upgradeServerUrl;
-        private readonly HttpClient _httpClient;
-        private readonly Version _currentVersion;
-        private readonly string _downloadDirectory;
-        private readonly string _backupDirectory;
+        protected readonly string _appId;
+        protected readonly string _appDirectory;
+        protected readonly string _upgradeServerUrl;
+        protected readonly HttpClient _httpClient;
+        protected readonly Version _currentVersion;
+        protected readonly string _downloadDirectory;
+        protected readonly string _backupDirectory;
 
         /// <summary>
         /// 是否在更新前备份应用
@@ -512,7 +508,7 @@ namespace TaiChi.UpgradeKit.Client
         /// <param name="packageInfo">更新包信息</param>
         /// <param name="packagePath">更新包路径</param>
         /// <returns>是否成功启动更新流程</returns>
-        public async Task<bool> ExecuteSelfUpdateAsync(UpdatePackageInfo packageInfo, string packagePath)
+        public virtual async Task<bool> ExecuteSelfUpdateAsync(UpdatePackageInfo packageInfo, string packagePath)
         {
             if (packageInfo == null)
                 throw new ArgumentNullException(nameof(packageInfo));
