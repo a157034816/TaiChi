@@ -1,4 +1,7 @@
 ﻿using System.Windows;
+using System.Windows.Input;
+using System.Runtime.InteropServices;
+using System;
 
 namespace TaiChi.Wpf.Controls;
 
@@ -42,6 +45,13 @@ public partial class FloatingControlDockWindow : Window
     private double _windowHeight;
     private DockPosition _currentPosition;
     
+    // Win32 常量和方法定义，用于禁止窗口移动
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MOVE = 0xF010;
+    
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+    
     public FloatingControlDockWindow()
     {
         InitializeComponent();
@@ -59,6 +69,40 @@ public partial class FloatingControlDockWindow : Window
         {
             this.RecalcPosition(_currentPosition);
         };
+        
+        // 禁止窗口被拖动
+        this.MouseLeftButtonDown += (sender, e) => e.Handled = true;
+        this.MouseMove += (sender, e) => e.Handled = true;
+
+        this.Loaded += (sender, args) =>
+        {
+            RecalcPosition(_currentPosition);
+        };
+
+        // // 处理本机窗口消息以阻止移动
+        // this.SourceInitialized += (sender, e) =>
+        // {
+        //     System.Windows.Interop.HwndSource source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        //     source.AddHook(WndProc);
+        // };
+    }
+    
+    /// <summary>
+    /// 处理窗口消息，阻止窗口移动
+    /// </summary>
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // 检查是否为系统命令消息，如果是移动窗口命令则阻止
+        if (msg == WM_SYSCOMMAND)
+        {
+            int command = wParam.ToInt32() & 0xFFF0;
+            if (command == SC_MOVE)
+            {
+                handled = true;
+                return IntPtr.Zero;
+            }
+        }
+        return IntPtr.Zero;
     }
     
     /// <summary>
@@ -114,8 +158,8 @@ public partial class FloatingControlDockWindow : Window
         switch (position)
         {
             case DockPosition.Center:
-                this.Left = workingArea.Left + (workingArea.Width - this.Width) / 2;
-                this.Top = workingArea.Top + (workingArea.Height - this.Height) / 2;
+                this.Left = workingArea.Left + (workingArea.Width - this.ActualWidth) / 2;
+                this.Top = workingArea.Top + (workingArea.Height - this.ActualHeight) / 2;
                 break;
                 
             case DockPosition.TopLeft:
@@ -124,18 +168,18 @@ public partial class FloatingControlDockWindow : Window
                 break;
                 
             case DockPosition.TopRight:
-                this.Left = workingArea.Right - this.Width;
+                this.Left = workingArea.Right - this.ActualWidth;
                 this.Top = workingArea.Top;
                 break;
                 
             case DockPosition.BottomLeft:
                 this.Left = workingArea.Left;
-                this.Top = workingArea.Bottom - this.Height;
+                this.Top = workingArea.Bottom - this.ActualHeight;
                 break;
                 
             case DockPosition.BottomRight:
-                this.Left = workingArea.Right - this.Width;
-                this.Top = workingArea.Bottom - this.Height;
+                this.Left = workingArea.Right - this.ActualWidth;
+                this.Top = workingArea.Bottom - this.ActualHeight;
                 break;
         }
     }
@@ -173,5 +217,16 @@ public partial class FloatingControlDockWindow : Window
         SetContent(content);
         SetSizeAndPosition(width, height, position);
         this.Show();
+    }
+    
+    /// <summary>
+    /// 将窗口移动到指定位置（屏幕坐标）
+    /// </summary>
+    /// <param name="x">窗口左上角X坐标</param>
+    /// <param name="y">窗口左上角Y坐标</param>
+    public void MoveWindow(double x, double y)
+    {
+        this.Left = x;
+        this.Top = y;
     }
 }

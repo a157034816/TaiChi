@@ -11,9 +11,11 @@
         ShowInTaskbar="False"
         AllowsTransparency="True"
         Background="Transparent"
+        HorizontalAlignment="Right"
+        VerticalAlignment="Bottom"
         Topmost="True">
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="-1" />
+        <WindowChrome GlassFrameThickness="-1" ResizeBorderThickness="0" CaptionHeight="0" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
     <Window.Template>
         <ControlTemplate TargetType="Window">
