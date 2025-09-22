@@ -1,0 +1,47 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Font Sizes -->
+    <sys:Double x:Key="PinControl_FontSize_Normal">10</sys:Double>
+    <sys:Double x:Key="PinControl_FontSize_Small">8</sys:Double>
+    <sys:Double x:Key="PinControl_FontSize_Large">12</sys:Double>
+    
+    <!-- Margin and Padding -->
+    <Thickness x:Key="PinControl_Margin">0,2</Thickness>
+    <Thickness x:Key="PinControl_ContentMargin">5,0,0,0</Thickness>
+    <Thickness x:Key="PinControl_OutputContentMargin">0,0,5,0</Thickness>
+    <Thickness x:Key="PinControl_ContainerMargin">0,2</Thickness>
+    
+    <!-- Border Thickness -->
+    <Thickness x:Key="PinControl_BorderThickness">1</Thickness>
+    <Thickness x:Key="PinControl_SelectedBorderThickness">2</Thickness>
+    
+    <!-- Connector Sizes -->
+    <sys:Double x:Key="PinControl_ConnectorSize">8</sys:Double>
+    <sys:Double x:Key="PinControl_ConnectorHoverSize">10</sys:Double>
+    <sys:Double x:Key="PinControl_ConnectorSelectedSize">12</sys:Double>
+    
+    <!-- Layout Sizes -->
+    <sys:Double x:Key="PinControl_MinWidth">120</sys:Double>
+    <sys:Double x:Key="PinControl_MinHeight">20</sys:Double>
+    <sys:Double x:Key="PinControl_HeaderHeight">24</sys:Double>
+    
+    <!-- CornerRadius -->
+    <CornerRadius x:Key="PinControl_CornerRadius">3</CornerRadius>
+    <CornerRadius x:Key="PinControl_HeaderCornerRadius">3,3,0,0</CornerRadius>
+    
+    <!-- Effect Sizes -->
+    <sys:Double x:Key="PinControl_ShadowBlurRadius">4</sys:Double>
+    <sys:Double x:Key="PinControl_ShadowDepth">0</sys:Double>
+    <sys:Double x:Key="PinControl_GlowBlurRadius">6</sys:Double>
+    <sys:Double x:Key="PinControl_SelectedShadowBlurRadius">8</sys:Double>
+    <sys:Double x:Key="PinControl_HighlightShadowBlurRadius">10</sys:Double>
+    
+    <!-- Opacity Values -->
+    <sys:Double x:Key="PinControl_EffectOpacity">0.8</sys:Double>
+    <sys:Double x:Key="PinControl_GlowOpacity">0.6</sys:Double>
+    <sys:Double x:Key="PinControl_SelectedGlowOpacity">0.8</sys:Double>
+    <sys:Double x:Key="PinControl_ActiveGlowOpacity">0.9</sys:Double>
+    
+</ResourceDictionary>

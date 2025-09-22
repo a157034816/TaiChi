@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    
+    <sys:Double x:Key="DefaultConnectorSize">12</sys:Double>
+
+    <!-- 统一的 Pin 连接器默认模板 -->
+    <DataTemplate x:Key="DefaultPinConnectorTemplate">
+        <Ellipse Width="{StaticResource DefaultConnectorSize}"
+                 Height="{StaticResource DefaultConnectorSize}"
+                 Fill="{Binding Tag.MainColor, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
+                 Stroke="{Binding Tag.StrokeColor, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
+                 StrokeThickness="{Binding Tag.StrokeThickness, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
+                 Cursor="Hand"
+                 SnapsToDevicePixels="True" />
+    </DataTemplate>
+
+</ResourceDictionary>
