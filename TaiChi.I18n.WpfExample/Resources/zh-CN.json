@@ -1,0 +1,61 @@
+{
+  "_info": {
+    "culture": "zh-CN",
+    "description": "TaiChi.I18n WPF示例应用的中文资源文件",
+    "version": "1.0.0"
+  },
+  "UI": {
+    "WindowTitle": "TaiChi.I18n WPF示例应用",
+    "LanguageSettings": "语言设置",
+    "LanguageLabel": "语言",
+    "TabBasicExample": "基本示例",
+    "TabToolsExample": "工具示例",
+    "WelcomeSection": "欢迎信息",
+    "UserFormSection": "用户表单",
+    "ImageExampleSection": "图片示例",
+    "ResourceToolsSection": "资源工具",
+    "StatisticsSection": "统计信息",
+    "ShowMessageButton": "显示消息",
+    "ShowPersonalizedMessageButton": "显示个性化消息",
+    "ValidateFormButton": "验证表单",
+    "GenerateResourcesButton": "生成资源文件",
+    "ValidateResourcesButton": "验证资源文件",
+    "UserNameLabel": "用户名",
+    "EmailLabel": "电子邮箱",
+    "CurrentLanguageLabel": "当前语言",
+    "SupportedLanguagesLabel": "支持的语言",
+    "ResourceDirectoryLabel": "资源目录",
+    "CachingEnabledLabel": "缓存已启用",
+    "ReadyStatus": "就绪",
+    "ImageExampleDescription": "这里演示了本地化图片资源的使用。不同语言可以显示不同的图片。",
+    "ResourceToolsDescription": "使用这些工具可以自动生成和验证资源文件，确保多语言资源的完整性和正确性。"
+  },
+  "Messages": {
+    "WelcomeMessage": "欢迎使用 TaiChi.I18n 多语言框架！这个示例演示了如何在WPF应用中实现多语言支持。",
+    "PersonalizedWelcome": "你好，{0}！欢迎使用 TaiChi.I18n 多语言框架！",
+    "InfoTitle": "信息",
+    "SuccessTitle": "成功",
+    "ValidationErrorTitle": "验证错误",
+    "ValidationSuccess": "表单验证通过！"
+  },
+  "Validation": {
+    "UserNameRequired": "用户名是必填项",
+    "EmailRequired": "电子邮箱是必填项",
+    "EmailInvalid": "请输入有效的电子邮箱地址"
+  },
+  "General": {
+    "Yes": "是",
+    "No": "否",
+    "OK": "确定",
+    "Cancel": "取消",
+    "DefaultUserName": "访客用户"
+  },
+  "Images": {
+    "Logo": "Resources/Images/logo-zh.png",
+    "Icon": "Resources/Images/icon-zh.png"
+  },
+  "Audio": {
+    "ButtonClick": "Resources/Audio/button-click.wav",
+    "Notification": "Resources/Audio/notification.wav"
+  }
+}

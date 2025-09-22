@@ -1,0 +1,61 @@
+{
+  "_info": {
+    "culture": "en-US",
+    "description": "English resource file for TaiChi.I18n WPF example application",
+    "version": "1.0.0"
+  },
+  "UI": {
+    "WindowTitle": "TaiChi.I18n WPF Example Application",
+    "LanguageSettings": "Language Settings",
+    "LanguageLabel": "Language",
+    "TabBasicExample": "Basic Example",
+    "TabToolsExample": "Tools Example",
+    "WelcomeSection": "Welcome",
+    "UserFormSection": "User Form",
+    "ImageExampleSection": "Image Example",
+    "ResourceToolsSection": "Resource Tools",
+    "StatisticsSection": "Statistics",
+    "ShowMessageButton": "Show Message",
+    "ShowPersonalizedMessageButton": "Show Personalized Message",
+    "ValidateFormButton": "Validate Form",
+    "GenerateResourcesButton": "Generate Resources",
+    "ValidateResourcesButton": "Validate Resources",
+    "UserNameLabel": "User Name",
+    "EmailLabel": "Email",
+    "CurrentLanguageLabel": "Current Language",
+    "SupportedLanguagesLabel": "Supported Languages",
+    "ResourceDirectoryLabel": "Resource Directory",
+    "CachingEnabledLabel": "Caching Enabled",
+    "ReadyStatus": "Ready",
+    "ImageExampleDescription": "This demonstrates the use of localized image resources. Different languages can display different images.",
+    "ResourceToolsDescription": "Use these tools to automatically generate and validate resource files, ensuring completeness and correctness of multilingual resources."
+  },
+  "Messages": {
+    "WelcomeMessage": "Welcome to TaiChi.I18n multilingual framework! This example demonstrates how to implement multilingual support in WPF applications.",
+    "PersonalizedWelcome": "Hello, {0}! Welcome to TaiChi.I18n multilingual framework!",
+    "InfoTitle": "Information",
+    "SuccessTitle": "Success",
+    "ValidationErrorTitle": "Validation Error",
+    "ValidationSuccess": "Form validation passed!"
+  },
+  "Validation": {
+    "UserNameRequired": "User name is required",
+    "EmailRequired": "Email is required",
+    "EmailInvalid": "Please enter a valid email address"
+  },
+  "General": {
+    "Yes": "Yes",
+    "No": "No",
+    "OK": "OK",
+    "Cancel": "Cancel",
+    "DefaultUserName": "Guest User"
+  },
+  "Images": {
+    "Logo": "Resources/Images/logo-en.png",
+    "Icon": "Resources/Images/icon-en.png"
+  },
+  "Audio": {
+    "ButtonClick": "Resources/Audio/button-click.wav",
+    "Notification": "Resources/Audio/notification.wav"
+  }
+}

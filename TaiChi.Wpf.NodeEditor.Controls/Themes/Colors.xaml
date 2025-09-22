@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Primary Colors -->
+    <Color x:Key="PinControl_PrimaryColor">#4A90E2</Color>
+    <SolidColorBrush x:Key="PinControl_PrimaryBrush" Color="{StaticResource PinControl_PrimaryColor}" />
+    
+    <!-- Secondary Colors -->
+    <Color x:Key="PinControl_SecondaryColor">#6C757D</Color>
+    <SolidColorBrush x:Key="PinControl_SecondaryBrush" Color="{StaticResource PinControl_SecondaryColor}" />
+    
+    <!-- Accent Colors -->
+    <Color x:Key="PinControl_AccentColor">#FF6B35</Color>
+    <SolidColorBrush x:Key="PinControl_AccentBrush" Color="{StaticResource PinControl_AccentColor}" />
+    
+    <!-- State Colors -->
+    <Color x:Key="PinControl_NormalColor">#000000</Color>
+    <SolidColorBrush x:Key="PinControl_NormalBrush" Color="{StaticResource PinControl_NormalColor}" />
+    
+    <Color x:Key="PinControl_HighlightColor">#F39C12</Color>
+    <SolidColorBrush x:Key="PinControl_HighlightBrush" Color="{StaticResource PinControl_HighlightColor}" />
+    
+    <Color x:Key="PinControl_ConnectingColor">#FFD700</Color>
+    <SolidColorBrush x:Key="PinControl_ConnectingBrush" Color="{StaticResource PinControl_ConnectingColor}" />
+    
+    <Color x:Key="PinControl_SelectedColor">#FF8C5A</Color>
+    <SolidColorBrush x:Key="PinControl_SelectedBrush" Color="{StaticResource PinControl_SelectedColor}" />
+    
+    <Color x:Key="PinControl_ActiveColor">#2ECC71</Color>
+    <SolidColorBrush x:Key="PinControl_ActiveBrush" Color="{StaticResource PinControl_ActiveColor}" />
+    
+    <!-- Background Colors -->
+    <Color x:Key="PinControl_BackgroundColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="PinControl_BackgroundBrush" Color="{StaticResource PinControl_BackgroundColor}" />
+    
+    <!-- Effect Colors -->
+    <Color x:Key="PinControl_ShadowColor">#808080</Color>
+    <Color x:Key="PinControl_GlowColor">#7BB3F0</Color>
+    
+    <!-- Pin Specific Colors -->
+    <SolidColorBrush x:Key="PinControl_Foreground" Color="{StaticResource PinControl_NormalColor}" />
+    <SolidColorBrush x:Key="PinControl_PinBackground" Color="{StaticResource PinControl_BackgroundColor}" />
+    <SolidColorBrush x:Key="PinControl_PinBorder" Color="{StaticResource PinControl_SecondaryColor}" />
+    
+    <!-- Pin State Brushes -->
+    <SolidColorBrush x:Key="PinControl_HighlightEffectBrush" Color="{StaticResource PinControl_HighlightColor}" />
+    <SolidColorBrush x:Key="PinControl_ConnectingEffectBrush" Color="{StaticResource PinControl_ConnectingColor}" />
+    <SolidColorBrush x:Key="PinControl_SelectedEffectBrush" Color="{StaticResource PinControl_SelectedColor}" />
+    <SolidColorBrush x:Key="PinControl_ActiveEffectBrush" Color="{StaticResource PinControl_ActiveColor}" />
+    
+    <!-- Connector Colors -->
+    <SolidColorBrush x:Key="PinControl_ConnectorBrush" Color="{StaticResource PinControl_SecondaryColor}" />
+    <SolidColorBrush x:Key="PinControl_ConnectorHoverBrush" Color="{StaticResource PinControl_PrimaryColor}" />
+    <SolidColorBrush x:Key="PinControl_ConnectorSelectedBrush" Color="{StaticResource PinControl_AccentColor}" />
+    
+</ResourceDictionary>
