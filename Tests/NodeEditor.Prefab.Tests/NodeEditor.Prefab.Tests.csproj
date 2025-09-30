@@ -1,9 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net6.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -19,7 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\TaiChi.Core\TaiChi.Core.csproj" />
+    <ProjectReference Include="..\..\..\NodeEditor.Prefab\NodeEditor.Prefab.csproj" />
+    <ProjectReference Include="..\..\TaiChi.Wpf.NodeEditor.Core\TaiChi.Wpf.NodeEditor.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -16,6 +16,7 @@ public abstract class Node : INotifyPropertyChanged
     private bool _isEnabled = true;
     private NodeState _state = NodeState.Normal;
     private bool _isSelected = false;
+    private NodeGroup? _group;
 
     /// <summary>
     /// 节点的唯一标识符
@@ -113,6 +114,39 @@ public abstract class Node : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 所属分组（运行时引用，不参与直接序列化）
+    /// </summary>
+    [JsonIgnore]
+    public NodeGroup? Group
+    {
+        get => _group;
+        set
+        {
+            if (!ReferenceEquals(_group, value))
+            {
+                var old = _group;
+                _group = value;
+                // 维护可序列化的 GroupId
+                GroupId = value?.Id;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(GroupId));
+
+                // 维护双向关系（避免重复/空引用）
+                if (old != null && old.Nodes.Contains(this))
+                    old.Nodes.Remove(this);
+
+                if (value != null && !value.Nodes.Contains(this))
+                    value.Nodes.Add(this);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 所属分组的标识（用于序列化/反序列化后的重建）
+    /// </summary>
+    public Guid? GroupId { get; set; }
+
+    /// <summary>
     /// 属性变化通知事件
     /// </summary>
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -202,6 +236,13 @@ public abstract class Node : INotifyPropertyChanged
         foreach (var pin in OutputPins)
         {
             pin.ParentNode = this;
+        }
+
+        // 如果反序列化时已有 Group 引用，则同步 GroupId；
+        // 常规流程由上层管理器根据 GroupId 重新绑定 Group。
+        if (Group != null)
+        {
+            GroupId = Group.Id;
         }
     }
 

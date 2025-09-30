@@ -8,6 +8,34 @@ namespace TaiChi.IO.File
     public static class FileHelper
     {
         /// <summary>
+        /// 获取应用程序基础目录的绝对路径
+        /// </summary>
+        /// <param name="relativePath">相对路径</param>
+        /// <returns>绝对路径</returns>
+        public static string GetAbsolutePath(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+            {
+                throw new ArgumentNullException(nameof(relativePath), "路径不能为空");
+            }
+
+            // 如果已经是绝对路径，则直接返回
+            if (Path.IsPathRooted(relativePath))
+            {
+                return relativePath;
+            }
+
+            // 移除开头的 ./ 或 .\
+            if (relativePath.StartsWith("./") || relativePath.StartsWith(".\\"))
+            {
+                relativePath = relativePath.Substring(2);
+            }
+
+            // 使用应用程序基础目录
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+        }
+
+        /// <summary>
         /// 读取文件内容
         /// </summary>
         /// <param name="filePath">文件路径</param>
@@ -24,7 +52,45 @@ namespace TaiChi.IO.File
             }
 
             encoding ??= Encoding.UTF8;
-            
+
+            if (System.IO.File.Exists(filePath))
+            {
+                try
+                {
+                    using (StreamReader sr = new StreamReader(filePath, encoding))
+                    {
+                        return sr.ReadToEnd();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (ex is FileNotFoundException)
+                    {
+                        throw;
+                    }
+
+                    throw new IOException($"读取文件失败: {ex.Message}", ex);
+                }
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 读取文件内容为二进制数据
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <returns>文件内容字节数组</returns>
+        /// <exception cref="ArgumentNullException">文件路径为空</exception>
+        /// <exception cref="FileNotFoundException">文件不存在</exception>
+        /// <exception cref="IOException">读取文件失败</exception>
+        public static byte[] ReadFileBytes(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
             if (!System.IO.File.Exists(filePath))
             {
                 throw new FileNotFoundException("文件不存在", filePath);
@@ -32,10 +98,7 @@ namespace TaiChi.IO.File
 
             try
             {
-                using (StreamReader sr = new StreamReader(filePath, encoding))
-                {
-                    return sr.ReadToEnd();
-                }
+                return System.IO.File.ReadAllBytes(filePath);
             }
             catch (Exception ex)
             {
@@ -43,6 +106,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"读取文件失败: {ex.Message}", ex);
             }
         }
@@ -64,7 +128,7 @@ namespace TaiChi.IO.File
             }
 
             encoding ??= Encoding.UTF8;
-            
+
             if (!System.IO.File.Exists(filePath))
             {
                 throw new FileNotFoundException("文件不存在", filePath);
@@ -83,6 +147,42 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
+                throw new IOException($"读取文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 异步读取文件内容为二进制数据
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <returns>文件内容字节数组</returns>
+        /// <exception cref="ArgumentNullException">文件路径为空</exception>
+        /// <exception cref="FileNotFoundException">文件不存在</exception>
+        /// <exception cref="IOException">读取文件失败</exception>
+        public static async Task<byte[]> ReadFileBytesAsync(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                throw new FileNotFoundException("文件不存在", filePath);
+            }
+
+            try
+            {
+                return await System.IO.File.ReadAllBytesAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                if (ex is FileNotFoundException)
+                {
+                    throw;
+                }
+
                 throw new IOException($"读取文件失败: {ex.Message}", ex);
             }
         }
@@ -104,7 +204,7 @@ namespace TaiChi.IO.File
             }
 
             encoding ??= Encoding.UTF8;
-            
+
             try
             {
                 // 确保目录存在
@@ -117,6 +217,46 @@ namespace TaiChi.IO.File
                 using (StreamWriter sw = new StreamWriter(filePath, append, encoding))
                 {
                     sw.Write(content ?? string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"写入文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 写入二进制数据到文件
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <param name="data">要写入的二进制数据</param>
+        /// <param name="append">是否追加内容，默认为覆盖</param>
+        /// <exception cref="ArgumentNullException">文件路径为空或数据为null</exception>
+        /// <exception cref="IOException">写入文件失败</exception>
+        public static void WriteFile(string filePath, byte[] data, bool append = false)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data), "数据不能为null");
+            }
+
+            try
+            {
+                // 确保目录存在
+                string directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (FileStream fs = new FileStream(filePath, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                {
+                    fs.Write(data, 0, data.Length);
                 }
             }
             catch (Exception ex)
@@ -142,7 +282,7 @@ namespace TaiChi.IO.File
             }
 
             encoding ??= Encoding.UTF8;
-            
+
             try
             {
                 // 确保目录存在
@@ -155,6 +295,46 @@ namespace TaiChi.IO.File
                 using (StreamWriter sw = new StreamWriter(filePath, append, encoding))
                 {
                     await sw.WriteAsync(content ?? string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"写入文件失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 异步写入二进制数据到文件
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        /// <param name="data">要写入的二进制数据</param>
+        /// <param name="append">是否追加内容，默认为覆盖</param>
+        /// <exception cref="ArgumentNullException">文件路径为空或数据为null</exception>
+        /// <exception cref="IOException">写入文件失败</exception>
+        public static async Task WriteFileAsync(string filePath, byte[] data, bool append = false)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentNullException(nameof(filePath), "文件路径不能为空");
+            }
+
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data), "数据不能为null");
+            }
+
+            try
+            {
+                // 确保目录存在
+                string directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (FileStream fs = new FileStream(filePath, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                {
+                    await fs.WriteAsync(data, 0, data.Length);
                 }
             }
             catch (Exception ex)
@@ -206,6 +386,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"复制文件失败: {ex.Message}", ex);
             }
         }
@@ -258,6 +439,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"移动文件失败: {ex.Message}", ex);
             }
         }
@@ -288,6 +470,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"删除文件失败: {ex.Message}", ex);
             }
         }
@@ -338,6 +521,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"获取文件大小失败: {ex.Message}", ex);
             }
         }
@@ -365,6 +549,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"创建目录失败: {ex.Message}", ex);
             }
         }
@@ -395,10 +580,11 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"删除目录失败: {ex.Message}", ex);
             }
         }
-        
+
         /// <summary>
         /// 检查目录是否存在
         /// </summary>
@@ -414,7 +600,7 @@ namespace TaiChi.IO.File
 
             return Directory.Exists(directoryPath);
         }
-        
+
         /// <summary>
         /// 获取文件的最后修改时间
         /// </summary>
@@ -445,6 +631,7 @@ namespace TaiChi.IO.File
                 {
                     throw;
                 }
+
                 throw new IOException($"获取文件修改时间失败: {ex.Message}", ex);
             }
         }

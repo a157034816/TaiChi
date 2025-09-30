@@ -120,6 +120,13 @@ public class NodeControl : Control
             new PropertyMetadata(true));
 
     #endregion
+
+    /// <summary>
+    /// 是否为主节点（由上层决定，用于视觉标识）
+    /// </summary>
+    public static readonly DependencyProperty IsMainProperty =
+        DependencyProperty.Register(nameof(IsMain), typeof(bool), typeof(NodeControl),
+            new PropertyMetadata(false));
         // 将控件实测尺寸回写给 ViewModel 的代理属性，便于 VM 计算精确的引脚中心
         public static readonly DependencyProperty NodeWidthProxyProperty =
             DependencyProperty.Register(nameof(NodeWidthProxy), typeof(double), typeof(NodeControl),
@@ -268,6 +275,15 @@ public class NodeControl : Control
     {
         get => (bool)GetValue(EnableDragSimplifiedRenderingProperty);
         set => SetValue(EnableDragSimplifiedRenderingProperty, value);
+    }
+
+    /// <summary>
+    /// 是否为主节点
+    /// </summary>
+    public bool IsMain
+    {
+        get => (bool)GetValue(IsMainProperty);
+        set => SetValue(IsMainProperty, value);
     }
 
     #endregion
@@ -669,9 +685,11 @@ public class NodeControl : Control
                 if (canvas != null)
                 {
                     var mouseCanvas = e.GetPosition(canvas);
+                    // 转换为画布逻辑坐标（去除缩放和平移），与拖拽起始时记录的逻辑偏移保持同一坐标系
+                    var logicalMouse = ToCanvasLogical(canvas, mouseCanvas);
                     var newPosition = new Point(
-                        mouseCanvas.X - _dragOffsetInCanvas.X,
-                        mouseCanvas.Y - _dragOffsetInCanvas.Y);
+                        logicalMouse.X - _dragOffsetInCanvas.X,
+                        logicalMouse.Y - _dragOffsetInCanvas.Y);
 
                     // 更新时间戳
                     _lastMouseMoveTime = currentTime;

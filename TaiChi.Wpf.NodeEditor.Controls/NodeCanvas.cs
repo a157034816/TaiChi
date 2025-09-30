@@ -13,6 +13,7 @@ using TaiChi.Wpf.NodeEditor.Core.Registry;
 using TaiChi.Wpf.NodeEditor.Core.Models;
 using TaiChi.Wpf.NodeEditor.Controls.Helpers;
 using TaiChi.Wpf.NodeEditor.Controls.AttachedProperties;
+using TaiChi.Wpf.NodeEditor.Controls.Managers;
 using VisualTreeHelper = System.Windows.Media.VisualTreeHelper;
 
 
@@ -212,6 +213,20 @@ public class NodeCanvas : Control
             new PropertyMetadata(true));
 
     /// <summary>
+    /// 分组数据源
+    /// </summary>
+    public static readonly DependencyProperty GroupsSourceProperty =
+        DependencyProperty.Register(nameof(GroupsSource), typeof(IEnumerable), typeof(NodeCanvas),
+            new PropertyMetadata(null));
+
+    /// <summary>
+    /// 分组管理器（用于执行分组相关操作，如创建/添加/移除等）
+    /// </summary>
+    public static readonly DependencyProperty GroupManagerProperty =
+        DependencyProperty.Register(nameof(GroupManager), typeof(NodeGroupManager), typeof(NodeCanvas),
+            new PropertyMetadata(null));
+
+    /// <summary>
     /// 上下文菜单提供器（由上层应用提供）。
     /// </summary>
     public static readonly DependencyProperty ContextMenuProviderProperty =
@@ -310,6 +325,24 @@ public class NodeCanvas : Control
     {
         get => (bool)GetValue(AllowMultiSelectionProperty);
         set => SetValue(AllowMultiSelectionProperty, value);
+    }
+
+    /// <summary>
+    /// 分组数据源
+    /// </summary>
+    public IEnumerable GroupsSource
+    {
+        get => (IEnumerable)GetValue(GroupsSourceProperty);
+        set => SetValue(GroupsSourceProperty, value);
+    }
+
+    /// <summary>
+    /// 分组管理器
+    /// </summary>
+    public NodeGroupManager? GroupManager
+    {
+        get => (NodeGroupManager?)GetValue(GroupManagerProperty);
+        set => SetValue(GroupManagerProperty, value);
     }
 
     /// <summary>
@@ -486,6 +519,9 @@ public class NodeCanvas : Control
 
     // 最近一次弹出上下文菜单的位置（画布逻辑坐标）
     private Point? _lastContextMenuLogicalPosition;
+
+    // 当前拖拽时的分组命中（用于Ctrl+拖拽加入分组的视觉反馈）
+    private NodeGroup? _currentDropTargetGroup;
 
     #region 访问器
 
@@ -728,6 +764,8 @@ public class NodeCanvas : Control
             _mainCanvas.MouseDown += OnCanvasMouseDown;
             _mainCanvas.MouseMove += OnCanvasMouseMove;
             _mainCanvas.MouseUp += OnCanvasMouseUp;
+            // 预览阶段处理分组点击以控制选中，不拦截拖拽
+            _mainCanvas.PreviewMouseLeftButtonDown += OnCanvasPreviewMouseLeftButtonDown;
             _mainCanvas.MouseWheel += OnCanvasMouseWheel;
             _mainCanvas.KeyDown += OnCanvasKeyDown;
             _mainCanvas.Drop += OnCanvasDrop;
@@ -1048,8 +1086,9 @@ public class NodeCanvas : Control
         {
             if (e.ClickCount == 1)
             {
-                // 单击空白处，清除选择并开始框选
+                // 单击空白处，清除选择并开始框选（包含节点与分组）
                 ClearNodeSelection();
+                ClearGroupSelection();
                 StartSelection(position);
 
                 var clickArgs = new RoutedEventArgs(CanvasClickEvent, this);
@@ -1279,7 +1318,7 @@ public class NodeCanvas : Control
 
         if (Math.Abs(dx) < 0.0001 && Math.Abs(dy) < 0.0001) return;
 
-        // 同步其他选中节点的位置
+        // 同步其他选中节点的位置（考虑分组边界约束/动态扩展）
         foreach (var node in _draggingNodes)
         {
             if (node == dragged) continue; // 被拖拽节点自己由其内部逻辑负责
@@ -1290,7 +1329,16 @@ public class NodeCanvas : Control
 
                 if (node.NodeData != null)
                 {
-                    node.NodeData.Position = new TaiChi.Wpf.NodeEditor.Core.Models.NodeEditorPoint(newPos.X, newPos.Y);
+                    var desired = new TaiChi.Wpf.NodeEditor.Core.Models.NodeEditorPoint(newPos.X, newPos.Y);
+                    if (GroupManager != null && node.NodeData.Group != null)
+                    {
+                        var adjusted = GroupManager.ConstrainOrExpandNodePosition(node.NodeData, node.NodeData.Group, desired, dynamicExpand: true);
+                        node.NodeData.Position = adjusted;
+                    }
+                    else
+                    {
+                        node.NodeData.Position = desired;
+                    }
                 }
                 else
                 {
@@ -1299,12 +1347,62 @@ public class NodeCanvas : Control
             }
         }
 
+        // 对被拖拽的节点本身也做一次约束/扩展校正
+        if (dragged.NodeData != null && dragged.NodeData.Group != null && GroupManager != null)
+        {
+            var desired = dragged.NodeData.Position;
+            var adjusted = GroupManager.ConstrainOrExpandNodePosition(dragged.NodeData, dragged.NodeData.Group, desired, dynamicExpand: true);
+            if (!desired.Equals(adjusted))
+            {
+                dragged.NodeData.Position = adjusted;
+            }
+        }
+
+        // Ctrl 按住时，提供分组命中反馈
+        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+        {
+            var pos = Mouse.GetPosition(_mainCanvas);
+            UpdateDropTargetHighlight(pos);
+        }
+        else
+        {
+            ClearDropTargetHighlight();
+        }
+
         e.Handled = false;
     }
 
     private void OnNodeDragCompleted(object sender, RoutedEventArgs e)
     {
         if (!_isDraggingNode) return;
+
+        // 如果按住 Ctrl 并且存在命中分组，则将选中节点加入该分组
+        if ((Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)) && _currentDropTargetGroup != null)
+        {
+            var target = _currentDropTargetGroup;
+            var nodes = _draggingNodes
+                .Where(nc => nc.NodeData != null)
+                .Select(nc => nc.NodeData!)
+                .Distinct()
+                .ToList();
+
+            if (nodes.Count > 0)
+            {
+                if (GroupManager != null)
+                {
+                    foreach (var n in nodes)
+                        GroupManager.AddNodeToGroup(n, target);
+                }
+                else
+                {
+                    // 退化处理：直接设置 Group 引用
+                    foreach (var n in nodes)
+                        n.Group = target;
+                }
+            }
+        }
+
+        ClearDropTargetHighlight();
 
         _draggingNodes.Clear();
         _initialNodePositions.Clear();
@@ -1318,6 +1416,45 @@ public class NodeCanvas : Control
         foreach (var nodeControl in GetAllNodeControls())
         {
             nodeControl.IsSelected = false;
+        }
+    }
+
+    /// <summary>
+    /// 画布预览鼠标按下处理（用于分组选中逻辑，避免被分组内部控件提前标记 Handled）
+    /// </summary>
+    private void OnCanvasPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (IsReadOnly) return;
+        if (_mainCanvas == null) return;
+
+        var position = e.GetPosition(_mainCanvas);
+        var hitGroup = HitTestGroupAt(position);
+        if (hitGroup != null)
+        {
+            // Ctrl 支持多选/切换；否则为单选
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+            {
+                hitGroup.IsSelected = !hitGroup.IsSelected;
+            }
+            else
+            {
+                foreach (var g in EnumerateAllGroups())
+                {
+                    g.IsSelected = ReferenceEquals(g, hitGroup);
+                }
+            }
+            // 不标记 Handled，允许分组控件继续处理拖拽
+        }
+    }
+
+    /// <summary>
+    /// 清除所有分组的选中状态
+    /// </summary>
+    private void ClearGroupSelection()
+    {
+        foreach (var g in EnumerateAllGroups())
+        {
+            g.IsSelected = false;
         }
     }
 
@@ -2216,7 +2353,76 @@ public class NodeCanvas : Control
         deleteItem.Click += (s, e) => DeleteSelectedItems();
         menu.Items.Add(deleteItem);
 
+        // 允许上层附加分组相关菜单项
+        ContextMenuProvider?.AppendGroupItemsForNode(menu, this, node, position);
+
         return menu;
+    }
+
+    // 分组命中与高亮辅助逻辑
+    private void UpdateDropTargetHighlight(Point physicalPoint)
+    {
+        var hit = HitTestGroupAt(physicalPoint);
+        if (!ReferenceEquals(hit, _currentDropTargetGroup))
+        {
+            // 清理旧高亮
+            if (_currentDropTargetGroup != null)
+                _currentDropTargetGroup.IsSelected = false;
+
+            _currentDropTargetGroup = hit;
+
+            if (_currentDropTargetGroup != null)
+                _currentDropTargetGroup.IsSelected = true;
+        }
+    }
+
+    private void ClearDropTargetHighlight()
+    {
+        if (_currentDropTargetGroup != null)
+        {
+            _currentDropTargetGroup.IsSelected = false;
+            _currentDropTargetGroup = null;
+        }
+    }
+
+    private NodeGroup? HitTestGroupAt(Point physicalPoint)
+    {
+        if (_mainCanvas == null) return null;
+        var logical = ToCanvasLogical(physicalPoint);
+        foreach (var g in EnumerateAllGroups())
+        {
+            var b = g.Bounds;
+            if (logical.X >= b.X && logical.X <= b.X + b.Width &&
+                logical.Y >= b.Y && logical.Y <= b.Y + b.Height)
+            {
+                return g;
+            }
+        }
+        return null;
+    }
+
+    private IEnumerable<NodeGroup> EnumerateAllGroups()
+    {
+        if (GroupsSource == null) yield break;
+
+        foreach (var item in GroupsSource)
+        {
+            if (item is NodeGroup g)
+            {
+                foreach (var gg in FlattenGroup(g))
+                    yield return gg;
+            }
+        }
+    }
+
+    private IEnumerable<NodeGroup> FlattenGroup(NodeGroup root)
+    {
+        yield return root;
+        foreach (var c in root.Children)
+        {
+            foreach (var gg in FlattenGroup(c))
+                yield return gg;
+        }
     }
 
     #endregion

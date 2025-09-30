@@ -21,11 +21,18 @@
     <converters:PercentageConverter x:Key="PercentageConverter" />
     <converters:DataTypeToBrushConverter x:Key="DataTypeToBrushConverter" />
     <converters:PinInputValueVisibilityConverter x:Key="PinInputValueVisibilityConverter" />
-    
+    <converters:EnumValuesConverter x:Key="EnumValuesConverter" />
+
     <!-- 对象是否为 null → Visibility 显示控制 -->
     <!-- 非空 => Visible；空 => Collapsed -->
     <converters:ObjectToVisibilityConverter x:Key="ObjectToVisibility_VisibleWhenNotNull" />
     <!-- 取反：空 => Visible；非空 => Collapsed -->
     <converters:ObjectToVisibilityConverter x:Key="ObjectToVisibility_VisibleWhenNull" Invert="True" />
+
+    <!-- 节点属性编辑相关转换器 -->
+    <converters:EditorForNodePropertiesConverter x:Key="EditorForNodePropertiesConverter" />
+    <converters:NodePropertyValueConverter x:Key="NodePropertyValueConverter" />
+    <converters:TypeIsBooleanConverter x:Key="TypeIsBooleanConverter" />
+    <converters:TypeIsBooleanConverter x:Key="TypeIsNotBooleanConverter" Invert="True" />
 </ResourceDictionary>
 

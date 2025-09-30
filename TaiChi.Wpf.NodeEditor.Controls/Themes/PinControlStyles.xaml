@@ -15,7 +15,15 @@
     <!-- 默认的输入值模板选择器（可被外部覆盖） -->
     <selectors:DefaultPinInputValueTemplateSelector x:Key="DefaultPinInputValueTemplateSelector"
                                                    DefaultTemplate="{StaticResource DefaultPinInputValueTemplate}"
-                                                   StringTemplate="{StaticResource DefaultPinStringInputTemplate}" />
+                                                   StringTemplate="{StaticResource DefaultPinStringInputTemplate}"
+                                                   IntTemplate="{StaticResource DefaultPinIntInputTemplate}"
+                                                   LongTemplate="{StaticResource DefaultPinLongInputTemplate}"
+                                                   FloatTemplate="{StaticResource DefaultPinFloatInputTemplate}"
+                                                   DoubleTemplate="{StaticResource DefaultPinDoubleInputTemplate}"
+                                                   DecimalTemplate="{StaticResource DefaultPinDecimalInputTemplate}"
+                                                   BoolTemplate="{StaticResource DefaultPinBoolInputTemplate}"
+                                                   DateTimeTemplate="{StaticResource DefaultPinDateTimeInputTemplate}"
+                                                   EnumTemplate="{StaticResource DefaultPinEnumInputTemplate}" />
 
     <!-- 修正后的 PinControl 样式 -->
     <Style x:Key="{x:Static controls:PinControl.PinStyleKey}" TargetType="{x:Type controls:PinControl}">
