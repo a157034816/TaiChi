@@ -1,0 +1,45 @@
+<UserControl x:Class="TaiChi.Wpf.Tour.TourBubble"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="360" d:DesignHeight="160">
+    <Border Background="#FF1F2937" CornerRadius="8" Padding="12" BorderBrush="#334155" BorderThickness="1" Effect="{DynamicResource TourBubbleShadow}">
+        <Border.Resources>
+            <DropShadowEffect x:Key="TourBubbleShadow" BlurRadius="10" ShadowDepth="2" Opacity="0.35" Color="#000000"/>
+        </Border.Resources>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title -->
+            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0 0 0 8">
+                <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                           FontWeight="SemiBold" Foreground="#F8FAFC" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding StepText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                           Foreground="#94A3B8" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                <Button Content="×" Width="22" Height="22" Margin="6,0,0,0" Padding="0" HorizontalAlignment="Right"
+                        Command="{Binding CloseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ToolTip="关闭引导"/>
+            </DockPanel>
+
+            <!-- Content -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" CanContentScroll="True">
+                <TextBlock Text="{Binding Description, RelativeSource={RelativeSource AncestorType=UserControl}}" TextWrapping="Wrap"
+                           Foreground="#E2E8F0"/>
+            </ScrollViewer>
+
+            <!-- Footer Buttons -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                <Button Content="上一步" Margin="0,0,8,0" MinWidth="72"
+                        Command="{Binding PrevCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                <Button Content="下一步" MinWidth="88" IsDefault="True"
+                        Command="{Binding NextCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>
