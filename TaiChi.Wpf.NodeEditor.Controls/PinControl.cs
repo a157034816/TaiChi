@@ -265,26 +265,69 @@ public class PinControl : Control
 
     private static void OnPinDataChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is PinControl control && e.NewValue is Pin pin)
+        if (d is PinControl control)
         {
-            // 根据数据类型自动设置颜色
-            // control.PinColor = GetColorForDataType(pin.DataType);
+            // 当 PinData 被赋值时，尝试根据数据类型设置颜色
+            control.UpdateColorsFromDataType();
         }
     }
 
     /// <summary>
-    /// 根据数据类型获取颜色
+    /// 根据数据类型获取主色画刷。
+    /// 可在此维护数据类型到颜色的映射表，保持连线与引脚的配色一致性。
     /// </summary>
+    /// <param name="dataType">引脚数据类型</param>
+    /// <returns>用于填充的主色画刷</returns>
     private static Brush GetColorForDataType(Type dataType)
     {
         return dataType?.Name switch
         {
-            nameof(Int32) => Brushes.Blue,
-            nameof(Double) => Brushes.Green,
+            nameof(Int32) or nameof(Int64) or nameof(Int16) => Brushes.Blue,
+            nameof(Single) or nameof(Double) or nameof(Decimal) => Brushes.Green,
             nameof(String) => Brushes.Red,
             nameof(Boolean) => Brushes.Orange,
             _ => Brushes.Gray
         };
+    }
+
+    /// <summary>
+    /// 尝试从主色创建较深的描边色。
+    /// </summary>
+    /// <param name="brush">主色画刷</param>
+    /// <param name="amount">加深比例（0~1）</param>
+    /// <returns>加深后的画刷；若无法处理则返回 null</returns>
+    private static Brush? TryCreateDarkerBrush(SolidColorBrush? brush, double amount = 0.25)
+    {
+        if (brush == null) return null;
+        amount = Math.Max(0, Math.Min(1, amount));
+        var c = brush.Color;
+        byte Dark(byte v) => (byte)(v * (1 - amount));
+        return new SolidColorBrush(Color.FromRgb(Dark(c.R), Dark(c.G), Dark(c.B)));
+    }
+
+    /// <summary>
+    /// 根据 PinData 的数据类型更新引脚的主色与描边色。
+    /// 若 PinData 或 DataType 为空，则保持当前颜色设置不变。
+    /// </summary>
+    private void UpdateColorsFromDataType()
+    {
+        try
+        {
+            var type = PinData?.DataType;
+            if (type == null) return;
+
+            var main = GetColorForDataType(type);
+            MainColor = main;
+
+            // 优先生成较深的描边色，若无法生成则回退到主色
+            var darker = TryCreateDarkerBrush(main as SolidColorBrush);
+            StrokeColor = darker ?? main;
+        }
+        catch (Exception ex)
+        {
+            // 安全回退：异常时不影响显示与交互
+            System.Diagnostics.Debug.WriteLine($"根据数据类型设置引脚颜色时发生异常: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -777,6 +820,9 @@ public class PinControl : Control
             // 监听节点大小变化事件
             _parentNodeControl.SizeChanged += OnNodeSizeChanged;
         }
+
+        // 基于数据类型更新引脚颜色
+        UpdateColorsFromDataType();
         
         // 初始化主画布缓存
         InitializeMainCanvasCache();

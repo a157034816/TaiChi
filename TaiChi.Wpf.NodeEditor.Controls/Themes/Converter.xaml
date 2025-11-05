@@ -19,7 +19,10 @@
     <converters:ClampValueConverter x:Key="ClampValueConverter" />
     <converters:FlowPinFilterConverter x:Key="FlowPinFilterConverter" />
     <converters:PercentageConverter x:Key="PercentageConverter" />
-    <converters:DataTypeToBrushConverter x:Key="DataTypeToBrushConverter" />
+    <!-- 新增：Pin 颜色转换器（可在引用端通过相同 x:Key 覆盖来自定义配色） -->
+    <converters:DataTypeToFillBrushConverter x:Key="PinFillBrushConverter" />
+    <converters:DataTypeToStrokeBrushConverter x:Key="PinStrokeBrushConverter" />
+
     <converters:PinInputValueVisibilityConverter x:Key="PinInputValueVisibilityConverter" />
     <converters:EnumValuesConverter x:Key="EnumValuesConverter" />
 

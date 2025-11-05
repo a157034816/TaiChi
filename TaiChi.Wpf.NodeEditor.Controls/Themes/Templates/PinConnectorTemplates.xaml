@@ -1,6 +1,11 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- 确保转换器资源可用：本字典内直接合并 Converter.xaml -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/TaiChi.Wpf.NodeEditor.Controls;component/Themes/Converter.xaml" />
+    </ResourceDictionary.MergedDictionaries>
     
     <sys:Double x:Key="DefaultConnectorSize">12</sys:Double>
 
@@ -8,11 +13,23 @@
     <DataTemplate x:Key="DefaultPinConnectorTemplate">
         <Ellipse Width="{StaticResource DefaultConnectorSize}"
                  Height="{StaticResource DefaultConnectorSize}"
-                 Fill="{Binding Tag.MainColor, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
-                 Stroke="{Binding Tag.StrokeColor, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
                  StrokeThickness="{Binding Tag.StrokeThickness, RelativeSource={RelativeSource FindAncestor, AncestorType=ContentControl}}"
                  Cursor="Hand"
-                 SnapsToDevicePixels="True" />
+                 SnapsToDevicePixels="True">
+            <!-- 优先使用类型到颜色的转换器；若资源覆盖或转换器不可用，则回退到 PinControl 的 MainColor/StrokeColor -->
+            <Ellipse.Fill>
+                <PriorityBinding>
+                    <Binding Path="DataType" Converter="{StaticResource PinFillBrushConverter}" />
+                    <Binding Path="Tag.MainColor" RelativeSource="{RelativeSource FindAncestor, AncestorType=ContentControl}" />
+                </PriorityBinding>
+            </Ellipse.Fill>
+            <Ellipse.Stroke>
+                <PriorityBinding>
+                    <Binding Path="DataType" Converter="{StaticResource PinStrokeBrushConverter}" />
+                    <Binding Path="Tag.StrokeColor" RelativeSource="{RelativeSource FindAncestor, AncestorType=ContentControl}" />
+                </PriorityBinding>
+            </Ellipse.Stroke>
+        </Ellipse>
     </DataTemplate>
 
 </ResourceDictionary>
