@@ -74,7 +74,7 @@ namespace TaiChi.IO.Ports.Utils
         }
         
         /// <summary>
-        /// 检测串口设备是否是扫描枪（通过通信测试）(可能是无效方法)
+        /// 检测串口设备是否是扫描枪（通过通信测试）
         /// </summary>
         /// <param name="portName">串口名称</param>
         /// <param name="baudRate">波特率</param>
@@ -83,7 +83,6 @@ namespace TaiChi.IO.Ports.Utils
         /// <param name="parity">校验位</param>
         /// <param name="timeoutMs">超时时间（毫秒）</param>
         /// <returns>检测结果及信息</returns>
-        [Obsolete]
         public static async Task<(bool IsScanner, string Message)> DetectScannerDeviceAsync(
             string portName, 
             int baudRate = 9600, 
@@ -354,13 +353,12 @@ namespace TaiChi.IO.Ports.Utils
         }
 
         /// <summary>
-        /// 测试扫描枪并监听数据(可能是无效方法)
+        /// 测试扫描枪并监听数据
         /// </summary>
         /// <param name="portName">串口名</param>
         /// <param name="timeout">超时时间(毫秒)</param>
         /// <param name="triggerScanner">是否发送触发指令</param>
         /// <returns>测试结果</returns>
-        [Obsolete]
         public static async Task<(bool Success, string Result)> TestScannerAsync(
             string portName, int timeout = 10000, bool triggerScanner = true)
         {

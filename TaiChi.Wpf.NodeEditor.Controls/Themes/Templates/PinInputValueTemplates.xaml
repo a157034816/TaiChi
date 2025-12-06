@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 默认回退模板：仅显示占位文本 -->
+    <DataTemplate x:Key="DefaultPinInputValueTemplate">
+        <!-- <TextBlock Text="未连接" -->
+        <!--            Opacity="0.6" -->
+        <!--            VerticalAlignment="Center" /> -->
+    </DataTemplate>
+
+    <!-- string 类型：未连接时显示可编辑文本框，双向绑定到 Pin.Value -->
+    <DataTemplate x:Key="DefaultPinStringInputTemplate">
+        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 MinWidth="80"
+                 VerticalAlignment="Center" />
+    </DataTemplate>
+
+</ResourceDictionary>
+
