@@ -1103,26 +1103,26 @@ public class ExcelConverter
                     SetCellValue(cell, value);
                 }
             }
-            
-            // 自动调整列宽
-            for (int i = 0; i < dataTable.Columns.Count; i++)
-            {
-                try
-                {
-                    sheet.AutoSizeColumn(i);
-                    
-                    // 设置一个最大列宽，防止单元格内容过大导致的列宽过大问题
-                    if (sheet.GetColumnWidth(i) > 15000) // NPOI单位，约250个像素
-                    {
-                        sheet.SetColumnWidth(i, 15000);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // 如果调整列宽失败，记录错误但继续
-                    System.Diagnostics.Debug.WriteLine($"调整列宽失败: {ex.Message}");
-                }
-            }
+
+            // // 自动调整列宽
+            // for (int i = 0; i < dataTable.Columns.Count; i++)
+            // {
+            //     try
+            //     {
+            //         sheet.AutoSizeColumn(i);
+            //         
+            //         // 设置一个最大列宽，防止单元格内容过大导致的列宽过大问题
+            //         if (sheet.GetColumnWidth(i) > 15000) // NPOI单位，约250个像素
+            //         {
+            //             sheet.SetColumnWidth(i, 15000);
+            //         }
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         // 如果调整列宽失败，记录错误但继续
+            //         System.Diagnostics.Debug.WriteLine($"调整列宽失败: {ex.Message}");
+            //     }
+            // }
         }
         catch (Exception ex)
         {

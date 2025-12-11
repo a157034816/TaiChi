@@ -2,7 +2,6 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:converters="clr-namespace:TaiChi.Wpf.NodeEditor.Controls.Converters">
     
-    <!-- 杞崲鍣ㄨ祫婧?-->
     <converters:EnumToVisibilityConverter x:Key="EnumToVisibilityConverter" />
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
@@ -19,7 +18,7 @@
     <converters:ClampValueConverter x:Key="ClampValueConverter" />
     <converters:FlowPinFilterConverter x:Key="FlowPinFilterConverter" />
     <converters:PercentageConverter x:Key="PercentageConverter" />
-    <!-- 新增：Pin 颜色转换器（可在引用端通过相同 x:Key 覆盖来自定义配色） -->
+    <!-- Pin 颜色转换器（可在引用端通过相同 x:Key 覆盖来自定义配色） -->
     <converters:DataTypeToFillBrushConverter x:Key="PinFillBrushConverter" />
     <converters:DataTypeToStrokeBrushConverter x:Key="PinStrokeBrushConverter" />
 
