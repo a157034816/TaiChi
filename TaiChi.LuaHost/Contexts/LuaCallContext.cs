@@ -7,6 +7,7 @@ using Lua;
 using TaiChi.LuaHost.Attributes;
 using TaiChi.LuaHost.Exceptions;
 using TaiChi.LuaHost.Options;
+using TaiChi.LuaHost.Proxies;
 
 namespace TaiChi.LuaHost.Contexts;
 
@@ -266,6 +267,7 @@ public sealed class LuaCallContext
             long longValue => ExecutionContext.Return(longValue),
             double doubleValue => ExecutionContext.Return(doubleValue),
             float floatValue => ExecutionContext.Return(floatValue),
+            LuaValue luaValue => ExecutionContext.Return(luaValue),
             LuaTable table => ExecutionContext.Return(table),
             LuaFunction function => ExecutionContext.Return(function),
             _ => TryReturnCustomOrFallback(value)
@@ -290,7 +292,22 @@ public sealed class LuaCallContext
             return (int)method.Invoke(ExecutionContext, new[] { value });
         }
 
-        throw new LuaMappingException($"Lua 函数 {_functionName} 暂不支持返回类型 {value.GetType().Name}。");
+        var wrapped = LuaProxyTableFactory.WrapValue(ResolveLuaState(), value);
+        return ExecutionContext.Return(wrapped);
+    }
+
+    private LuaState ResolveLuaState()
+    {
+        var executionContextType = ExecutionContext.GetType();
+        var property = executionContextType.GetProperty("State", BindingFlags.Public | BindingFlags.Instance)
+                       ?? executionContextType.GetProperty("LuaState", BindingFlags.Public | BindingFlags.Instance);
+
+        if (property?.GetValue(ExecutionContext) is LuaState state)
+        {
+            return state;
+        }
+
+        throw new LuaMappingException($"Lua 函数 {_functionName} 无法从 LuaFunctionExecutionContext 获取 LuaState。");
     }
 
     private string FormatMissingArgumentMessage(int index, string? parameterName)

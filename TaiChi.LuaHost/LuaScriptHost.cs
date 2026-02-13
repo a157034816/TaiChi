@@ -9,6 +9,7 @@ using Lua;
 using Lua.Loaders;
 using Lua.Standard;
 using System.Linq;
+using TaiChi.LuaHost.Proxies;
 
 namespace TaiChi.LuaHost;
 
@@ -159,6 +160,45 @@ public sealed class LuaScriptHost : IDisposable
         }
 
         State.Environment[name] = value;
+    }
+
+    /// <summary>
+    /// 将对象以代理壳形式注册到 Lua 全局环境。
+    /// </summary>
+    /// <param name="name">全局变量名。</param>
+    /// <param name="target">被代理的真实对象。</param>
+    public void SetGlobalProxy(string name, object target)
+    {
+        EnsureNotDisposed();
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("全局变量名不能为空。", nameof(name));
+        }
+
+        if (target is null)
+        {
+            throw new ArgumentNullException(nameof(target));
+        }
+
+        State.Environment[name] = LuaProxyTableFactory.Wrap(State, target);
+    }
+
+    /// <summary>
+    /// 将任意值尽力而为注册到 Lua 全局环境：必要时自动包装为代理壳。
+    /// </summary>
+    /// <param name="name">全局变量名。</param>
+    /// <param name="value">待注册值。</param>
+    public void SetGlobalProxyValue(string name, object? value)
+    {
+        EnsureNotDisposed();
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("全局变量名不能为空。", nameof(name));
+        }
+
+        State.Environment[name] = LuaProxyTableFactory.WrapValue(State, value);
     }
 
     /// <summary>
