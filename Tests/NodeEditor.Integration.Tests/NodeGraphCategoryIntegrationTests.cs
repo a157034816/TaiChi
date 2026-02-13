@@ -2,11 +2,20 @@ using NodeEditor.Prefab.Services.Execution;
 using NodeEditor.Prefab.ViewModels;
 using TaiChi.Wpf.NodeEditor.Core.Enums;
 using TaiChi.Wpf.NodeEditor.Core.Models;
+using TaiChi.Wpf.NodeEditor.Core.Registry;
 
 namespace NodeEditor.Integration.Tests;
 
 public class NodeGraphCategoryIntegrationTests
 {
+    private static void RegisterTestNodes()
+    {
+        NodeRegistry.Clear();
+        NodeRegistry.RegisterNode(() => new FlowNode(), nameof(FlowNode));
+        NodeRegistry.RegisterNode(() => new SourceNode(), nameof(SourceNode));
+        NodeRegistry.RegisterNode(() => new PlusOneNode(), nameof(PlusOneNode));
+    }
+
     private sealed class FlowNode : Node
     {
         public int Called { get; private set; }
@@ -70,6 +79,7 @@ public class NodeGraphCategoryIntegrationTests
         // Load
         var save2 = NodeGraphSaveData.Deserialize(json!);
         Assert.NotNull(save2);
+        RegisterTestNodes();
         var g2 = save2!.ToModel();
         Assert.Equal(NodeGraphCategory.ControlFlow, g2.Category);
 
@@ -94,6 +104,7 @@ public class NodeGraphCategoryIntegrationTests
         var json = save.Serialize();
         var save2 = NodeGraphSaveData.Deserialize(json!);
         Assert.NotNull(save2);
+        RegisterTestNodes();
         var g2 = save2!.ToModel();
         Assert.Equal(NodeGraphCategory.DataFlow, g2.Category);
 
@@ -101,8 +112,13 @@ public class NodeGraphCategoryIntegrationTests
         var result = await engine.ExecuteAsync(g2) as DataFlowResult;
         Assert.NotNull(result);
 
-        // find sink node (no data outputs) after load
-        var sink = g2.Nodes.First(n => n.OutputPins.All(p => p.IsFlowPin || p.Value == null));
+        // 查找终端节点：无数据出边（与 DataFlowEngine 的 outdegree 规则一致）
+        var sink = g2.Nodes.First(n =>
+            !g2.Connections.Any(c =>
+                c.SourcePin?.ParentNode == n &&
+                c.SourcePin is { IsFlowPin: false } &&
+                c.TargetPin is { IsFlowPin: false }));
+
         Assert.True(result!.SinkNodeOutputs.ContainsKey(sink.Id));
     }
 }
