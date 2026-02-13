@@ -27,6 +27,12 @@ public sealed class LuaScriptHostOptions
     public bool LoadStandardLibraries { get; set; } = true;
 
     /// <summary>
+    /// 获取或设置是否启用 Lua 全局 <c>static</c> 表的未注册静态类自动解析。
+    /// 默认启用；关闭后访问未显式注册的 <c>static.Xxx</c> 将直接返回 <c>nil</c>。
+    /// </summary>
+    public bool EnableStaticAutoRegister { get; set; } = true;
+
+    /// <summary>
     /// 获取或设置 Lua 平台描述，可用于替换文件系统等底层行为。
     /// </summary>
     public LuaPlatform? Platform { get; set; }

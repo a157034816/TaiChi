@@ -177,3 +177,129 @@ public sealed class AliasConflictTarget
         return v + 1;
     }
 }
+
+/// <summary>
+/// 用于验证 Lua 静态类型代理（static 表）成员读写、递归包装与静态方法调用的示例静态类。
+/// </summary>
+public static class StaticTestTarget
+{
+    /// <summary>
+    /// 获取或设置一个公开静态属性。
+    /// </summary>
+    public static int Value { get; set; } = 1;
+
+    /// <summary>
+    /// 表示一个可读写的公开静态字段。
+    /// </summary>
+    public static int Count = 2;
+
+    /// <summary>
+    /// 获取或设置一个返回引用类型的静态属性，用于递归包装验证。
+    /// </summary>
+    public static ProxyTestPerson Person { get; set; } = new ProxyTestPerson("P");
+
+    /// <summary>
+    /// 获取或设置一个私有静态属性，用于验证 nonpublic 静态成员读写。
+    /// </summary>
+    private static string PrivateName { get; set; } = "private";
+
+    /// <summary>
+    /// 表示一个私有静态字段，用于验证 nonpublic 静态成员读写。
+    /// </summary>
+    private static int PrivateNumber = 7;
+
+    /// <summary>
+    /// 读取私有静态属性值，便于在测试中断言。
+    /// </summary>
+    public static string ReadPrivateName()
+    {
+        return PrivateName;
+    }
+
+    /// <summary>
+    /// 读取私有静态字段值，便于在测试中断言。
+    /// </summary>
+    public static int ReadPrivateNumber()
+    {
+        return PrivateNumber;
+    }
+
+    /// <summary>
+    /// 用于验证静态方法调用。
+    /// </summary>
+    /// <param name="a">参数 a。</param>
+    /// <param name="b">参数 b。</param>
+    /// <returns>两数之和。</returns>
+    public static int Add(int a, int b)
+    {
+        return a + b;
+    }
+}
+
+/// <summary>
+/// 用于验证“同名静态方法多重载即异常”以及“重载别名调用”的示例静态类。
+/// </summary>
+public static class StaticOverloadTarget
+{
+    /// <summary>
+    /// Foo 的单参数重载。
+    /// </summary>
+    /// <param name="v">输入。</param>
+    /// <returns>原样返回。</returns>
+    [LuaOverloadPreferred("Foo_1")]
+    public static int Foo(int v)
+    {
+        return v;
+    }
+
+    /// <summary>
+    /// Foo 的双参数重载。
+    /// </summary>
+    /// <param name="a">参数 a。</param>
+    /// <param name="b">参数 b。</param>
+    /// <returns>两数之和。</returns>
+    [LuaOverloadPreferred("Foo_2")]
+    public static int Foo(int a, int b)
+    {
+        return a + b;
+    }
+}
+
+/// <summary>
+/// 用于验证“静态方法别名冲突会抛异常”的示例静态类。
+/// </summary>
+public static class StaticAliasConflictTarget
+{
+    /// <summary>
+    /// 示例方法 A，别名与 B 冲突。
+    /// </summary>
+    /// <param name="v">输入。</param>
+    /// <returns>原样返回。</returns>
+    [LuaOverloadPreferred("X")]
+    public static int A(int v)
+    {
+        return v;
+    }
+
+    /// <summary>
+    /// 示例方法 B，别名与 A 冲突。
+    /// </summary>
+    /// <param name="v">输入。</param>
+    /// <returns>返回 v + 1。</returns>
+    [LuaOverloadPreferred("X")]
+    public static int B(int v)
+    {
+        return v + 1;
+    }
+}
+
+/// <summary>
+/// 用于验证 <c>static</c> 根表自动注册行为的示例静态类（按类型名解析，避免与其他程序集同名冲突）。
+/// </summary>
+public static class LuaHostAutoStaticUnique
+{
+    /// <summary>
+    /// 获取或设置示例值。
+    /// </summary>
+    public static int Value { get; set; } = 10;
+}

@@ -19,6 +19,10 @@ namespace TaiChi.LuaHost;
 public sealed class LuaScriptHost : IDisposable
 {
     private readonly LuaScriptHostOptions _options;
+    /// <summary>
+    /// Lua 全局 <c>static</c> 根表（静态类型代理入口）。
+    /// </summary>
+    private readonly LuaTable _staticRoot;
     private static readonly MethodInfo? CompositeModuleLoaderArrayFactory =
         typeof(CompositeModuleLoader).GetMethod("Create", new[] { typeof(ILuaModuleLoader[]) });
     private bool _disposed;
@@ -31,6 +35,7 @@ public sealed class LuaScriptHost : IDisposable
     {
         _options = options ?? new LuaScriptHostOptions();
         State = CreateState(_options);
+        _staticRoot = LuaStaticProxyTableFactory.EnsureStaticRoot(State, _options);
     }
 
     /// <summary>
@@ -199,6 +204,34 @@ public sealed class LuaScriptHost : IDisposable
         }
 
         State.Environment[name] = LuaProxyTableFactory.WrapValue(State, value);
+    }
+
+    /// <summary>
+    /// 将指定类型的静态成员以代理壳形式注册到 Lua 全局 <c>static</c> 表。
+    /// </summary>
+    /// <typeparam name="T">目标类型。</typeparam>
+    /// <param name="alias">Lua 侧访问别名（可选），默认使用类型名。</param>
+    public void RegisterStaticType<T>(string? alias = null)
+    {
+        RegisterStaticType(typeof(T), alias);
+    }
+
+    /// <summary>
+    /// 将指定类型的静态成员以代理壳形式注册到 Lua 全局 <c>static</c> 表。
+    /// </summary>
+    /// <param name="type">目标类型。</param>
+    /// <param name="alias">Lua 侧访问别名（可选），默认使用类型名。</param>
+    public void RegisterStaticType(Type type, string? alias = null)
+    {
+        EnsureNotDisposed();
+
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        var resolvedAlias = string.IsNullOrWhiteSpace(alias) ? type.Name : alias.Trim();
+        _staticRoot[resolvedAlias] = LuaStaticProxyTableFactory.Wrap(State, type);
     }
 
     /// <summary>
