@@ -198,7 +198,27 @@ public class Connection : INotifyPropertyChanged
         if (SourcePin == null || TargetPin == null)
             return false;
 
-        return SourcePin.CanConnectTo(TargetPin);
+        // 校验既有连接时，不应使用 Pin.CanConnectTo（其用于“建立新连接”，会因输入引脚已有连接而返回 false）。
+        if (SourcePin == TargetPin)
+            return false;
+
+        // 不能连接到同一个节点的引脚（包含 ParentNode 都为 null 的异常状态）
+        if (SourcePin.ParentNode == TargetPin.ParentNode)
+            return false;
+
+        // 方向必须为 输出 -> 输入
+        if (SourcePin.Direction != TaiChi.Wpf.NodeEditor.Core.Enums.PinDirection.Output)
+            return false;
+
+        if (TargetPin.Direction != TaiChi.Wpf.NodeEditor.Core.Enums.PinDirection.Input)
+            return false;
+
+        // 流程引脚只能连接到流程引脚
+        if (SourcePin.IsFlowPin != TargetPin.IsFlowPin)
+            return false;
+
+        // 数据类型必须兼容
+        return SourcePin.IsDataTypeCompatible(TargetPin.DataType);
     }
 
     /// <summary>
