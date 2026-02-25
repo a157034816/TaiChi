@@ -209,16 +209,6 @@ public sealed class LuaScriptHost : IDisposable
     /// <summary>
     /// 将指定类型的静态成员以代理壳形式注册到 Lua 全局 <c>static</c> 表。
     /// </summary>
-    /// <typeparam name="T">目标类型。</typeparam>
-    /// <param name="alias">Lua 侧访问别名（可选），默认使用类型名。</param>
-    public void RegisterStaticType<T>(string? alias = null)
-    {
-        RegisterStaticType(typeof(T), alias);
-    }
-
-    /// <summary>
-    /// 将指定类型的静态成员以代理壳形式注册到 Lua 全局 <c>static</c> 表。
-    /// </summary>
     /// <param name="type">目标类型。</param>
     /// <param name="alias">Lua 侧访问别名（可选），默认使用类型名。</param>
     public void RegisterStaticType(Type type, string? alias = null)
