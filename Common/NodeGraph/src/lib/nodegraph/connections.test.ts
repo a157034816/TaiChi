@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isInputHandleOccupied } from "@/lib/nodegraph/connections";
+import { removeConflictingInputEdges } from "@/lib/nodegraph/connections";
 
 describe("nodegraph connections", () => {
-  it("marks a target handle as occupied when another edge already uses it", () => {
+  it("removes an existing edge when a new connection targets the same input handle", () => {
     expect(
-      isInputHandleOccupied(
+      removeConflictingInputEdges(
         [
           {
             id: "edge_approval_notify_success",
@@ -20,12 +20,12 @@ describe("nodegraph connections", () => {
           targetHandle: "success",
         },
       ),
-    ).toBe(true);
+    ).toEqual([]);
   });
 
-  it("treats different target handles on the same node as independent inputs", () => {
+  it("keeps edges on other target handles of the same node", () => {
     expect(
-      isInputHandleOccupied(
+      removeConflictingInputEdges(
         [
           {
             id: "edge_approval_notify_success",
@@ -40,12 +40,20 @@ describe("nodegraph connections", () => {
           targetHandle: "failure",
         },
       ),
-    ).toBe(false);
+    ).toEqual([
+      {
+        id: "edge_approval_notify_success",
+        source: "node_approval",
+        sourceHandle: "approved",
+        target: "node_notify",
+        targetHandle: "success",
+      },
+    ]);
   });
 
-  it("treats legacy single-input edges without handle ids as a single occupied input", () => {
+  it("treats legacy single-input edges without handle ids as a replaceable default input", () => {
     expect(
-      isInputHandleOccupied(
+      removeConflictingInputEdges(
         [
           {
             id: "edge_start_approval",
@@ -58,6 +66,6 @@ describe("nodegraph connections", () => {
           targetHandle: null,
         },
       ),
-    ).toBe(true);
+    ).toEqual([]);
   });
 });

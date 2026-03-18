@@ -6,19 +6,19 @@ function normalizeHandleId(handleId?: string | null) {
   return handleId ?? "__default_handle__";
 }
 
-export function isInputHandleOccupied(
+export function removeConflictingInputEdges(
   edges: NodeGraphEdge[],
   connection: Pick<Connection, "target" | "targetHandle">,
 ) {
   if (!connection.target) {
-    return false;
+    return edges;
   }
 
   const targetHandle = normalizeHandleId(connection.targetHandle);
 
-  return edges.some(
+  return edges.filter(
     (edge) =>
-      edge.target === connection.target &&
-      normalizeHandleId(edge.targetHandle) === targetHandle,
+      edge.target !== connection.target ||
+      normalizeHandleId(edge.targetHandle) !== targetHandle,
   );
 }

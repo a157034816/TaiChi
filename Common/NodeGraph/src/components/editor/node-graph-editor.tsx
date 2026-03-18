@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   addEdge,
   Background,
@@ -19,8 +19,14 @@ import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react"
 import { BlueprintNode } from "@/components/editor/blueprint-node";
 import { NodeInspectorPanel } from "@/components/editor/node-inspector-panel";
 import { NodeLibraryPanel } from "@/components/editor/node-library-panel";
-import { isInputHandleOccupied } from "@/lib/nodegraph/connections";
+import { removeConflictingInputEdges } from "@/lib/nodegraph/connections";
 import { buildNodeStyle, createNodeFromLibrary, normalizeNodeDataPorts } from "@/lib/nodegraph/factories";
+import {
+  getCanvasFocusLabel,
+  getCanvasTypeLabel,
+  resolveCanvasSelection,
+  type CanvasSelection,
+} from "@/lib/nodegraph/selection";
 import type { EditorSessionPayload, NodeGraphEdge, NodeGraphNode, NodeLibraryItem } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,14 +108,36 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const [graphDescription, setGraphDescription] = useState(payload.session.graph.description ?? "");
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [nodes, setNodes, onNodesChange] = useNodesState(
+  const [nodes, setNodes, onNodesChange] = useNodesState<NodeGraphNode>(
     payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary)),
   );
-  const [edges, setEdges, onEdgesChange] = useEdgesState(payload.session.graph.edges.map(prepareCanvasEdge));
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<NodeGraphEdge>(
+    payload.session.graph.edges.map(prepareCanvasEdge),
+  );
+  const [selectedItem, setSelectedItem] = useState<CanvasSelection>(null);
 
-  const selectedNode = (nodes.find((node) => node.id === selectedNodeId) as NodeGraphNode | undefined) ?? null;
+  const selectedNode =
+    selectedItem?.type === "node"
+      ? (nodes.find((node) => node.id === selectedItem.id) as NodeGraphNode | undefined) ?? null
+      : null;
+  const selectedEdge =
+    selectedItem?.type === "edge"
+      ? (edges.find((edge) => edge.id === selectedItem.id) as NodeGraphEdge | undefined) ?? null
+      : null;
   const selectedTemplate = selectedNode ? getNodeTemplate(payload.nodeLibrary, selectedNode.data.nodeType) ?? null : null;
+  const focusLabel = getCanvasFocusLabel(selectedItem, nodes, edges);
+  const selectionTypeLabel = getCanvasTypeLabel(selectedItem, nodes, edges);
+  const handleSelectionChange = useCallback(
+    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: NodeGraphNode[]; edges: NodeGraphEdge[] }) => {
+      setSelectedItem(
+        resolveCanvasSelection({
+          nodes: selectedNodes,
+          edges: selectedEdges,
+        }),
+      );
+    },
+    [],
+  );
 
   function addNode(item: EditorSessionPayload["nodeLibrary"][number]) {
     setNodes((currentNodes) => [
@@ -208,7 +236,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   <div className="graph-stage__stat">
                     <span className="graph-stage__stat-label">Focus</span>
                     <span className="graph-stage__stat-value truncate">
-                      {selectedNode?.data.label ?? "Canvas"}
+                      {focusLabel}
                     </span>
                   </div>
                 </div>
@@ -263,7 +291,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   </span>
                   <span className="graph-stage__badge">
                     <Crosshair className="size-4" />
-                    {selectedNode?.data.nodeType ?? "canvas focus"}
+                    {selectionTypeLabel}
                   </span>
                 </div>
               </div>
@@ -274,27 +302,27 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 connectionLineStyle={defaultEdgeOptions.style}
                 connectionLineType={ConnectionLineType.SmoothStep}
                 defaultEdgeOptions={defaultEdgeOptions}
+                deleteKeyCode={["Delete", "Backspace"]}
                 edges={edges}
+                elevateEdgesOnSelect
                 fitView
                 fitViewOptions={{ padding: 0.18 }}
                 nodeTypes={editorNodeTypes}
                 nodes={nodes}
                 onConnect={(connection: Connection) =>
                   setEdges((currentEdges) => {
-                    if (isInputHandleOccupied(currentEdges, connection)) {
-                      return currentEdges;
-                    }
-
-                    return addEdge(createCanvasEdge(connection), currentEdges);
+                    return addEdge(
+                      createCanvasEdge(connection),
+                      removeConflictingInputEdges(currentEdges, connection),
+                    );
                   })
                 }
+                onEdgeClick={(_, edge) => setSelectedItem({ type: "edge", id: edge.id })}
                 onEdgesChange={onEdgesChange}
-                onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+                onNodeClick={(_, node) => setSelectedItem({ type: "node", id: node.id })}
                 onNodesChange={onNodesChange}
-                onPaneClick={() => setSelectedNodeId(null)}
-                onSelectionChange={({ nodes: selectedNodes }) =>
-                  setSelectedNodeId(selectedNodes[0]?.id ?? null)
-                }
+                onPaneClick={() => setSelectedItem(null)}
+                onSelectionChange={handleSelectionChange}
               >
                 <Background
                   color="rgba(125, 142, 173, 0.08)"
@@ -333,9 +361,11 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
 
         <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
           <NodeInspectorPanel
+            edge={selectedEdge}
             graphDescription={graphDescription}
             graphName={graphName}
             node={selectedNode}
+            nodes={nodes}
             onGraphDescriptionChange={setGraphDescription}
             onGraphNameChange={setGraphName}
             onNodeFieldChange={(field, value) =>
