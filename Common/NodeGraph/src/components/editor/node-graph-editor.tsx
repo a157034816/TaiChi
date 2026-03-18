@@ -19,6 +19,7 @@ import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react"
 import { BlueprintNode } from "@/components/editor/blueprint-node";
 import { NodeInspectorPanel } from "@/components/editor/node-inspector-panel";
 import { NodeLibraryPanel } from "@/components/editor/node-library-panel";
+import { isInputHandleOccupied } from "@/lib/nodegraph/connections";
 import { buildNodeStyle, createNodeFromLibrary, normalizeNodeDataPorts } from "@/lib/nodegraph/factories";
 import type { EditorSessionPayload, NodeGraphEdge, NodeGraphNode, NodeLibraryItem } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
@@ -279,7 +280,13 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 nodeTypes={editorNodeTypes}
                 nodes={nodes}
                 onConnect={(connection: Connection) =>
-                  setEdges((currentEdges) => addEdge(createCanvasEdge(connection), currentEdges))
+                  setEdges((currentEdges) => {
+                    if (isInputHandleOccupied(currentEdges, connection)) {
+                      return currentEdges;
+                    }
+
+                    return addEdge(createCanvasEdge(connection), currentEdges);
+                  })
                 }
                 onEdgesChange={onEdgesChange}
                 onNodeClick={(_, node) => setSelectedNodeId(node.id)}
