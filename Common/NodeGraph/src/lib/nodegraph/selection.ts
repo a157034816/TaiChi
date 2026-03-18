@@ -5,6 +5,11 @@ export type CanvasSelection =
   | { type: "edge"; id: string }
   | null;
 
+export interface CanvasSelectionSnapshot {
+  nodeIds: string[];
+  edgeIds: string[];
+}
+
 interface SelectionChangeSnapshot {
   nodes: Array<Pick<NodeGraphNode, "id">>;
   edges: Array<Pick<NodeGraphEdge, "id">>;
@@ -15,6 +20,20 @@ const DEFAULT_TYPE_LABEL = "canvas focus";
 
 function getNodeLabel(nodeId: string, nodes: NodeGraphNode[]) {
   return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
+}
+
+export function createEmptyCanvasSelectionSnapshot(): CanvasSelectionSnapshot {
+  return {
+    nodeIds: [],
+    edgeIds: [],
+  };
+}
+
+export function createCanvasSelectionSnapshot({ nodes, edges }: SelectionChangeSnapshot): CanvasSelectionSnapshot {
+  return {
+    nodeIds: nodes.map((node) => node.id),
+    edgeIds: edges.map((edge) => edge.id),
+  };
 }
 
 export function resolveCanvasSelection({ nodes, edges }: SelectionChangeSnapshot): CanvasSelection {
@@ -37,6 +56,13 @@ export function resolveCanvasSelection({ nodes, edges }: SelectionChangeSnapshot
   }
 
   return null;
+}
+
+export function resolveCanvasSelectionFromSnapshot(selection: CanvasSelectionSnapshot): CanvasSelection {
+  return resolveCanvasSelection({
+    nodes: selection.nodeIds.map((id) => ({ id })),
+    edges: selection.edgeIds.map((id) => ({ id })),
+  });
 }
 
 export function getCanvasFocusLabel(

@@ -257,6 +257,152 @@ body {
   height: 100%;
 }
 
+.canvas-context-menu {
+  position: fixed;
+  z-index: 40;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: min(32rem, calc(100vh - 2rem));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.4rem;
+  background:
+    linear-gradient(180deg, rgba(23, 30, 43, 0.98), rgba(10, 14, 22, 0.98)),
+    rgba(14, 19, 29, 0.96);
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.canvas-context-menu__section {
+  padding: 0.9rem;
+}
+
+.canvas-context-menu__divider {
+  height: 1px;
+  margin: 0 0.9rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.canvas-context-menu__label,
+.canvas-context-menu__group-title,
+.canvas-context-menu__library-type {
+  font-family: var(--font-display), sans-serif;
+  text-transform: uppercase;
+}
+
+.canvas-context-menu__label,
+.canvas-context-menu__group-title {
+  color: #92a3bc;
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
+}
+
+.canvas-context-menu__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.canvas-context-menu__action,
+.canvas-context-menu__library-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf3ff;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.canvas-context-menu__action {
+  min-height: 2.75rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.canvas-context-menu__action:hover,
+.canvas-context-menu__library-item:hover {
+  border-color: rgba(255, 157, 28, 0.3);
+  background: rgba(255, 157, 28, 0.08);
+  transform: translateY(-1px);
+}
+
+.canvas-context-menu__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
+.canvas-context-menu__library {
+  display: flex;
+  max-height: 18rem;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.canvas-context-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.canvas-context-menu__action-icon {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffb44c;
+}
+
+.canvas-context-menu__library-item {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0.8rem 0.9rem;
+}
+
+.canvas-context-menu__library-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.canvas-context-menu__library-title {
+  display: block;
+  color: #f7fbff;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.canvas-context-menu__library-type {
+  display: block;
+  margin-top: 0.18rem;
+  color: #8fa0bc;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+}
+
+.canvas-context-menu__library-description {
+  margin-top: 0.7rem;
+  color: #93a4be;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
 .editor-workbench .react-flow__renderer {
   background: transparent;
 }

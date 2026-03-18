@@ -1,33 +1,25 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
-  addEdge,
   Background,
   BackgroundVariant,
-  type Connection,
   ConnectionLineType,
   Controls,
-  MarkerType,
   MiniMap,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
 } from "@xyflow/react";
 import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react";
 
-import { BlueprintNode } from "@/components/editor/blueprint-node";
+import { CanvasContextMenu } from "@/components/editor/canvas-context-menu";
 import { NodeInspectorPanel } from "@/components/editor/node-inspector-panel";
 import { NodeLibraryPanel } from "@/components/editor/node-library-panel";
-import { removeConflictingInputEdges } from "@/lib/nodegraph/connections";
-import { buildNodeStyle, createNodeFromLibrary, normalizeNodeDataPorts } from "@/lib/nodegraph/factories";
 import {
-  getCanvasFocusLabel,
-  getCanvasTypeLabel,
-  resolveCanvasSelection,
-  type CanvasSelection,
-} from "@/lib/nodegraph/selection";
-import type { EditorSessionPayload, NodeGraphEdge, NodeGraphNode, NodeLibraryItem } from "@/lib/nodegraph/types";
+  defaultEdgeOptions,
+  editorNodeTypes,
+  useNodeGraphCanvas,
+} from "@/components/editor/use-node-graph-canvas";
+import type { EditorSessionPayload } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,125 +28,42 @@ interface NodeGraphEditorProps {
   payload: EditorSessionPayload;
 }
 
-const editorNodeTypes = {
-  default: BlueprintNode,
-};
-
-const EDGE_STROKE = "rgba(159, 179, 217, 0.94)";
-
-const defaultEdgeOptions = {
-  type: "smoothstep",
-  animated: false,
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    color: "#9fb3d9",
-    width: 18,
-    height: 18,
-  },
-  style: {
-    stroke: EDGE_STROKE,
-    strokeWidth: 3,
-  },
-} as const;
-
-function getNextNodePosition(currentCount: number) {
-  return {
-    x: 120 + (currentCount % 3) * 360,
-    y: 140 + Math.floor(currentCount / 3) * 230,
-  };
-}
-
-function getNodeTemplate(nodeLibrary: NodeLibraryItem[], nodeType: string) {
-  return nodeLibrary.find((item) => item.type === nodeType);
-}
-
-function prepareCanvasNode(node: NodeGraphNode, nodeLibrary: NodeLibraryItem[]): NodeGraphNode {
-  const template = getNodeTemplate(nodeLibrary, node.data.nodeType);
-
-  return {
-    ...node,
-    type: "default",
-    data: normalizeNodeDataPorts(node.data, template),
-    style: {
-      ...(node.style ?? {}),
-      ...buildNodeStyle(node.data.appearance),
-    },
-  };
-}
-
-function prepareCanvasEdge(edge: NodeGraphEdge): NodeGraphEdge {
-  return {
-    ...edge,
-    type: "smoothstep",
-    animated: false,
-    markerEnd: edge.markerEnd ?? defaultEdgeOptions.markerEnd,
-    style: {
-      stroke: EDGE_STROKE,
-      strokeWidth: 3,
-      ...(edge.style ?? {}),
-    },
-  };
-}
-
-function createCanvasEdge(connection: Connection): NodeGraphEdge {
-  return prepareCanvasEdge({
-    ...connection,
-    id: `edge_${crypto.randomUUID()}`,
-  });
-}
-
 export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const [graphName, setGraphName] = useState(payload.session.graph.name);
   const [graphDescription, setGraphDescription] = useState(payload.session.graph.description ?? "");
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [nodes, setNodes, onNodesChange] = useNodesState<NodeGraphNode>(
-    payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary)),
-  );
-  const [edges, setEdges, onEdgesChange] = useEdgesState<NodeGraphEdge>(
-    payload.session.graph.edges.map(prepareCanvasEdge),
-  );
-  const [selectedItem, setSelectedItem] = useState<CanvasSelection>(null);
-
-  const selectedNode =
-    selectedItem?.type === "node"
-      ? (nodes.find((node) => node.id === selectedItem.id) as NodeGraphNode | undefined) ?? null
-      : null;
-  const selectedEdge =
-    selectedItem?.type === "edge"
-      ? (edges.find((edge) => edge.id === selectedItem.id) as NodeGraphEdge | undefined) ?? null
-      : null;
-  const selectedTemplate = selectedNode ? getNodeTemplate(payload.nodeLibrary, selectedNode.data.nodeType) ?? null : null;
-  const focusLabel = getCanvasFocusLabel(selectedItem, nodes, edges);
-  const selectionTypeLabel = getCanvasTypeLabel(selectedItem, nodes, edges);
-  const handleSelectionChange = useCallback(
-    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: NodeGraphNode[]; edges: NodeGraphEdge[] }) => {
-      setSelectedItem(
-        resolveCanvasSelection({
-          nodes: selectedNodes,
-          edges: selectedEdges,
-        }),
-      );
-    },
-    [],
-  );
-
-  function addNode(item: EditorSessionPayload["nodeLibrary"][number]) {
-    setNodes((currentNodes) => [
-      ...currentNodes,
-      createNodeFromLibrary(item, getNextNodePosition(currentNodes.length)),
-    ]);
-  }
-
-  function updateSelectedNode(mutator: (node: NodeGraphNode) => NodeGraphNode) {
-    if (!selectedNode) {
-      return;
-    }
-
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => (node.id === selectedNode.id ? mutator(node as NodeGraphNode) : node)),
-    );
-  }
+  const {
+    addNode,
+    addNodeAtMenuPosition,
+    contextMenuMeta,
+    contextMenuState,
+    copyCurrentSelection,
+    cutCurrentSelection,
+    deleteCurrentSelection,
+    edges,
+    focusLabel,
+    handleConnect,
+    handleDelete,
+    handleEdgeClick,
+    handleEdgeContextMenu,
+    handleNodeClick,
+    handleNodeContextMenu,
+    handlePaneClick,
+    handlePaneContextMenu,
+    handleSelectionChange,
+    handleSelectionContextMenu,
+    nodes,
+    onEdgesChange,
+    onNodesChange,
+    pasteClipboardAtMenuPosition,
+    selectedEdge,
+    selectedNode,
+    selectedTemplate,
+    selectionTypeLabel,
+    setReactFlowInstance,
+    updateSelectedNode,
+  } = useNodeGraphCanvas(payload);
 
   async function saveGraph() {
     setSaveState("saving");
@@ -235,9 +144,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   </div>
                   <div className="graph-stage__stat">
                     <span className="graph-stage__stat-label">Focus</span>
-                    <span className="graph-stage__stat-value truncate">
-                      {focusLabel}
-                    </span>
+                    <span className="graph-stage__stat-value truncate">{focusLabel}</span>
                   </div>
                 </div>
 
@@ -309,20 +216,19 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 fitViewOptions={{ padding: 0.18 }}
                 nodeTypes={editorNodeTypes}
                 nodes={nodes}
-                onConnect={(connection: Connection) =>
-                  setEdges((currentEdges) => {
-                    return addEdge(
-                      createCanvasEdge(connection),
-                      removeConflictingInputEdges(currentEdges, connection),
-                    );
-                  })
-                }
-                onEdgeClick={(_, edge) => setSelectedItem({ type: "edge", id: edge.id })}
+                onConnect={handleConnect}
+                onDelete={handleDelete}
+                onEdgeClick={(_, edge) => handleEdgeClick(edge.id)}
+                onEdgeContextMenu={handleEdgeContextMenu}
                 onEdgesChange={onEdgesChange}
-                onNodeClick={(_, node) => setSelectedItem({ type: "node", id: node.id })}
+                onInit={setReactFlowInstance}
+                onNodeClick={(_, node) => handleNodeClick(node.id)}
+                onNodeContextMenu={handleNodeContextMenu}
                 onNodesChange={onNodesChange}
-                onPaneClick={() => setSelectedItem(null)}
+                onPaneClick={handlePaneClick}
+                onPaneContextMenu={handlePaneContextMenu}
                 onSelectionChange={handleSelectionChange}
+                onSelectionContextMenu={handleSelectionContextMenu}
               >
                 <Background
                   color="rgba(125, 142, 173, 0.08)"
@@ -347,6 +253,25 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   }
                 />
               </ReactFlow>
+
+              {contextMenuState && contextMenuMeta ? (
+                <CanvasContextMenu
+                  canCopy={contextMenuMeta.canCopy}
+                  canCut={contextMenuMeta.canCut}
+                  canDelete={contextMenuMeta.canDelete}
+                  canPaste={contextMenuMeta.canPaste}
+                  copyLabel={contextMenuMeta.copyLabel}
+                  cutLabel={contextMenuMeta.cutLabel}
+                  deleteLabel={contextMenuMeta.deleteLabel}
+                  items={payload.nodeLibrary}
+                  onAddNode={addNodeAtMenuPosition}
+                  onCopy={copyCurrentSelection}
+                  onCut={cutCurrentSelection}
+                  onDelete={deleteCurrentSelection}
+                  onPaste={pasteClipboardAtMenuPosition}
+                  position={contextMenuState.position}
+                />
+              ) : null}
             </CardContent>
           </Card>
 

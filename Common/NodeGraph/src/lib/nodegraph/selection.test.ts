@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { getCanvasFocusLabel, getCanvasTypeLabel, resolveCanvasSelection } from "@/lib/nodegraph/selection";
+import {
+  createCanvasSelectionSnapshot,
+  createEmptyCanvasSelectionSnapshot,
+  getCanvasFocusLabel,
+  getCanvasTypeLabel,
+  resolveCanvasSelection,
+  resolveCanvasSelectionFromSnapshot,
+} from "@/lib/nodegraph/selection";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
 
 const nodes: NodeGraphNode[] = [
@@ -31,6 +38,25 @@ const edges: NodeGraphEdge[] = [
 ];
 
 describe("nodegraph selection", () => {
+  it("creates an empty selection snapshot", () => {
+    expect(createEmptyCanvasSelectionSnapshot()).toEqual({
+      nodeIds: [],
+      edgeIds: [],
+    });
+  });
+
+  it("captures all selected node and edge ids in a selection snapshot", () => {
+    expect(
+      createCanvasSelectionSnapshot({
+        nodes: [{ id: "node_start" }, { id: "node_notify" }],
+        edges: [{ id: "edge_start_notify" }],
+      }),
+    ).toEqual({
+      nodeIds: ["node_start", "node_notify"],
+      edgeIds: ["edge_start_notify"],
+    });
+  });
+
   it("prefers the first selected node when nodes and edges are both selected", () => {
     expect(
       resolveCanvasSelection({
@@ -40,6 +66,28 @@ describe("nodegraph selection", () => {
     ).toEqual({
       type: "node",
       id: "node_start",
+    });
+  });
+
+  it("resolves the primary selection from a selection snapshot", () => {
+    expect(
+      resolveCanvasSelectionFromSnapshot({
+        nodeIds: ["node_start", "node_notify"],
+        edgeIds: ["edge_start_notify"],
+      }),
+    ).toEqual({
+      type: "node",
+      id: "node_start",
+    });
+
+    expect(
+      resolveCanvasSelectionFromSnapshot({
+        nodeIds: [],
+        edgeIds: ["edge_start_notify"],
+      }),
+    ).toEqual({
+      type: "edge",
+      id: "edge_start_notify",
     });
   });
 
