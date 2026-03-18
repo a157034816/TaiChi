@@ -1,0 +1,12 @@
+{
+  "name": "nodegraph-demo-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.mjs",
+    "start": "node src/server.mjs",
+    "demo:interactive": "python -X utf8 scripts/interactive-demo.py",
+    "test": "node --test",
+    "check": "node --check src/app.mjs && node --check src/html.mjs && node --check src/server.mjs && python -X utf8 -m py_compile scripts/interactive-demo.py"
+  }
+}

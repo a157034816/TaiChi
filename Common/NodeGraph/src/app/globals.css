@@ -1,0 +1,568 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f0e7;
+  --foreground: #1b2430;
+  --card: rgba(255, 255, 255, 0.8);
+  --card-foreground: #16202b;
+  --muted: #eee2d1;
+  --muted-foreground: #5d6b78;
+  --border: rgba(15, 23, 42, 0.12);
+  --primary: #0f766e;
+  --primary-foreground: #effcf8;
+  --accent: #f4c95d;
+  --accent-foreground: #47330c;
+  --ring: rgba(15, 118, 110, 0.35);
+  --danger: #b42318;
+  --danger-foreground: #fff6f6;
+  --radius: 1.25rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+  background-image:
+    radial-gradient(circle at top, rgba(15, 118, 110, 0.14), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(244, 201, 93, 0.3), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(246, 240, 231, 0.96));
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.panel-surface {
+  background: var(--card);
+  backdrop-filter: blur(16px);
+}
+
+.editor-grid {
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.display-font {
+  font-family: var(--font-display), sans-serif;
+}
+
+.editor-workbench {
+  --background: #080b12;
+  --foreground: #edf3ff;
+  --card: rgba(14, 19, 29, 0.88);
+  --card-foreground: #f6f9ff;
+  --muted: rgba(23, 31, 46, 0.96);
+  --muted-foreground: #92a3bc;
+  --border: rgba(161, 179, 206, 0.16);
+  --primary: #ff9d1c;
+  --primary-foreground: #221507;
+  --accent: #57c7ff;
+  --accent-foreground: #06131a;
+  --ring: rgba(255, 157, 28, 0.45);
+  --danger: #ff6b6b;
+  --danger-foreground: #fff3f3;
+  --radius: 1.5rem;
+  --font-body: var(--font-editor-body);
+  --font-display: var(--font-editor-display);
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at top left, rgba(255, 157, 28, 0.18), transparent 22%),
+    radial-gradient(circle at top right, rgba(87, 199, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, #111722 0%, #090d14 100%);
+}
+
+.editor-workbench::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 120px 120px;
+  mask-image: radial-gradient(circle at center, black 32%, transparent 86%);
+  opacity: 0.4;
+}
+
+.editor-panel {
+  position: relative;
+  border-color: rgba(161, 179, 206, 0.16);
+  background:
+    linear-gradient(180deg, rgba(23, 30, 43, 0.9), rgba(10, 14, 22, 0.96)),
+    rgba(14, 19, 29, 0.88);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.editor-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 28%);
+}
+
+.editor-workbench .editor-grid {
+  position: relative;
+  background:
+    radial-gradient(circle at top, rgba(255, 157, 28, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(18, 24, 37, 0.98), rgba(8, 11, 18, 0.98));
+  background-size: auto, auto;
+}
+
+.editor-kicker {
+  color: #7e8ea8;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.editor-chip {
+  border-color: rgba(255, 157, 28, 0.24);
+  background: rgba(255, 157, 28, 0.12);
+  color: #ffd8a3;
+}
+
+.editor-icon-shell {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.graph-stage {
+  overflow: hidden;
+}
+
+.graph-stage__hud {
+  position: absolute;
+  inset: 1rem 1rem auto 1rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.graph-stage__title {
+  margin-top: 0.35rem;
+  color: #fff8ec;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.graph-stage__subtitle {
+  max-width: 30rem;
+  margin-top: 0.5rem;
+  color: #93a4be;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.graph-stage__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.graph-stage__badge,
+.graph-stage__stat {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(9, 13, 21, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.graph-stage__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  color: #dfe8f7;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.graph-stage__stat {
+  display: flex;
+  min-width: 7rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+}
+
+.graph-stage__stat-label {
+  color: #8193af;
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.graph-stage__stat-value {
+  color: #f6f9ff;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.graph-flow {
+  height: 100%;
+}
+
+.editor-workbench .react-flow__renderer {
+  background: transparent;
+}
+
+.editor-workbench .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(9, 13, 21, 0.84);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+}
+
+.editor-workbench .react-flow__controls-button {
+  height: 2.7rem;
+  width: 2.7rem;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #e7eef9;
+}
+
+.editor-workbench .react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.editor-workbench .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.graph-minimap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.2rem;
+  background: rgba(9, 13, 21, 0.78);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}
+
+.editor-workbench .react-flow__edge path,
+.editor-workbench .react-flow__connection-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(95, 126, 182, 0.3));
+}
+
+.editor-workbench .react-flow__edge.selected path {
+  stroke: #ffb44c;
+  filter: drop-shadow(0 0 12px rgba(255, 157, 28, 0.4));
+}
+
+.editor-workbench .react-flow__node {
+  border: none;
+  background: transparent;
+}
+
+.blueprint-node {
+  position: relative;
+  width: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.1rem;
+  overflow: visible;
+  color: var(--node-text);
+  background:
+    linear-gradient(180deg, var(--node-accent-muted), rgba(12, 16, 24, 0.98) 26%),
+    linear-gradient(180deg, rgba(23, 30, 43, 0.98), rgba(10, 13, 20, 0.98));
+  box-shadow:
+    0 24px 44px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.blueprint-node::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 35%);
+}
+
+.blueprint-node--selected {
+  border-color: var(--node-accent);
+  box-shadow:
+    0 28px 52px rgba(0, 0, 0, 0.42),
+    0 0 0 1px var(--node-accent-soft),
+    0 0 0 6px rgba(255, 157, 28, 0.08),
+    0 0 24px var(--node-accent-glow);
+}
+
+.blueprint-node__handle {
+  top: 50%;
+  height: 0.95rem;
+  width: 0.95rem;
+  border: 2px solid rgba(243, 247, 255, 0.88);
+  border-radius: 999px;
+  background: var(--node-accent);
+  box-shadow: 0 0 0 4px var(--node-accent-soft);
+  transform: translateY(-50%);
+}
+
+.blueprint-node__handle--input {
+  left: -0.55rem;
+}
+
+.blueprint-node__handle--output {
+  right: -0.55rem;
+}
+
+.blueprint-node__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, var(--node-accent-soft), rgba(255, 255, 255, 0.02));
+}
+
+.blueprint-node__category,
+.blueprint-node__type,
+.blueprint-node__status,
+.blueprint-node__port-label,
+.blueprint-node__field-key,
+.blueprint-node__footer {
+  font-family: var(--font-display), sans-serif;
+  text-transform: uppercase;
+}
+
+.blueprint-node__category,
+.blueprint-node__type,
+.blueprint-node__status,
+.blueprint-node__port-label {
+  font-size: 0.64rem;
+  letter-spacing: 0.2em;
+}
+
+.blueprint-node__category {
+  color: #f7f2e8;
+}
+
+.blueprint-node__type {
+  color: var(--node-text-soft);
+}
+
+.blueprint-node__body {
+  padding: 0.9rem;
+}
+
+.blueprint-node__title-row,
+.blueprint-node__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.blueprint-node__title-row {
+  margin-bottom: 0.65rem;
+}
+
+.blueprint-node__title {
+  margin: 0;
+  color: #fff8ef;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.blueprint-node__status {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: var(--node-accent);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.blueprint-node__description {
+  margin: 0;
+  color: var(--node-text-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.blueprint-node__ports {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.9rem;
+  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+}
+
+.blueprint-node__port-label {
+  color: #8e9eb8;
+}
+
+.blueprint-node__port-label--out {
+  color: var(--node-accent);
+}
+
+.blueprint-node__port-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.blueprint-node__port-column--output {
+  align-items: flex-end;
+}
+
+.blueprint-node__port-list {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.blueprint-node__port-chip,
+.blueprint-node__port-empty {
+  position: relative;
+  min-height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.blueprint-node__port-chip {
+  display: flex;
+  align-items: center;
+}
+
+.blueprint-node__port-chip--input {
+  padding: 0.55rem 0.75rem 0.55rem 1rem;
+}
+
+.blueprint-node__port-chip--output {
+  justify-content: flex-end;
+  padding: 0.55rem 1rem 0.55rem 0.75rem;
+}
+
+.blueprint-node__port-name {
+  color: #eff4ff;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.blueprint-node__port-empty {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  color: #6f7f99;
+  font-size: 0.72rem;
+}
+
+.blueprint-node__port-empty--out {
+  justify-content: flex-end;
+}
+
+.blueprint-node__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.blueprint-node__field {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.blueprint-node__field--empty {
+  opacity: 0.8;
+}
+
+.blueprint-node__field-key {
+  color: #8a9bb6;
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+}
+
+.blueprint-node__field-value {
+  color: #eff4ff;
+  font-size: 0.78rem;
+  max-width: 9.5rem;
+  text-align: right;
+  text-wrap: balance;
+}
+
+.blueprint-node__footer {
+  margin-top: 0.7rem;
+  color: var(--node-accent);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .graph-stage__hud {
+    position: static;
+    padding: 1rem 1rem 0;
+    pointer-events: auto;
+  }
+}
