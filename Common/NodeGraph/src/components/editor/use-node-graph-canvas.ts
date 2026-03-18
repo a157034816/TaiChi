@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { addEdge, type Connection, MarkerType, type ReactFlowInstance, useEdgesState, useNodesState } from "@xyflow/react";
 
 import { BlueprintNode } from "@/components/editor/blueprint-node";
+import { resolveContextMenuPosition } from "@/components/editor/context-menu-position";
 import { removeConflictingInputEdges } from "@/lib/nodegraph/connections";
 import { buildClipboardFromSelection, pasteClipboardAtPosition, type NodeClipboardPayload } from "@/lib/nodegraph/clipboard";
 import { buildNodeStyle, createNodeFromLibrary, normalizeNodeDataPorts } from "@/lib/nodegraph/factories";
@@ -20,18 +21,16 @@ import {
 import type { EditorSessionPayload, NodeGraphEdge, NodeGraphNode, NodeLibraryItem } from "@/lib/nodegraph/types";
 
 interface CanvasContextMenuState {
+  anchorPosition: NodeGraphNode["position"];
   position: NodeGraphNode["position"];
   flowPosition: NodeGraphNode["position"];
   selection: CanvasSelectionSnapshot;
+  showLibrary: boolean;
   targetEdgeId?: string;
 }
 
 const EDGE_STROKE = "rgba(159, 179, 217, 0.94)";
-const CONTEXT_MENU_SIZE = {
-  width: 364,
-  height: 520,
-  margin: 16,
-};
+const CONTEXT_MENU_MARGIN = 16;
 
 export const editorNodeTypes = {
   default: BlueprintNode,
@@ -112,23 +111,6 @@ function createEdgeSelectionSnapshot(edgeId: string): CanvasSelectionSnapshot {
   };
 }
 
-function getContextMenuPosition(position: NodeGraphNode["position"]) {
-  if (typeof window === "undefined") {
-    return position;
-  }
-
-  return {
-    x: Math.max(
-      CONTEXT_MENU_SIZE.margin,
-      Math.min(position.x, window.innerWidth - CONTEXT_MENU_SIZE.width - CONTEXT_MENU_SIZE.margin),
-    ),
-    y: Math.max(
-      CONTEXT_MENU_SIZE.margin,
-      Math.min(position.y, window.innerHeight - CONTEXT_MENU_SIZE.height - CONTEXT_MENU_SIZE.margin),
-    ),
-  };
-}
-
 function getCopyLabel(selection: CanvasSelectionSnapshot) {
   if (selection.nodeIds.length > 1) {
     return "Copy selected nodes";
@@ -167,6 +149,7 @@ function getDeleteLabel(selection: CanvasSelectionSnapshot, targetEdgeId?: strin
 
 export function useNodeGraphCanvas(payload: EditorSessionPayload) {
   const reactFlowRef = useRef<ReactFlowInstance<NodeGraphNode, NodeGraphEdge> | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [clipboard, setClipboard] = useState<NodeClipboardPayload | null>(null);
   const [pasteCount, setPasteCount] = useState(0);
   const [nodes, setNodes, onNodesChange] = useNodesState<NodeGraphNode>(
@@ -236,6 +219,60 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
     };
   }, [contextMenuState]);
 
+  useLayoutEffect(() => {
+    if (!contextMenuState || typeof window === "undefined") {
+      return;
+    }
+
+    const menuElement = contextMenuRef.current;
+
+    if (!menuElement) {
+      return;
+    }
+
+    const currentMenuElement = menuElement;
+    const { anchorPosition } = contextMenuState;
+
+    function updateMenuPosition() {
+      const { width, height } = currentMenuElement.getBoundingClientRect();
+      const nextPosition = resolveContextMenuPosition(
+        anchorPosition,
+        { width, height },
+        {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+        CONTEXT_MENU_MARGIN,
+      );
+
+      setContextMenuState((currentState) => {
+        if (
+          !currentState ||
+          (currentState.position.x === nextPosition.x && currentState.position.y === nextPosition.y)
+        ) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          position: nextPosition,
+        };
+      });
+    }
+
+    updateMenuPosition();
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateMenuPosition);
+    resizeObserver?.observe(currentMenuElement);
+    window.addEventListener("resize", updateMenuPosition);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateMenuPosition);
+    };
+  }, [contextMenuState]);
+
   function applyCanvasSelection(selection: CanvasSelectionSnapshot, primarySelection: CanvasSelection | null) {
     const selectedNodeIds = new Set(selection.nodeIds);
     const selectedEdgeIds = new Set(selection.edgeIds);
@@ -297,7 +334,7 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
   function openContextMenu(
     event: MouseEvent | ReactMouseEvent,
     selection: CanvasSelectionSnapshot,
-    options?: { targetEdgeId?: string },
+    options?: { showLibrary?: boolean; targetEdgeId?: string },
   ) {
     const reactFlow = reactFlowRef.current;
 
@@ -308,13 +345,20 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
       return;
     }
 
+    const anchorPosition = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+
     setContextMenuState({
-      position: getContextMenuPosition({ x: event.clientX, y: event.clientY }),
+      anchorPosition,
+      position: anchorPosition,
       flowPosition: reactFlow.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       }),
       selection,
+      showLibrary: options?.showLibrary ?? true,
       targetEdgeId: options?.targetEdgeId,
     });
   }
@@ -334,7 +378,7 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
       setSelectedItem({ type: "node", id: node.id });
     }
 
-    openContextMenu(event, nextSelection);
+    openContextMenu(event, nextSelection, { showLibrary: false });
   }
 
   function handleSelectionContextMenu(event: ReactMouseEvent, selectedNodes: NodeGraphNode[]) {
@@ -352,7 +396,10 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
     const nextSelection = createEdgeSelectionSnapshot(edge.id);
 
     applyCanvasSelection(nextSelection, { type: "edge", id: edge.id });
-    openContextMenu(event, nextSelection, { targetEdgeId: edge.id });
+    openContextMenu(event, nextSelection, {
+      showLibrary: false,
+      targetEdgeId: edge.id,
+    });
   }
 
   function handleConnect(connection: Connection) {
@@ -484,6 +531,7 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
   return {
     addNode,
     addNodeAtMenuPosition,
+    contextMenuRef,
     contextMenuMeta,
     contextMenuState,
     copyCurrentSelection,

@@ -36,6 +36,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const {
     addNode,
     addNodeAtMenuPosition,
+    contextMenuRef,
     contextMenuMeta,
     contextMenuState,
     copyCurrentSelection,
@@ -256,6 +257,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
 
               {contextMenuState && contextMenuMeta ? (
                 <CanvasContextMenu
+                  ref={contextMenuRef}
                   canCopy={contextMenuMeta.canCopy}
                   canCut={contextMenuMeta.canCut}
                   canDelete={contextMenuMeta.canDelete}
@@ -270,6 +272,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   onDelete={deleteCurrentSelection}
                   onPaste={pasteClipboardAtMenuPosition}
                   position={contextMenuState.position}
+                  showLibrary={contextMenuState.showLibrary}
                 />
               ) : null}
             </CardContent>

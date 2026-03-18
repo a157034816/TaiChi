@@ -1,5 +1,7 @@
 "use client";
 
+import { forwardRef } from "react";
+import { createPortal } from "react-dom";
 import { ClipboardPaste, Copy, Plus, Scissors, Trash2 } from "lucide-react";
 
 import type { NodeLibraryItem } from "@/lib/nodegraph/types";
@@ -17,6 +19,7 @@ interface CanvasContextMenuProps {
     x: number;
     y: number;
   };
+  showLibrary: boolean;
   onAddNode: (item: NodeLibraryItem) => void;
   onCopy: () => void;
   onCut: () => void;
@@ -62,26 +65,44 @@ function CanvasMenuAction({
   );
 }
 
-export function CanvasContextMenu({
-  canCopy,
-  canCut,
-  canDelete,
-  canPaste,
-  copyLabel,
-  cutLabel,
-  deleteLabel,
-  items,
-  position,
-  onAddNode,
-  onCopy,
-  onCut,
-  onDelete,
-  onPaste,
-}: CanvasContextMenuProps) {
+export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuProps>(function CanvasContextMenu(
+  {
+    canCopy,
+    canCut,
+    canDelete,
+    canPaste,
+    copyLabel,
+    cutLabel,
+    deleteLabel,
+    items,
+    position,
+    showLibrary,
+    onAddNode,
+    onCopy,
+    onCut,
+    onDelete,
+    onPaste,
+  },
+  ref,
+) {
   const itemGroups = groupItemsByCategory(items);
-
-  return (
+  const editActions = [
+    canCopy
+      ? { key: "copy", icon: Copy, label: copyLabel, onClick: onCopy }
+      : null,
+    canCut
+      ? { key: "cut", icon: Scissors, label: cutLabel, onClick: onCut }
+      : null,
+    canPaste
+      ? { key: "paste", icon: ClipboardPaste, label: "Paste nodes", onClick: onPaste }
+      : null,
+    canDelete
+      ? { key: "delete", icon: Trash2, label: deleteLabel, onClick: onDelete }
+      : null,
+  ].filter((action) => action !== null);
+  const content = (
     <div
+      ref={ref}
       className="canvas-context-menu nowheel nopan"
       data-canvas-context-menu="true"
       onContextMenu={(event) => event.preventDefault()}
@@ -91,50 +112,66 @@ export function CanvasContextMenu({
         top: position.y,
       }}
     >
-      <div className="canvas-context-menu__section">
-        <p className="canvas-context-menu__label">Edit</p>
-        <div className="canvas-context-menu__actions">
-          <CanvasMenuAction disabled={!canCopy} icon={Copy} label={copyLabel} onClick={onCopy} />
-          <CanvasMenuAction disabled={!canCut} icon={Scissors} label={cutLabel} onClick={onCut} />
-          <CanvasMenuAction disabled={!canPaste} icon={ClipboardPaste} label="Paste nodes" onClick={onPaste} />
-          <CanvasMenuAction disabled={!canDelete} icon={Trash2} label={deleteLabel} onClick={onDelete} />
-        </div>
-      </div>
-
-      <div className="canvas-context-menu__divider" />
-
-      <div className="canvas-context-menu__section">
-        <p className="canvas-context-menu__label">Add node</p>
-        <div className="canvas-context-menu__library">
-          {itemGroups.map(([category, categoryItems]) => (
-            <div className="canvas-context-menu__group" key={category}>
-              <p className="canvas-context-menu__group-title">{category}</p>
-
-              <div className="canvas-context-menu__actions">
-                {categoryItems.map((item) => (
-                  <button
-                    className="canvas-context-menu__library-item"
-                    key={item.type}
-                    onClick={() => onAddNode(item)}
-                    type="button"
-                  >
-                    <span className="canvas-context-menu__library-meta">
-                      <span className="canvas-context-menu__action-icon">
-                        <Plus className="size-4" />
-                      </span>
-                      <span>
-                        <span className="canvas-context-menu__library-title">{item.label}</span>
-                        <span className="canvas-context-menu__library-type">{item.type}</span>
-                      </span>
-                    </span>
-                    <span className="canvas-context-menu__library-description">{item.description}</span>
-                  </button>
-                ))}
-              </div>
+      {editActions.length ? (
+        <>
+          <div className="canvas-context-menu__section">
+            <p className="canvas-context-menu__label">Edit</p>
+            <div className="canvas-context-menu__actions">
+              {editActions.map((action) => (
+                <CanvasMenuAction
+                  icon={action.icon}
+                  key={action.key}
+                  label={action.label}
+                  onClick={action.onClick}
+                />
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="canvas-context-menu__divider" />
+        </>
+      ) : null}
+
+      {showLibrary ? (
+        <div className="canvas-context-menu__section canvas-context-menu__section--library">
+          <p className="canvas-context-menu__label">Add node</p>
+          <div className="canvas-context-menu__library">
+            {itemGroups.map(([category, categoryItems]) => (
+              <div className="canvas-context-menu__group" key={category}>
+                <p className="canvas-context-menu__group-title">{category}</p>
+
+                <div className="canvas-context-menu__actions">
+                  {categoryItems.map((item) => (
+                    <button
+                      className="canvas-context-menu__library-item"
+                      key={item.type}
+                      onClick={() => onAddNode(item)}
+                      type="button"
+                    >
+                      <span className="canvas-context-menu__library-meta">
+                        <span className="canvas-context-menu__action-icon">
+                          <Plus className="size-4" />
+                        </span>
+                        <span>
+                          <span className="canvas-context-menu__library-title">{item.label}</span>
+                          <span className="canvas-context-menu__library-type">{item.type}</span>
+                        </span>
+                      </span>
+                      <span className="canvas-context-menu__library-description">{item.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
-}
+
+  if (typeof document === "undefined") {
+    return content;
+  }
+
+  return createPortal(content, document.body);
+});
