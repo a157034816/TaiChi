@@ -117,11 +117,13 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
   "typeMappings": [
     {
       "canonicalId": "workflow/request",
-      "type": "WorkflowRequest"
+      "type": "WorkflowRequest",
+      "color": "#0ea5e9"
     },
     {
       "canonicalId": "workflow/approval-decision",
-      "type": "ApprovalDecision"
+      "type": "ApprovalDecision",
+      "color": "#f97316"
     }
   ]
 }
@@ -133,6 +135,7 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 - `inputs: []` 或 `outputs: []` 表示该方向没有可连接端口。
 - `dataType` 为可选字段，但语义上只表示跨语言共享的 canonical id，例如 `workflow/request`、`workflow/review-task`、`workflow/approval-decision`。
 - `typeMappings` 为可选字段，使用扁平数组声明 `canonicalId -> type` 的映射；这里的 `type` 只需要符合当前 SDK 或当前节点库提供方所使用的语言类型名。
+- `typeMappings.color` 为可选字段，用于声明该 canonical id 在编辑器里展示端口与连线时使用的颜色，格式为 `#RRGGBB`；缺省时 NodeGraph 会按灰色展示。
 - 同一个 `canonicalId` 在单次节点库响应里只需要声明一个 `type`，同一个 `type` 也不能映射到多个 `canonicalId`。
 - 只要返回了 `typeMappings`，节点库中所有端口上出现的 `dataType` 都必须能在 `typeMappings.canonicalId` 中找到对应项；旧节点库如果不返回 `typeMappings`，仍然可以继续使用。
 - 编辑器会在拖线到空白处时使用 `dataType` 过滤兼容节点，并在创建后自动选择匹配的对侧端口；NodeGraph 不会解析 `.NET List<T>`、Rust `Vec<T>` 这类语言类型字符串。

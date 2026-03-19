@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTypeMappingIndex, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
+import { DEFAULT_TYPE_COLOR, buildTypeMappingIndex, normalizeTypeMappings, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
 import type { NodeLibraryItem, TypeMappingEntry } from "@/lib/nodegraph/types";
 
 const workflowRequestType = "workflow/request";
@@ -23,6 +23,7 @@ describe("nodegraph type mappings", () => {
 
     expect(result.canonicalToType.get(workflowRequestType)).toBe("WorkflowRequest");
     expect(result.typeToCanonical.get("ReviewTask")).toBe(reviewTaskType);
+    expect(result.canonicalToColor.get(workflowRequestType)).toBe(DEFAULT_TYPE_COLOR);
   });
 
   it("rejects one current-sdk type pointing at multiple canonical ids", () => {
@@ -53,6 +54,35 @@ describe("nodegraph type mappings", () => {
         },
       ]),
     ).toThrow(/canonicalId/);
+  });
+
+  it("rejects invalid hex colors", () => {
+    expect(() =>
+      buildTypeMappingIndex([
+        {
+          canonicalId: workflowRequestType,
+          type: "WorkflowRequest",
+          color: "red",
+        },
+      ]),
+    ).toThrow(/invalid color/i);
+  });
+
+  it("fills missing colors with the default grey", () => {
+    expect(
+      normalizeTypeMappings([
+        {
+          canonicalId: workflowRequestType,
+          type: "WorkflowRequest",
+        },
+      ]),
+    ).toEqual([
+      {
+        canonicalId: workflowRequestType,
+        type: "WorkflowRequest",
+        color: DEFAULT_TYPE_COLOR,
+      },
+    ]);
   });
 
   it("requires mapped canonical ids for typed node ports when mappings exist", () => {

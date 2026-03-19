@@ -4,9 +4,11 @@ import type { CSSProperties } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
 import type { NodeGraphNode, NodeGraphNodeData, NodePortDefinition } from "@/lib/nodegraph/types";
+import { useTypeColors } from "@/components/editor/type-colors";
 
 const FALLBACK_ACCENT = "#ff9d1c";
 const FALLBACK_TEXT = "#f7fbff";
+const DEFAULT_TYPE_COLOR = "#64748B";
 
 function hexToRgba(color: string, alpha: number) {
   const normalized = color.trim();
@@ -86,6 +88,7 @@ function getPortLabel(port: NodePortDefinition) {
 }
 
 export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
+  const typeColors = useTypeColors();
   const valueEntries = Object.entries(data.values ?? {}).slice(0, 3);
   const hiddenFieldCount = Math.max(Object.keys(data.values ?? {}).length - valueEntries.length, 0);
   const inputPorts = data.inputs ?? [];
@@ -126,12 +129,29 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
             <div className="blueprint-node__port-list">
               {inputPorts.length ? (
                 inputPorts.map((port) => (
-                  <div className="blueprint-node__port-chip blueprint-node__port-chip--input" key={port.id}>
+                  <div
+                    className="blueprint-node__port-chip blueprint-node__port-chip--input"
+                    key={port.id}
+                    style={{
+                      borderColor: port.dataType ? (typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR) : undefined,
+                      backgroundColor: port.dataType
+                        ? hexToRgba(typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR, 0.08)
+                        : undefined,
+                    }}
+                  >
                     <Handle
                       className="blueprint-node__handle blueprint-node__handle--input"
                       id={port.id}
                       position={Position.Left}
                       type="target"
+                      style={
+                        port.dataType
+                          ? {
+                              backgroundColor: typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR,
+                              boxShadow: `0 0 0 4px ${hexToRgba(typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR, 0.26)}`,
+                            }
+                          : undefined
+                      }
                     />
                     <span className="blueprint-node__port-name">{getPortLabel(port)}</span>
                   </div>
@@ -147,13 +167,30 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
             <div className="blueprint-node__port-list">
               {outputPorts.length ? (
                 outputPorts.map((port) => (
-                  <div className="blueprint-node__port-chip blueprint-node__port-chip--output" key={port.id}>
+                  <div
+                    className="blueprint-node__port-chip blueprint-node__port-chip--output"
+                    key={port.id}
+                    style={{
+                      borderColor: port.dataType ? (typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR) : undefined,
+                      backgroundColor: port.dataType
+                        ? hexToRgba(typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR, 0.08)
+                        : undefined,
+                    }}
+                  >
                     <span className="blueprint-node__port-name">{getPortLabel(port)}</span>
                     <Handle
                       className="blueprint-node__handle blueprint-node__handle--output"
                       id={port.id}
                       position={Position.Right}
                       type="source"
+                      style={
+                        port.dataType
+                          ? {
+                              backgroundColor: typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR,
+                              boxShadow: `0 0 0 4px ${hexToRgba(typeColors.get(port.dataType) ?? DEFAULT_TYPE_COLOR, 0.26)}`,
+                            }
+                          : undefined
+                      }
                     />
                   </div>
                 ))

@@ -14,6 +14,7 @@ import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react"
 import { CanvasContextMenu } from "@/components/editor/canvas-context-menu";
 import { NodeInspectorPanel } from "@/components/editor/node-inspector-panel";
 import { NodeLibraryPanel } from "@/components/editor/node-library-panel";
+import { TypeColorsProvider } from "@/components/editor/type-colors";
 import {
   defaultEdgeOptions,
   editorNodeTypes,
@@ -69,6 +70,12 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     updateSelectedNode,
   } = useNodeGraphCanvas(payload);
 
+  const typeColors = new Map(
+    (payload.typeMappings ?? [])
+      .filter((mapping) => Boolean(mapping.color))
+      .map((mapping) => [mapping.canonicalId, String(mapping.color)] as const),
+  );
+
   async function saveGraph() {
     setSaveState("saving");
 
@@ -96,7 +103,8 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   }
 
   return (
-    <div className="editor-workbench">
+    <TypeColorsProvider value={typeColors}>
+      <div className="editor-workbench">
       <div className="grid min-h-screen gap-4 p-4 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
         <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
           <NodeLibraryPanel
@@ -329,6 +337,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
           />
         </div>
       </div>
-    </div>
+      </div>
+    </TypeColorsProvider>
   );
 }

@@ -28,6 +28,7 @@ export interface NodePortDefinition {
 export interface TypeMappingEntry {
   canonicalId: string;
   type: string;
+  color?: string;
 }
 
 export interface NodeLibraryItem {

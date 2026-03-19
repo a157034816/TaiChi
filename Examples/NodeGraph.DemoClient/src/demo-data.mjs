@@ -8,14 +8,17 @@ export const demoTypeMappings = [
   {
     canonicalId: workflowRequestType,
     type: WorkflowRequest.name,
+    color: "#0ea5e9",
   },
   {
     canonicalId: reviewTaskType,
     type: ReviewTask.name,
+    color: "#22c55e",
   },
   {
     canonicalId: approvalDecisionType,
     type: ApprovalDecision.name,
+    color: "#f97316",
   },
 ];
 

@@ -52,6 +52,7 @@ interface CanvasContextMenuState {
 
 const EDGE_STROKE = "rgba(159, 179, 217, 0.94)";
 const CONTEXT_MENU_MARGIN = 16;
+const DEFAULT_TYPE_COLOR = "#64748B";
 
 export const editorNodeTypes = {
   default: BlueprintNode,
@@ -71,6 +72,33 @@ export const defaultEdgeOptions = {
     strokeWidth: 3,
   },
 } as const;
+
+function resolveTypeColorForConnection(
+  connection: {
+    source: string;
+    target: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+  },
+  nodes: NodeGraphNode[],
+  typeColors: Map<string, string>,
+) {
+  const sourceNode = nodes.find((node) => node.id === connection.source) ?? null;
+  const sourcePort = sourceNode ? getPortForHandle(sourceNode.data, "source", connection.sourceHandle ?? null) : null;
+
+  if (sourcePort?.dataType) {
+    return typeColors.get(sourcePort.dataType) ?? DEFAULT_TYPE_COLOR;
+  }
+
+  const targetNode = nodes.find((node) => node.id === connection.target) ?? null;
+  const targetPort = targetNode ? getPortForHandle(targetNode.data, "target", connection.targetHandle ?? null) : null;
+
+  if (targetPort?.dataType) {
+    return typeColors.get(targetPort.dataType) ?? DEFAULT_TYPE_COLOR;
+  }
+
+  return null;
+}
 
 function getNextNodePosition(currentCount: number) {
   return {
@@ -97,25 +125,32 @@ function prepareCanvasNode(node: NodeGraphNode, nodeLibrary: NodeLibraryItem[]):
   };
 }
 
-function prepareCanvasEdge(edge: NodeGraphEdge): NodeGraphEdge {
+function prepareCanvasEdge(edge: NodeGraphEdge, nodes: NodeGraphNode[], typeColors: Map<string, string>): NodeGraphEdge {
+  const typeStroke = resolveTypeColorForConnection(edge, nodes, typeColors);
+  const baseMarkerEnd =
+    edge.markerEnd && typeof edge.markerEnd === "object" ? edge.markerEnd : defaultEdgeOptions.markerEnd;
+
   return {
     ...edge,
     type: "smoothstep",
     animated: false,
-    markerEnd: edge.markerEnd ?? defaultEdgeOptions.markerEnd,
+    markerEnd: {
+      ...baseMarkerEnd,
+      color: typeStroke ?? EDGE_STROKE,
+    },
     style: {
-      stroke: EDGE_STROKE,
+      stroke: typeStroke ?? EDGE_STROKE,
       strokeWidth: 3,
       ...(edge.style ?? {}),
     },
   };
 }
 
-function createCanvasEdge(connection: Connection): NodeGraphEdge {
+function createCanvasEdge(connection: Connection, nodes: NodeGraphNode[], typeColors: Map<string, string>): NodeGraphEdge {
   return prepareCanvasEdge({
     ...connection,
     id: `edge_${crypto.randomUUID()}`,
-  });
+  }, nodes, typeColors);
 }
 
 function createNodeSelectionSnapshot(nodeId: string): CanvasSelectionSnapshot {
@@ -211,11 +246,16 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
   const pendingConnectionRef = useRef<PendingConnectionDraft | null>(null);
   const [clipboard, setClipboard] = useState<NodeClipboardPayload | null>(null);
   const [pasteCount, setPasteCount] = useState(0);
+  const typeColors = new Map(
+    (payload.typeMappings ?? []).map((mapping) => [mapping.canonicalId, mapping.color ?? DEFAULT_TYPE_COLOR] as const),
+  );
+  const initialNodes = payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary));
+  const initialEdges = payload.session.graph.edges.map((edge) => prepareCanvasEdge(edge, initialNodes, typeColors));
   const [nodes, setNodes, onNodesChange] = useNodesState<NodeGraphNode>(
-    payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary)),
+    initialNodes,
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<NodeGraphEdge>(
-    payload.session.graph.edges.map(prepareCanvasEdge),
+    initialEdges,
   );
   const [selectedItem, setSelectedItem] = useState<CanvasSelection>(null);
   const [selectionSnapshot, setSelectionSnapshot] = useState<CanvasSelectionSnapshot>(createEmptyCanvasSelectionSnapshot);
@@ -417,7 +457,10 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
         return deselectedEdges;
       }
 
-      return addEdge(createCanvasEdge(nextConnection), removeConflictingInputEdges(deselectedEdges, nextConnection));
+      return addEdge(
+        createCanvasEdge(nextConnection, nodes, typeColors),
+        removeConflictingInputEdges(deselectedEdges, nextConnection),
+      );
     });
     setSelectionSnapshot(nextSelection);
     setSelectedItem({ type: "node", id: nextNode.id });
@@ -530,7 +573,7 @@ export function useNodeGraphCanvas(payload: EditorSessionPayload) {
   function handleConnect(connection: Connection) {
     clearPendingConnection();
     setEdges((currentEdges) =>
-      addEdge(createCanvasEdge(connection), removeConflictingInputEdges(currentEdges, connection)),
+      addEdge(createCanvasEdge(connection, nodes, typeColors), removeConflictingInputEdges(currentEdges, connection)),
     );
   }
 

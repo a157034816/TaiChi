@@ -140,6 +140,12 @@ export default function Home() {
                 its own runtime type name without bloating <code>dataType</code>.
               </p>
               <p>
+                Each type mapping may also optionally include <code>color</code> in the form{" "}
+                <code>#RRGGBB</code>, so ports and links can be visually grouped by the canonical
+                type id inside the editor. When omitted, NodeGraph renders the type in a neutral
+                grey.
+              </p>
+              <p>
                 Persisted edges may include <code>sourceHandle</code> and <code>targetHandle</code>{" "}
                 so the editor can restore which specific port each link used.
               </p>

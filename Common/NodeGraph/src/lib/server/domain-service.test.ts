@@ -4,6 +4,7 @@ import { ensureDomain } from "@/lib/server/domain-service";
 import { getRuntimeStore } from "@/lib/server/store";
 
 const workflowRequestType = "workflow/request";
+const defaultTypeColor = "#64748B";
 
 const createInput = () => ({
   domain: "erp-workflow",
@@ -59,6 +60,7 @@ describe("domain service", () => {
       {
         canonicalId: workflowRequestType,
         type: "WorkflowRequest",
+        color: defaultTypeColor,
       },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -151,6 +153,39 @@ describe("domain service", () => {
 
     await expect(ensureDomain(createInput())).rejects.toMatchObject({
       message: expect.stringContaining(`canonicalId "${workflowRequestType}"`),
+      status: 502,
+    });
+  });
+
+  it("rejects invalid type mapping colors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            nodes: [
+              {
+                type: "start",
+                label: "Start",
+                description: "Entry node",
+                category: "control",
+                outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+              },
+            ],
+            typeMappings: [
+              {
+                canonicalId: workflowRequestType,
+                type: "WorkflowRequest",
+                color: "red",
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    await expect(ensureDomain(createInput())).rejects.toMatchObject({
+      message: expect.stringContaining("node library payload is invalid"),
       status: 502,
     });
   });

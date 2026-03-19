@@ -1,5 +1,5 @@
 import { nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
-import { validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
+import { normalizeTypeMappings, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
 import type {
   CreateSessionRequest,
   DomainRegistryEntry,
@@ -23,20 +23,19 @@ export function normalizeNodeLibraryPayload(payload: unknown): {
     throw new HttpError("The client node library payload is invalid.", 502);
   }
 
-  const normalized = Array.isArray(parsed.data)
-    ? { nodes: parsed.data }
-    : {
-        nodes: parsed.data.nodes,
-        typeMappings: parsed.data.typeMappings,
-      };
+  const nodes = Array.isArray(parsed.data) ? parsed.data : parsed.data.nodes;
 
   try {
-    validateNodeLibraryTypeMappings(normalized.nodes, normalized.typeMappings);
+    const typeMappings = Array.isArray(parsed.data) ? undefined : normalizeTypeMappings(parsed.data.typeMappings);
+    validateNodeLibraryTypeMappings(nodes, typeMappings);
+
+    return {
+      nodes,
+      typeMappings,
+    };
   } catch (error) {
     throw new HttpError(error instanceof Error ? error.message : "The client node library payload is invalid.", 502);
   }
-
-  return normalized;
 }
 
 async function fetchNodeLibrary(endpoint: string) {

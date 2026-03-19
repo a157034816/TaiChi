@@ -26,10 +26,12 @@ describe("nodegraph schema", () => {
           {
             canonicalId: workflowRequestType,
             type: "WorkflowRequest",
+            color: "#0ea5e9",
           },
           {
             canonicalId: approvalDecisionType,
             type: "ApprovalDecision",
+            color: "#f97316",
           },
         ],
       }),
@@ -106,6 +108,21 @@ describe("nodegraph schema", () => {
           {
             canonicalId: workflowRequestType,
             languageType: "WorkflowRequest",
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("rejects invalid color formats in typeMappings", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [],
+        typeMappings: [
+          {
+            canonicalId: workflowRequestType,
+            type: "WorkflowRequest",
+            color: "red",
           },
         ],
       }),

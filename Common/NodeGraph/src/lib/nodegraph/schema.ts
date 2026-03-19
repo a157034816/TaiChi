@@ -11,6 +11,10 @@ export const nodePortDefinitionSchema = z.object({
 export const typeMappingEntrySchema = z.object({
   canonicalId: z.string().min(1),
   type: z.string().min(1),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i, 'Expected a hex color like "#RRGGBB".')
+    .optional(),
 });
 
 export const nodeLibraryFieldSchema = z.object({
