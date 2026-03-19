@@ -1,3 +1,24 @@
+import { ApprovalDecision, ReviewTask, WorkflowRequest } from "./contracts.mjs";
+
+const workflowRequestType = "workflow/request";
+const reviewTaskType = "workflow/review-task";
+const approvalDecisionType = "workflow/approval-decision";
+
+export const demoTypeMappings = [
+  {
+    canonicalId: workflowRequestType,
+    type: WorkflowRequest.name,
+  },
+  {
+    canonicalId: reviewTaskType,
+    type: ReviewTask.name,
+  },
+  {
+    canonicalId: approvalDecisionType,
+    type: ApprovalDecision.name,
+  },
+];
+
 export const demoNodeLibrary = [
   {
     type: "start",
@@ -5,7 +26,7 @@ export const demoNodeLibrary = [
     description: "Entry point for a new workflow.",
     category: "control",
     inputs: [],
-    outputs: [{ id: "next", label: "Next", dataType: "WorkflowRequest" }],
+    outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
     fields: [
       {
         key: "note",
@@ -25,11 +46,11 @@ export const demoNodeLibrary = [
     label: "Parallel Split",
     description: "Fan out one trigger into multiple review branches.",
     category: "control",
-    inputs: [{ id: "trigger", label: "Trigger", dataType: "WorkflowRequest" }],
+    inputs: [{ id: "trigger", label: "Trigger", dataType: workflowRequestType }],
     outputs: [
-      { id: "finance", label: "Finance", dataType: "ReviewTask" },
-      { id: "legal", label: "Legal", dataType: "ReviewTask" },
-      { id: "security", label: "Security", dataType: "ReviewTask" },
+      { id: "finance", label: "Finance", dataType: reviewTaskType },
+      { id: "legal", label: "Legal", dataType: reviewTaskType },
+      { id: "security", label: "Security", dataType: reviewTaskType },
     ],
     fields: [
       {
@@ -51,11 +72,11 @@ export const demoNodeLibrary = [
     description: "Collect multiple upstream branches before continuing.",
     category: "control",
     inputs: [
-      { id: "finance", label: "Finance", dataType: "ReviewTask" },
-      { id: "legal", label: "Legal", dataType: "ReviewTask" },
-      { id: "security", label: "Security", dataType: "ReviewTask" },
+      { id: "finance", label: "Finance", dataType: reviewTaskType },
+      { id: "legal", label: "Legal", dataType: reviewTaskType },
+      { id: "security", label: "Security", dataType: reviewTaskType },
     ],
-    outputs: [{ id: "next", label: "Next", dataType: "WorkflowRequest" }],
+    outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
     fields: [
       {
         key: "waitForAll",
@@ -75,10 +96,10 @@ export const demoNodeLibrary = [
     label: "Approval",
     description: "Manual approval step with explicit approved and rejected exits.",
     category: "workflow",
-    inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
+    inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
     outputs: [
-      { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
-      { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
+      { id: "approved", label: "Approved", dataType: approvalDecisionType },
+      { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
     ],
     fields: [
       {
@@ -106,8 +127,8 @@ export const demoNodeLibrary = [
     description: "Send success or failure notifications after approval completes.",
     category: "integration",
     inputs: [
-      { id: "success", label: "Success", dataType: "ApprovalDecision" },
-      { id: "failure", label: "Failure", dataType: "ApprovalDecision" },
+      { id: "success", label: "Success", dataType: approvalDecisionType },
+      { id: "failure", label: "Failure", dataType: approvalDecisionType },
     ],
     outputs: [],
     fields: [
@@ -166,7 +187,7 @@ function createExistingGraph(graphName) {
           category: "control",
           nodeType: "start",
           inputs: [],
-          outputs: [{ id: "next", label: "Next", dataType: "WorkflowRequest" }],
+          outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
           values: {
             note: "Request entered from the demo client",
           },
@@ -188,11 +209,11 @@ function createExistingGraph(graphName) {
           description: "Dispatch the request to finance, legal, and security reviewers.",
           category: "control",
           nodeType: "parallel_split",
-          inputs: [{ id: "trigger", label: "Trigger", dataType: "WorkflowRequest" }],
+          inputs: [{ id: "trigger", label: "Trigger", dataType: workflowRequestType }],
           outputs: [
-            { id: "finance", label: "Finance", dataType: "ReviewTask" },
-            { id: "legal", label: "Legal", dataType: "ReviewTask" },
-            { id: "security", label: "Security", dataType: "ReviewTask" },
+            { id: "finance", label: "Finance", dataType: reviewTaskType },
+            { id: "legal", label: "Legal", dataType: reviewTaskType },
+            { id: "security", label: "Security", dataType: reviewTaskType },
           ],
           values: {
             strategy: "broadcast",
@@ -216,11 +237,11 @@ function createExistingGraph(graphName) {
           category: "control",
           nodeType: "merge",
           inputs: [
-            { id: "finance", label: "Finance", dataType: "ReviewTask" },
-            { id: "legal", label: "Legal", dataType: "ReviewTask" },
-            { id: "security", label: "Security", dataType: "ReviewTask" },
+            { id: "finance", label: "Finance", dataType: reviewTaskType },
+            { id: "legal", label: "Legal", dataType: reviewTaskType },
+            { id: "security", label: "Security", dataType: reviewTaskType },
           ],
-          outputs: [{ id: "next", label: "Next", dataType: "WorkflowRequest" }],
+          outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
           values: {
             waitForAll: true,
           },
@@ -242,10 +263,10 @@ function createExistingGraph(graphName) {
           description: "Manager checks the aggregated review bundle.",
           category: "workflow",
           nodeType: "approval",
-          inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
+          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
           outputs: [
-            { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
-            { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
+            { id: "approved", label: "Approved", dataType: approvalDecisionType },
+            { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
           ],
           values: {
             owner: "finance.manager",
@@ -270,8 +291,8 @@ function createExistingGraph(graphName) {
           category: "integration",
           nodeType: "notify",
           inputs: [
-            { id: "success", label: "Success", dataType: "ApprovalDecision" },
-            { id: "failure", label: "Failure", dataType: "ApprovalDecision" },
+            { id: "success", label: "Success", dataType: approvalDecisionType },
+            { id: "failure", label: "Failure", dataType: approvalDecisionType },
           ],
           outputs: [],
           values: {

@@ -21,8 +21,13 @@ export interface NodeAppearance {
 export interface NodePortDefinition {
   id: string;
   label: string;
-  /** Programming-language type identifier, e.g. string, number, WorkflowRequest. */
+  /** Canonical type identifier shared across languages, e.g. workflow/request. */
   dataType?: string;
+}
+
+export interface TypeMappingEntry {
+  canonicalId: string;
+  type: string;
 }
 
 export interface NodeLibraryItem {
@@ -92,6 +97,7 @@ export interface DomainRegistryEntry {
   nodeLibraryEndpoint: string;
   completionWebhook: string;
   nodeLibrary: NodeLibraryItem[];
+  typeMappings?: TypeMappingEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -117,6 +123,7 @@ export interface NodeGraphSession {
 export interface EditorSessionPayload {
   session: NodeGraphSession;
   nodeLibrary: NodeLibraryItem[];
+  typeMappings?: TypeMappingEntry[];
 }
 
 export interface CompletionWebhookPayload {

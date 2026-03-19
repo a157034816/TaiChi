@@ -26,3 +26,4 @@ Console.WriteLine(session.EditorUrl);
 
 - SDK 通过 `HttpClient` 调用 NodeGraph HTTP API。
 - 编辑完成后的结果回传仍由业务方自己的 webhook 地址接收。
+- 如果你希望把 canonical id 映射回当前 `.NET` SDK 的类型名，端口 `dataType` 应使用 canonical id，例如 `workflow/request`；再通过 `typeMappings` 把它映射到 `.NET` 类型名，如 `TaiChi.Workflow.Contracts.WorkflowRequest`。

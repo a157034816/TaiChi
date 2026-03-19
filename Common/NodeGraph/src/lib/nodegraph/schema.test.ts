@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { nodeGraphDocumentSchema, nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
 
+const workflowRequestType = "workflow/request";
+const approvalDecisionType = "workflow/approval-decision";
+
 describe("nodegraph schema", () => {
   it("accepts node library items with explicit multi-port definitions", () => {
     expect(
@@ -12,11 +15,21 @@ describe("nodegraph schema", () => {
             label: "Approval",
             description: "Review and route the request",
             category: "workflow",
-            inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
+            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
             outputs: [
-              { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
-              { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
+              { id: "approved", label: "Approved", dataType: approvalDecisionType },
+              { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
             ],
+          },
+        ],
+        typeMappings: [
+          {
+            canonicalId: workflowRequestType,
+            type: "WorkflowRequest",
+          },
+          {
+            canonicalId: approvalDecisionType,
+            type: "ApprovalDecision",
           },
         ],
       }),
@@ -35,10 +48,10 @@ describe("nodegraph schema", () => {
             data: {
               label: "Approval",
               nodeType: "approval",
-              inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
+              inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
               outputs: [
-                { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
-                { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
+                { id: "approved", label: "Approved", dataType: approvalDecisionType },
+                { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
               ],
             },
           },
@@ -50,8 +63,8 @@ describe("nodegraph schema", () => {
               label: "Notify",
               nodeType: "notify",
               inputs: [
-                { id: "success", label: "Success", dataType: "ApprovalDecision" },
-                { id: "failure", label: "Failure", dataType: "ApprovalDecision" },
+                { id: "success", label: "Success", dataType: approvalDecisionType },
+                { id: "failure", label: "Failure", dataType: approvalDecisionType },
               ],
               outputs: [],
             },
@@ -83,5 +96,19 @@ describe("nodegraph schema", () => {
         },
       ]),
     ).toBeTruthy();
+  });
+
+  it("rejects legacy languageType field names in typeMappings", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [],
+        typeMappings: [
+          {
+            canonicalId: workflowRequestType,
+            languageType: "WorkflowRequest",
+          },
+        ],
+      }),
+    ).toThrow();
   });
 });

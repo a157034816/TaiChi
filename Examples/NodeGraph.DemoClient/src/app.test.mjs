@@ -6,6 +6,7 @@ import test from "node:test";
 import { createApp } from "./app.mjs";
 import { createDemoState } from "./state.mjs";
 import { getDemoConfig } from "./config.mjs";
+import { ApprovalDecision, ReviewTask, WorkflowRequest } from "./contracts.mjs";
 
 async function withServer(handler, callback) {
   const server = createServer(handler);
@@ -35,8 +36,14 @@ test("GET /api/node-library returns the demo node library", async () => {
     assert.equal(response.status, 200);
     assert.ok(Array.isArray(payload.nodes));
     assert.ok(payload.nodes.length >= 5);
+    assert.ok(Array.isArray(payload.typeMappings));
+    assert.equal(payload.typeMappings.length, 3);
     assert.ok(payload.nodes.some((node) => Array.isArray(node.outputs) && node.outputs.length > 1));
     assert.ok(payload.nodes.some((node) => Array.isArray(node.inputs) && node.inputs.length > 1));
+    assert.ok(payload.typeMappings.some((mapping) => mapping.canonicalId === "workflow/request"));
+    assert.ok(payload.typeMappings.some((mapping) => mapping.type === WorkflowRequest.name));
+    assert.ok(payload.typeMappings.some((mapping) => mapping.type === ReviewTask.name));
+    assert.ok(payload.typeMappings.some((mapping) => mapping.type === ApprovalDecision.name));
   });
 });
 

@@ -34,3 +34,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - Rust SDK 使用 `reqwest` 发送 HTTP 请求。
 - 若要接收编辑完成 webhook，请在业务侧自行提供对应 HTTP 服务。
+- 如果你希望把 canonical id 映射回当前 Rust SDK 的类型名，端口 `dataType` 应使用 canonical id，例如 `workflow/request`；再通过 `typeMappings` 把它映射到 Rust 类型名，如 `crate::workflow::WorkflowRequest`。

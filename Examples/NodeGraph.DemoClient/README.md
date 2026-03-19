@@ -20,6 +20,8 @@
 
 当前示例节点库已经内置 Blueprint 风格的多输入/多输出节点，包括分流、汇聚、审批通过/拒绝双出口，以及成功/失败双入口通知节点。
 
+示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient/src/contracts.mjs` 中定义。
+
 ## 启动前提
 
 先启动 `Common/NodeGraph`：

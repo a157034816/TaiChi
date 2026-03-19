@@ -8,6 +8,9 @@ import {
   removeConflictingInputEdges,
 } from "@/lib/nodegraph/connections";
 
+const workflowRequestType = "workflow/request";
+const approvalDecisionType = "workflow/approval-decision";
+
 describe("nodegraph connections", () => {
   it("removes an existing edge when a new connection targets the same input handle", () => {
     expect(
@@ -79,8 +82,8 @@ describe("nodegraph connections", () => {
     expect(
       getPortForHandle(
         {
-          inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
-          outputs: [{ id: "approved", label: "Approved", dataType: "ApprovalDecision" }],
+          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
         },
         "source",
         "approved",
@@ -88,7 +91,7 @@ describe("nodegraph connections", () => {
     ).toEqual({
       id: "approved",
       label: "Approved",
-      dataType: "ApprovalDecision",
+      dataType: approvalDecisionType,
     });
   });
 
@@ -97,20 +100,20 @@ describe("nodegraph connections", () => {
       findCompatibleOppositePort(
         {
           inputs: [
-            { id: "request", label: "Request", dataType: "WorkflowRequest" },
+            { id: "request", label: "Request", dataType: workflowRequestType },
             { id: "fallback", label: "Fallback", dataType: "OtherType" },
           ],
           outputs: [],
         },
         {
           handleType: "source",
-          startPort: { id: "next", label: "Next", dataType: "WorkflowRequest" },
+          startPort: { id: "next", label: "Next", dataType: workflowRequestType },
         },
       ),
     ).toEqual({
       id: "request",
       label: "Request",
-      dataType: "WorkflowRequest",
+      dataType: workflowRequestType,
     });
   });
 
@@ -126,7 +129,7 @@ describe("nodegraph connections", () => {
         },
         {
           handleType: "source",
-          startPort: { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+          startPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
         },
       ),
     ).toEqual({
@@ -144,7 +147,7 @@ describe("nodegraph connections", () => {
             label: "Notify",
             description: "Send a notification",
             category: "integration",
-            inputs: [{ id: "success", label: "Success", dataType: "ApprovalDecision" }],
+            inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
             outputs: [],
           },
           {
@@ -152,14 +155,14 @@ describe("nodegraph connections", () => {
             label: "Merge",
             description: "Collect branches",
             category: "control",
-            inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
-            outputs: [{ id: "next", label: "Next", dataType: "WorkflowRequest" }],
+            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+            outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
           },
         ],
         {
           handleType: "source",
         },
-        { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+        { id: "approved", label: "Approved", dataType: approvalDecisionType },
       ).map((item) => item.type),
     ).toEqual(["notify"]);
   });
@@ -170,10 +173,10 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_approval",
         existingHandleId: "approved",
         existingHandleType: "source",
-        existingPort: { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+        existingPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
         insertedNodeId: "node_notify",
         insertedNodeData: {
-          inputs: [{ id: "success", label: "Success", dataType: "ApprovalDecision" }],
+          inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
           outputs: [],
         },
       }),
@@ -191,11 +194,11 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_notify",
         existingHandleId: "success",
         existingHandleType: "target",
-        existingPort: { id: "success", label: "Success", dataType: "ApprovalDecision" },
+        existingPort: { id: "success", label: "Success", dataType: approvalDecisionType },
         insertedNodeId: "node_approval",
         insertedNodeData: {
-          inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
-          outputs: [{ id: "approved", label: "Approved", dataType: "ApprovalDecision" }],
+          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
         },
       }),
     ).toEqual({

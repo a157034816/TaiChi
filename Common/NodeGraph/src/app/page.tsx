@@ -128,9 +128,16 @@ export default function Home() {
               </p>
               <p>
                 Port definitions can also include an optional <code>dataType</code> so the editor
-                can suggest compatible nodes when a user drops a connection onto empty canvas space.
-                Use programming-language type names such as <code>string</code>, <code>boolean</code>,
-                or <code>WorkflowRequest</code> rather than business status labels.
+                can suggest compatible nodes when a user drops a connection onto empty canvas
+                space. Use a cross-language canonical id such as <code>workflow/request</code> or{" "}
+                <code>workflow/approval-decision</code> instead of a language-specific type name.
+              </p>
+              <p>
+                If your current SDK needs to map canonical ids back to runtime types, return an
+                optional <code>typeMappings</code> array alongside <code>nodes</code>, with flat
+                entries shaped like <code>{`{ canonicalId, type }`}</code>. The editor still
+                matches ports by canonical id only, while the mapping lets the current SDK attach
+                its own runtime type name without bloating <code>dataType</code>.
               </p>
               <p>
                 Persisted edges may include <code>sourceHandle</code> and <code>targetHandle</code>{" "}

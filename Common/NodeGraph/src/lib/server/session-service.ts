@@ -112,6 +112,7 @@ export function getEditorPayload(sessionId: string): EditorSessionPayload {
   return {
     session,
     nodeLibrary: domain.nodeLibrary,
+    typeMappings: domain.typeMappings,
   };
 }
 

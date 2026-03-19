@@ -11,6 +11,13 @@
 
 多端口图在统一契约里通过边对象上的 `sourceHandle` / `targetHandle` 标识具体连接到哪个端口。
 
+如果业务系统希望把 canonical id 映射回当前 SDK 的类型名，建议 `nodeLibraryEndpoint` 返回以下结构：
+
+- 端口上的 `dataType` 只放跨语言共享的 canonical id，例如 `workflow/request`
+- 节点库对象可额外返回 `typeMappings`，每项为 `{ canonicalId, type }`
+- 每个 `canonicalId` 在单次响应里只需要提供一个当前 SDK 可识别的 `type`
+- 同一个 `type` 不能映射到多个 `canonicalId`
+
 创建会话时需要提供：
 
 - `domain`：client 的业务域标识

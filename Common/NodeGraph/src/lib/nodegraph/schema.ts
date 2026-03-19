@@ -8,6 +8,11 @@ export const nodePortDefinitionSchema = z.object({
   dataType: z.string().min(1).optional(),
 });
 
+export const typeMappingEntrySchema = z.object({
+  canonicalId: z.string().min(1),
+  type: z.string().min(1),
+});
+
 export const nodeLibraryFieldSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
@@ -98,6 +103,7 @@ export const completeSessionRequestSchema = z.object({
 export const nodeLibraryEnvelopeSchema = z.union([
   z.object({
     nodes: z.array(nodeLibraryItemSchema),
+    typeMappings: z.array(typeMappingEntrySchema).optional(),
   }),
   z.array(nodeLibraryItemSchema),
 ]);
