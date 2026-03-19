@@ -14,7 +14,10 @@ interface CanvasContextMenuProps {
   copyLabel: string;
   cutLabel: string;
   deleteLabel: string;
+  emptyStateMessage: string;
   items: NodeLibraryItem[];
+  isConnectionCreation: boolean;
+  libraryLabel: string;
   position: {
     x: number;
     y: number;
@@ -74,7 +77,10 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
     copyLabel,
     cutLabel,
     deleteLabel,
+    emptyStateMessage,
     items,
+    isConnectionCreation,
+    libraryLabel,
     position,
     showLibrary,
     onAddNode,
@@ -112,7 +118,7 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
         top: position.y,
       }}
     >
-      {editActions.length ? (
+      {!isConnectionCreation && editActions.length ? (
         <>
           <div className="canvas-context-menu__section">
             <p className="canvas-context-menu__label">Edit</p>
@@ -134,35 +140,39 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
 
       {showLibrary ? (
         <div className="canvas-context-menu__section canvas-context-menu__section--library">
-          <p className="canvas-context-menu__label">Add node</p>
+          <p className="canvas-context-menu__label">{libraryLabel}</p>
           <div className="canvas-context-menu__library">
-            {itemGroups.map(([category, categoryItems]) => (
-              <div className="canvas-context-menu__group" key={category}>
-                <p className="canvas-context-menu__group-title">{category}</p>
+            {itemGroups.length ? (
+              itemGroups.map(([category, categoryItems]) => (
+                <div className="canvas-context-menu__group" key={category}>
+                  <p className="canvas-context-menu__group-title">{category}</p>
 
-                <div className="canvas-context-menu__actions">
-                  {categoryItems.map((item) => (
-                    <button
-                      className="canvas-context-menu__library-item"
-                      key={item.type}
-                      onClick={() => onAddNode(item)}
-                      type="button"
-                    >
-                      <span className="canvas-context-menu__library-meta">
-                        <span className="canvas-context-menu__action-icon">
-                          <Plus className="size-4" />
+                  <div className="canvas-context-menu__actions">
+                    {categoryItems.map((item) => (
+                      <button
+                        className="canvas-context-menu__library-item"
+                        key={item.type}
+                        onClick={() => onAddNode(item)}
+                        type="button"
+                      >
+                        <span className="canvas-context-menu__library-meta">
+                          <span className="canvas-context-menu__action-icon">
+                            <Plus className="size-4" />
+                          </span>
+                          <span>
+                            <span className="canvas-context-menu__library-title">{item.label}</span>
+                            <span className="canvas-context-menu__library-type">{item.type}</span>
+                          </span>
                         </span>
-                        <span>
-                          <span className="canvas-context-menu__library-title">{item.label}</span>
-                          <span className="canvas-context-menu__library-type">{item.type}</span>
-                        </span>
-                      </span>
-                      <span className="canvas-context-menu__library-description">{item.description}</span>
-                    </button>
-                  ))}
+                        <span className="canvas-context-menu__library-description">{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="canvas-context-menu__library-description">{emptyStateMessage}</p>
+            )}
           </div>
         </div>
       ) : null}

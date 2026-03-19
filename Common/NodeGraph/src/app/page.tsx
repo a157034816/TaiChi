@@ -127,6 +127,12 @@ export default function Home() {
                 NodeGraph falls back to one input and one output.
               </p>
               <p>
+                Port definitions can also include an optional <code>dataType</code> so the editor
+                can suggest compatible nodes when a user drops a connection onto empty canvas space.
+                Use programming-language type names such as <code>string</code>, <code>boolean</code>,
+                or <code>WorkflowRequest</code> rather than business status labels.
+              </p>
+              <p>
                 Persisted edges may include <code>sourceHandle</code> and <code>targetHandle</code>{" "}
                 so the editor can restore which specific port each link used.
               </p>

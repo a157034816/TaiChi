@@ -9,6 +9,7 @@
 - NodeGraph 会根据请求来源 IP 选择公网或内网可访问的编辑 URL。
 - 用户在编辑器完成提交后，NodeGraph 会主动调用 client webhook，并回传最终节点图数据。
 - 编辑器画布支持右键自定义菜单：空白处可快速添加节点，选中节点后可复制、剪切、粘贴和删除。
+- 从 input 或 output 把连接线拖到空白处时，会弹出兼容节点创建菜单，并在创建后自动补齐这条连接。
 
 ## 目录结构
 
@@ -87,10 +88,10 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
     "label": "Approval",
     "description": "A manual approval step",
     "category": "workflow",
-    "inputs": [{ "id": "request", "label": "Request" }],
+    "inputs": [{ "id": "request", "label": "Request", "dataType": "WorkflowRequest" }],
     "outputs": [
-      { "id": "approved", "label": "Approved" },
-      { "id": "rejected", "label": "Rejected" }
+      { "id": "approved", "label": "Approved", "dataType": "ApprovalDecision" },
+      { "id": "rejected", "label": "Rejected", "dataType": "ApprovalDecision" }
     ]
   }
 ]
@@ -106,10 +107,10 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
       "label": "Approval",
       "description": "A manual approval step",
       "category": "workflow",
-      "inputs": [{ "id": "request", "label": "Request" }],
+      "inputs": [{ "id": "request", "label": "Request", "dataType": "WorkflowRequest" }],
       "outputs": [
-        { "id": "approved", "label": "Approved" },
-        { "id": "rejected", "label": "Rejected" }
+        { "id": "approved", "label": "Approved", "dataType": "ApprovalDecision" },
+        { "id": "rejected", "label": "Rejected", "dataType": "ApprovalDecision" }
       ]
     }
   ]
@@ -120,6 +121,9 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 
 - `inputs` / `outputs` 省略时，NodeGraph 会兼容回退为单输入和单输出。
 - `inputs: []` 或 `outputs: []` 表示该方向没有可连接端口。
+- `dataType` 为可选字段，用于声明端口承载的编程语言/运行时数据类型，例如 `string`、`boolean`、`WorkflowRequest`、`ApprovalDecision[]`。
+- 编辑器会在拖线到空白处时使用 `dataType` 过滤兼容节点，并在创建后自动选择匹配的对侧端口。
+- 若端口未声明 `dataType`，编辑器会回退使用端口 `id` 和端口顺序进行匹配，以兼容旧节点库。
 
 ## 验证
 

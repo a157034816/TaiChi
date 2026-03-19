@@ -36,6 +36,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const {
     addNode,
     addNodeAtMenuPosition,
+    contextMenuItems,
     contextMenuRef,
     contextMenuMeta,
     contextMenuState,
@@ -45,6 +46,8 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     edges,
     focusLabel,
     handleConnect,
+    handleConnectEnd,
+    handleConnectStart,
     handleDelete,
     handleEdgeClick,
     handleEdgeContextMenu,
@@ -189,7 +192,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   <p className="editor-kicker">Blueprint workspace</p>
                   <h2 className="graph-stage__title">Node canvas</h2>
                   <p className="graph-stage__subtitle">
-                    Drag to position nodes, connect outputs into inputs, then edit graph and node data from the inspector dock.
+                    Drag to position nodes, connect outputs into inputs, or drop a link on empty space to create the next compatible node in place.
                   </p>
                 </div>
                 <div className="graph-stage__stats">
@@ -218,6 +221,8 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 nodeTypes={editorNodeTypes}
                 nodes={nodes}
                 onConnect={handleConnect}
+                onConnectEnd={handleConnectEnd}
+                onConnectStart={handleConnectStart}
                 onDelete={handleDelete}
                 onEdgeClick={(_, edge) => handleEdgeClick(edge.id)}
                 onEdgeContextMenu={handleEdgeContextMenu}
@@ -265,7 +270,10 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   copyLabel={contextMenuMeta.copyLabel}
                   cutLabel={contextMenuMeta.cutLabel}
                   deleteLabel={contextMenuMeta.deleteLabel}
-                  items={payload.nodeLibrary}
+                  emptyStateMessage={contextMenuMeta.emptyStateMessage}
+                  isConnectionCreation={contextMenuMeta.mode === "connection"}
+                  items={contextMenuItems}
+                  libraryLabel={contextMenuMeta.libraryLabel}
                   onAddNode={addNodeAtMenuPosition}
                   onCopy={copyCurrentSelection}
                   onCut={cutCurrentSelection}

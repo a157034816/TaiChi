@@ -5,6 +5,7 @@ const nodeFieldKindSchema = z.enum(["text", "textarea", "number", "boolean"]);
 export const nodePortDefinitionSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
+  dataType: z.string().min(1).optional(),
 });
 
 export const nodeLibraryFieldSchema = z.object({

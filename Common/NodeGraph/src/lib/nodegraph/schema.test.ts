@@ -12,10 +12,10 @@ describe("nodegraph schema", () => {
             label: "Approval",
             description: "Review and route the request",
             category: "workflow",
-            inputs: [{ id: "request", label: "Request" }],
+            inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
             outputs: [
-              { id: "approved", label: "Approved" },
-              { id: "rejected", label: "Rejected" },
+              { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+              { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
             ],
           },
         ],
@@ -35,10 +35,10 @@ describe("nodegraph schema", () => {
             data: {
               label: "Approval",
               nodeType: "approval",
-              inputs: [{ id: "request", label: "Request" }],
+              inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
               outputs: [
-                { id: "approved", label: "Approved" },
-                { id: "rejected", label: "Rejected" },
+                { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+                { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
               ],
             },
           },
@@ -50,8 +50,8 @@ describe("nodegraph schema", () => {
               label: "Notify",
               nodeType: "notify",
               inputs: [
-                { id: "success", label: "Success" },
-                { id: "failure", label: "Failure" },
+                { id: "success", label: "Success", dataType: "ApprovalDecision" },
+                { id: "failure", label: "Failure", dataType: "ApprovalDecision" },
               ],
               outputs: [],
             },
@@ -68,6 +68,20 @@ describe("nodegraph schema", () => {
         ],
         viewport: { x: 0, y: 0, zoom: 1 },
       }),
+    ).toBeTruthy();
+  });
+
+  it("keeps node port data types optional for legacy libraries", () => {
+    expect(
+      nodeLibraryEnvelopeSchema.parse([
+        {
+          type: "start",
+          label: "Start",
+          description: "Kick off the flow",
+          category: "control",
+          outputs: [{ id: "next", label: "Next" }],
+        },
+      ]),
     ).toBeTruthy();
   });
 });

@@ -21,6 +21,8 @@ export interface NodeAppearance {
 export interface NodePortDefinition {
   id: string;
   label: string;
+  /** Programming-language type identifier, e.g. string, number, WorkflowRequest. */
+  dataType?: string;
 }
 
 export interface NodeLibraryItem {

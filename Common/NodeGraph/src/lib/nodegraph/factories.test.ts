@@ -53,15 +53,15 @@ describe("nodegraph factories", () => {
       buildPortSnapshot({
         inputs: [],
         outputs: [
-          { id: "approved", label: "Approved" },
-          { id: "rejected", label: "Rejected" },
+          { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+          { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
         ],
       }),
     ).toEqual({
       inputs: [],
       outputs: [
-        { id: "approved", label: "Approved" },
-        { id: "rejected", label: "Rejected" },
+        { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+        { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
       ],
     });
   });
@@ -74,18 +74,18 @@ describe("nodegraph factories", () => {
           nodeType: "approval",
         },
         {
-          inputs: [{ id: "request", label: "Request" }],
+          inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
           outputs: [
-            { id: "approved", label: "Approved" },
-            { id: "rejected", label: "Rejected" },
+            { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+            { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
           ],
         },
       ),
     ).toMatchObject({
-      inputs: [{ id: "request", label: "Request" }],
+      inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
       outputs: [
-        { id: "approved", label: "Approved" },
-        { id: "rejected", label: "Rejected" },
+        { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+        { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
       ],
     });
   });
@@ -97,10 +97,10 @@ describe("nodegraph factories", () => {
         label: "Approval",
         description: "Manual approval step",
         category: "workflow",
-        inputs: [{ id: "request", label: "Request" }],
+        inputs: [{ id: "request", label: "Request", dataType: "WorkflowRequest" }],
         outputs: [
-          { id: "approved", label: "Approved" },
-          { id: "rejected", label: "Rejected" },
+          { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+          { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
         ],
         fields: [
           { key: "owner", label: "Owner", kind: "text" },
@@ -118,10 +118,10 @@ describe("nodegraph factories", () => {
 
     expect(node.type).toBe("default");
     expect(node.position).toEqual({ x: 120, y: 80 });
-    expect(node.data.inputs).toEqual([{ id: "request", label: "Request" }]);
+    expect(node.data.inputs).toEqual([{ id: "request", label: "Request", dataType: "WorkflowRequest" }]);
     expect(node.data.outputs).toEqual([
-      { id: "approved", label: "Approved" },
-      { id: "rejected", label: "Rejected" },
+      { id: "approved", label: "Approved", dataType: "ApprovalDecision" },
+      { id: "rejected", label: "Rejected", dataType: "ApprovalDecision" },
     ]);
     expect(node.data.values).toEqual({
       owner: "",
