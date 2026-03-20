@@ -3,7 +3,180 @@ import { ApprovalDecision, ReviewTask, WorkflowRequest } from "./contracts.mjs";
 const workflowRequestType = "workflow/request";
 const reviewTaskType = "workflow/review-task";
 const approvalDecisionType = "workflow/approval-decision";
-const text = (zhCN, en) => ({ "zh-CN": zhCN, en });
+
+const categoryKeys = {
+  control: "categories.control",
+  integration: "categories.integration",
+  workflow: "categories.workflow",
+};
+
+const nodeKeys = {
+  approval: {
+    description: "nodes.approval.description",
+    label: "nodes.approval.label",
+  },
+  merge: {
+    description: "nodes.merge.description",
+    label: "nodes.merge.label",
+  },
+  notify: {
+    description: "nodes.notify.description",
+    label: "nodes.notify.label",
+  },
+  parallelSplit: {
+    description: "nodes.parallelSplit.description",
+    label: "nodes.parallelSplit.label",
+  },
+  start: {
+    description: "nodes.start.description",
+    label: "nodes.start.label",
+  },
+};
+
+const fieldKeys = {
+  channel: "fields.channel.label",
+  includeSummary: "fields.includeSummary.label",
+  note: "fields.note.label",
+  owner: "fields.owner.label",
+  slaHours: "fields.slaHours.label",
+  strategy: "fields.strategy.label",
+  waitForAll: "fields.waitForAll.label",
+};
+
+const portKeys = {
+  approved: "ports.approved",
+  failure: "ports.failure",
+  finance: "ports.finance",
+  legal: "ports.legal",
+  next: "ports.next",
+  rejected: "ports.rejected",
+  request: "ports.request",
+  security: "ports.security",
+  success: "ports.success",
+  trigger: "ports.trigger",
+};
+
+export const demoI18n = {
+  defaultLocale: "en",
+  locales: {
+    en: {
+      [categoryKeys.control]: "Control",
+      [categoryKeys.integration]: "Integration",
+      [categoryKeys.workflow]: "Workflow",
+      [fieldKeys.channel]: "Channel",
+      [fieldKeys.includeSummary]: "Include summary",
+      [fieldKeys.note]: "Opening note",
+      [fieldKeys.owner]: "Owner",
+      [fieldKeys.slaHours]: "SLA hours",
+      [fieldKeys.strategy]: "Dispatch strategy",
+      [fieldKeys.waitForAll]: "Wait for all branches",
+      [nodeKeys.approval.description]: "Manual approval step with explicit approved and rejected exits.",
+      [nodeKeys.approval.label]: "Approval",
+      [nodeKeys.merge.description]: "Collect multiple upstream branches before continuing.",
+      [nodeKeys.merge.label]: "Merge",
+      [nodeKeys.notify.description]: "Send success or failure notifications after approval completes.",
+      [nodeKeys.notify.label]: "Notify",
+      [nodeKeys.parallelSplit.description]: "Fan out one trigger into multiple review branches.",
+      [nodeKeys.parallelSplit.label]: "Parallel Split",
+      [nodeKeys.start.description]: "Entry point for a new workflow.",
+      [nodeKeys.start.label]: "Start",
+      [portKeys.approved]: "Approved",
+      [portKeys.failure]: "Failure",
+      [portKeys.finance]: "Finance",
+      [portKeys.legal]: "Legal",
+      [portKeys.next]: "Next",
+      [portKeys.rejected]: "Rejected",
+      [portKeys.request]: "Request",
+      [portKeys.security]: "Security",
+      [portKeys.success]: "Success",
+      [portKeys.trigger]: "Trigger",
+    },
+    "zh-CN": {
+      [categoryKeys.control]: "控制",
+      [categoryKeys.integration]: "集成",
+      [categoryKeys.workflow]: "流程",
+      [fieldKeys.channel]: "通道",
+      [fieldKeys.includeSummary]: "包含摘要",
+      [fieldKeys.note]: "开场说明",
+      [fieldKeys.owner]: "负责人",
+      [fieldKeys.slaHours]: "SLA 小时",
+      [fieldKeys.strategy]: "分发策略",
+      [fieldKeys.waitForAll]: "等待全部分支",
+      [nodeKeys.approval.description]: "带有明确通过与驳回出口的人工审批步骤。",
+      [nodeKeys.approval.label]: "审批",
+      [nodeKeys.merge.description]: "在继续前汇集多个上游分支。",
+      [nodeKeys.merge.label]: "汇合",
+      [nodeKeys.notify.description]: "审批结束后发送成功或失败通知。",
+      [nodeKeys.notify.label]: "通知",
+      [nodeKeys.parallelSplit.description]: "把一个触发拆分成多个并行评审分支。",
+      [nodeKeys.parallelSplit.label]: "并行分发",
+      [nodeKeys.start.description]: "新工作流的入口节点。",
+      [nodeKeys.start.label]: "开始",
+      [portKeys.approved]: "通过",
+      [portKeys.failure]: "失败",
+      [portKeys.finance]: "财务",
+      [portKeys.legal]: "法务",
+      [portKeys.next]: "下一步",
+      [portKeys.rejected]: "驳回",
+      [portKeys.request]: "请求",
+      [portKeys.security]: "安全",
+      [portKeys.success]: "成功",
+      [portKeys.trigger]: "触发",
+    },
+  },
+};
+
+function translate(locale, key) {
+  return demoI18n.locales[locale]?.[key] ?? key;
+}
+
+function createPort(id, labelKey, dataType) {
+  return dataType ? { id, labelKey, dataType } : { id, labelKey };
+}
+
+function createField(key, labelKey, kind, defaultValue) {
+  return defaultValue === undefined
+    ? { key, labelKey, kind }
+    : { key, labelKey, kind, defaultValue };
+}
+
+function createStoredNode({
+  id,
+  nodeType,
+  position,
+  labelKey,
+  descriptionKey,
+  categoryKey,
+  inputs = [],
+  outputs = [],
+  values = {},
+  appearance,
+}) {
+  return {
+    id,
+    type: "default",
+    position,
+    data: {
+      label: translate("en", labelKey),
+      labelKey,
+      description: translate("en", descriptionKey),
+      descriptionKey,
+      categoryKey,
+      nodeType,
+      inputs,
+      outputs,
+      values,
+      appearance,
+    },
+    style: {
+      background: appearance?.bgColor,
+      borderColor: appearance?.borderColor,
+      color: appearance?.textColor,
+      borderWidth: 1,
+      borderRadius: 20,
+    },
+  };
+}
 
 export const demoTypeMappings = [
   {
@@ -26,18 +199,13 @@ export const demoTypeMappings = [
 export const demoNodeLibrary = [
   {
     type: "start",
-    label: text("开始", "Start"),
-    description: text("新工作流的入口节点。", "Entry point for a new workflow."),
-    category: text("控制", "control"),
+    labelKey: nodeKeys.start.label,
+    descriptionKey: nodeKeys.start.description,
+    categoryKey: categoryKeys.control,
     inputs: [],
-    outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
+    outputs: [createPort("next", portKeys.next, workflowRequestType)],
     fields: [
-      {
-        key: "note",
-        label: text("开场说明", "Opening note"),
-        kind: "text",
-        defaultValue: "Kick off the workflow",
-      },
+      createField("note", fieldKeys.note, "text", "Kick off the workflow"),
     ],
     appearance: {
       bgColor: "#ecfdf5",
@@ -47,22 +215,17 @@ export const demoNodeLibrary = [
   },
   {
     type: "parallel_split",
-    label: text("并行分发", "Parallel Split"),
-    description: text("把一个触发拆分成多个并行评审分支。", "Fan out one trigger into multiple review branches."),
-    category: text("控制", "control"),
-    inputs: [{ id: "trigger", label: text("触发", "Trigger"), dataType: workflowRequestType }],
+    labelKey: nodeKeys.parallelSplit.label,
+    descriptionKey: nodeKeys.parallelSplit.description,
+    categoryKey: categoryKeys.control,
+    inputs: [createPort("trigger", portKeys.trigger, workflowRequestType)],
     outputs: [
-      { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
-      { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
-      { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
+      createPort("finance", portKeys.finance, reviewTaskType),
+      createPort("legal", portKeys.legal, reviewTaskType),
+      createPort("security", portKeys.security, reviewTaskType),
     ],
     fields: [
-      {
-        key: "strategy",
-        label: text("分发策略", "Dispatch strategy"),
-        kind: "text",
-        defaultValue: "broadcast",
-      },
+      createField("strategy", fieldKeys.strategy, "text", "broadcast"),
     ],
     appearance: {
       bgColor: "#eff6ff",
@@ -72,22 +235,17 @@ export const demoNodeLibrary = [
   },
   {
     type: "merge",
-    label: text("汇合", "Merge"),
-    description: text("在继续前汇集多个上游分支。", "Collect multiple upstream branches before continuing."),
-    category: text("控制", "control"),
+    labelKey: nodeKeys.merge.label,
+    descriptionKey: nodeKeys.merge.description,
+    categoryKey: categoryKeys.control,
     inputs: [
-      { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
-      { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
-      { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
+      createPort("finance", portKeys.finance, reviewTaskType),
+      createPort("legal", portKeys.legal, reviewTaskType),
+      createPort("security", portKeys.security, reviewTaskType),
     ],
-    outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
+    outputs: [createPort("next", portKeys.next, workflowRequestType)],
     fields: [
-      {
-        key: "waitForAll",
-        label: text("等待全部分支", "Wait for all branches"),
-        kind: "boolean",
-        defaultValue: true,
-      },
+      createField("waitForAll", fieldKeys.waitForAll, "boolean", true),
     ],
     appearance: {
       bgColor: "#fdf4ff",
@@ -97,27 +255,17 @@ export const demoNodeLibrary = [
   },
   {
     type: "approval",
-    label: text("审批", "Approval"),
-    description: text("带有明确通过与驳回出口的人工审批步骤。", "Manual approval step with explicit approved and rejected exits."),
-    category: text("流程", "workflow"),
-    inputs: [{ id: "request", label: text("请求", "Request"), dataType: workflowRequestType }],
+    labelKey: nodeKeys.approval.label,
+    descriptionKey: nodeKeys.approval.description,
+    categoryKey: categoryKeys.workflow,
+    inputs: [createPort("request", portKeys.request, workflowRequestType)],
     outputs: [
-      { id: "approved", label: text("通过", "Approved"), dataType: approvalDecisionType },
-      { id: "rejected", label: text("驳回", "Rejected"), dataType: approvalDecisionType },
+      createPort("approved", portKeys.approved, approvalDecisionType),
+      createPort("rejected", portKeys.rejected, approvalDecisionType),
     ],
     fields: [
-      {
-        key: "owner",
-        label: text("负责人", "Owner"),
-        kind: "text",
-        defaultValue: "finance.manager",
-      },
-      {
-        key: "slaHours",
-        label: text("SLA 小时", "SLA hours"),
-        kind: "number",
-        defaultValue: 24,
-      },
+      createField("owner", fieldKeys.owner, "text", "finance.manager"),
+      createField("slaHours", fieldKeys.slaHours, "number", 24),
     ],
     appearance: {
       bgColor: "#fff7ed",
@@ -127,27 +275,17 @@ export const demoNodeLibrary = [
   },
   {
     type: "notify",
-    label: text("通知", "Notify"),
-    description: text("审批结束后发送成功或失败通知。", "Send success or failure notifications after approval completes."),
-    category: text("集成", "integration"),
+    labelKey: nodeKeys.notify.label,
+    descriptionKey: nodeKeys.notify.description,
+    categoryKey: categoryKeys.integration,
     inputs: [
-      { id: "success", label: text("成功", "Success"), dataType: approvalDecisionType },
-      { id: "failure", label: text("失败", "Failure"), dataType: approvalDecisionType },
+      createPort("success", portKeys.success, approvalDecisionType),
+      createPort("failure", portKeys.failure, approvalDecisionType),
     ],
     outputs: [],
     fields: [
-      {
-        key: "channel",
-        label: text("通道", "Channel"),
-        kind: "text",
-        defaultValue: "email",
-      },
-      {
-        key: "includeSummary",
-        label: text("包含摘要", "Include summary"),
-        kind: "boolean",
-        defaultValue: true,
-      },
+      createField("channel", fieldKeys.channel, "text", "email"),
+      createField("includeSummary", fieldKeys.includeSummary, "boolean", true),
     ],
     appearance: {
       bgColor: "#eef2ff",
@@ -181,137 +319,112 @@ function createExistingGraph(graphName) {
     name: graphName,
     description: "A pre-filled multi-port workflow used to demo existing graph editing.",
     nodes: [
-      {
+      createStoredNode({
         id: "node_start",
-        type: "default",
+        nodeType: "start",
         position: { x: 80, y: 220 },
-        data: {
-          label: "Start",
-          description: "Receive the original request.",
-          category: text("控制", "control"),
-          nodeType: "start",
-          inputs: [],
-          outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
-          values: {
-            note: "Request entered from the demo client",
-          },
+        labelKey: nodeKeys.start.label,
+        descriptionKey: nodeKeys.start.description,
+        categoryKey: categoryKeys.control,
+        inputs: [],
+        outputs: [createPort("next", portKeys.next, workflowRequestType)],
+        values: {
+          note: "Request entered from the demo client",
         },
-        style: {
-          background: "#ecfdf5",
+        appearance: {
+          bgColor: "#ecfdf5",
           borderColor: "#10b981",
-          color: "#14532d",
-          borderWidth: 1,
-          borderRadius: 20,
+          textColor: "#14532d",
         },
-      },
-      {
+      }),
+      createStoredNode({
         id: "node_parallel_split",
-        type: "default",
+        nodeType: "parallel_split",
         position: { x: 360, y: 220 },
-        data: {
-          label: "Parallel Split",
-          description: "Dispatch the request to finance, legal, and security reviewers.",
-          category: text("控制", "control"),
-          nodeType: "parallel_split",
-          inputs: [{ id: "trigger", label: text("触发", "Trigger"), dataType: workflowRequestType }],
-          outputs: [
-            { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
-            { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
-            { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
-          ],
-          values: {
-            strategy: "broadcast",
-          },
+        labelKey: nodeKeys.parallelSplit.label,
+        descriptionKey: nodeKeys.parallelSplit.description,
+        categoryKey: categoryKeys.control,
+        inputs: [createPort("trigger", portKeys.trigger, workflowRequestType)],
+        outputs: [
+          createPort("finance", portKeys.finance, reviewTaskType),
+          createPort("legal", portKeys.legal, reviewTaskType),
+          createPort("security", portKeys.security, reviewTaskType),
+        ],
+        values: {
+          strategy: "broadcast",
         },
-        style: {
-          background: "#eff6ff",
+        appearance: {
+          bgColor: "#eff6ff",
           borderColor: "#0ea5e9",
-          color: "#0c4a6e",
-          borderWidth: 1,
-          borderRadius: 20,
+          textColor: "#0c4a6e",
         },
-      },
-      {
+      }),
+      createStoredNode({
         id: "node_merge",
-        type: "default",
+        nodeType: "merge",
         position: { x: 700, y: 220 },
-        data: {
-          label: "Merge",
-          description: "Wait for the parallel checks before sending the consolidated request forward.",
-          category: text("控制", "control"),
-          nodeType: "merge",
-          inputs: [
-            { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
-            { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
-            { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
-          ],
-          outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
-          values: {
-            waitForAll: true,
-          },
+        labelKey: nodeKeys.merge.label,
+        descriptionKey: nodeKeys.merge.description,
+        categoryKey: categoryKeys.control,
+        inputs: [
+          createPort("finance", portKeys.finance, reviewTaskType),
+          createPort("legal", portKeys.legal, reviewTaskType),
+          createPort("security", portKeys.security, reviewTaskType),
+        ],
+        outputs: [createPort("next", portKeys.next, workflowRequestType)],
+        values: {
+          waitForAll: true,
         },
-        style: {
-          background: "#fdf4ff",
+        appearance: {
+          bgColor: "#fdf4ff",
           borderColor: "#c026d3",
-          color: "#701a75",
-          borderWidth: 1,
-          borderRadius: 20,
+          textColor: "#701a75",
         },
-      },
-      {
+      }),
+      createStoredNode({
         id: "node_approval",
-        type: "default",
+        nodeType: "approval",
         position: { x: 1040, y: 220 },
-        data: {
-          label: "Approval",
-          description: "Manager checks the aggregated review bundle.",
-          category: text("流程", "workflow"),
-          nodeType: "approval",
-          inputs: [{ id: "request", label: text("请求", "Request"), dataType: workflowRequestType }],
-          outputs: [
-            { id: "approved", label: text("通过", "Approved"), dataType: approvalDecisionType },
-            { id: "rejected", label: text("驳回", "Rejected"), dataType: approvalDecisionType },
-          ],
-          values: {
-            owner: "finance.manager",
-            slaHours: 24,
-          },
+        labelKey: nodeKeys.approval.label,
+        descriptionKey: nodeKeys.approval.description,
+        categoryKey: categoryKeys.workflow,
+        inputs: [createPort("request", portKeys.request, workflowRequestType)],
+        outputs: [
+          createPort("approved", portKeys.approved, approvalDecisionType),
+          createPort("rejected", portKeys.rejected, approvalDecisionType),
+        ],
+        values: {
+          owner: "finance.manager",
+          slaHours: 24,
         },
-        style: {
-          background: "#fff7ed",
+        appearance: {
+          bgColor: "#fff7ed",
           borderColor: "#f97316",
-          color: "#7c2d12",
-          borderWidth: 1,
-          borderRadius: 20,
+          textColor: "#7c2d12",
         },
-      },
-      {
+      }),
+      createStoredNode({
         id: "node_notify",
-        type: "default",
+        nodeType: "notify",
         position: { x: 1400, y: 220 },
-        data: {
-          label: "Notify",
-          description: "Tell the requester whether the request was approved or rejected.",
-          category: text("集成", "integration"),
-          nodeType: "notify",
-          inputs: [
-            { id: "success", label: text("成功", "Success"), dataType: approvalDecisionType },
-            { id: "failure", label: text("失败", "Failure"), dataType: approvalDecisionType },
-          ],
-          outputs: [],
-          values: {
-            channel: "email",
-            includeSummary: true,
-          },
+        labelKey: nodeKeys.notify.label,
+        descriptionKey: nodeKeys.notify.description,
+        categoryKey: categoryKeys.integration,
+        inputs: [
+          createPort("success", portKeys.success, approvalDecisionType),
+          createPort("failure", portKeys.failure, approvalDecisionType),
+        ],
+        outputs: [],
+        values: {
+          channel: "email",
+          includeSummary: true,
         },
-        style: {
-          background: "#eef2ff",
+        appearance: {
+          bgColor: "#eef2ff",
           borderColor: "#6366f1",
-          color: "#312e81",
-          borderWidth: 1,
-          borderRadius: 20,
+          textColor: "#312e81",
         },
-      },
+      }),
     ],
     edges: [
       {

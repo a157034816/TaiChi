@@ -1,8 +1,13 @@
+import {
+  normalizeI18nBundle,
+  validateNodeLibraryTranslationKeys,
+} from "@/lib/nodegraph/localization";
 import { nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
 import { normalizeTypeMappings, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
 import type {
   CreateSessionRequest,
   DomainRegistryEntry,
+  I18nBundle,
   NodeLibraryItem,
   TypeMappingEntry,
 } from "@/lib/nodegraph/types";
@@ -16,6 +21,7 @@ function nowIso() {
 
 export function normalizeNodeLibraryPayload(payload: unknown): {
   nodes: NodeLibraryItem[];
+  i18n: I18nBundle;
   typeMappings?: TypeMappingEntry[];
 } {
   const parsed = nodeLibraryEnvelopeSchema.safeParse(payload);
@@ -23,14 +29,18 @@ export function normalizeNodeLibraryPayload(payload: unknown): {
     throw new HttpError("The client node library payload is invalid.", 502);
   }
 
-  const nodes = Array.isArray(parsed.data) ? parsed.data : parsed.data.nodes;
+  const nodes = parsed.data.nodes;
+  const i18n = normalizeI18nBundle(parsed.data.i18n);
 
   try {
-    const typeMappings = Array.isArray(parsed.data) ? undefined : normalizeTypeMappings(parsed.data.typeMappings);
+    const typeMappings = normalizeTypeMappings(parsed.data.typeMappings);
+
+    validateNodeLibraryTranslationKeys(nodes, i18n);
     validateNodeLibraryTypeMappings(nodes, typeMappings);
 
     return {
       nodes,
+      i18n,
       typeMappings,
     };
   } catch (error) {
@@ -90,7 +100,7 @@ export async function ensureDomain(input: CreateSessionRequest) {
     };
   }
 
-  const { nodes: nodeLibrary, typeMappings } = await fetchNodeLibrary(input.nodeLibraryEndpoint);
+  const { nodes: nodeLibrary, i18n, typeMappings } = await fetchNodeLibrary(input.nodeLibraryEndpoint);
   if (!nodeLibrary.length) {
     throw new HttpError("The client returned an empty node library for this domain.", 422);
   }
@@ -102,6 +112,7 @@ export async function ensureDomain(input: CreateSessionRequest) {
     nodeLibraryEndpoint: input.nodeLibraryEndpoint,
     completionWebhook: input.completionWebhook,
     nodeLibrary,
+    i18n,
     typeMappings,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,

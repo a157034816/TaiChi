@@ -1,29 +1,54 @@
 import { describe, expect, it } from "vitest";
 
-import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { nodeGraphDocumentSchema, nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
 
 const workflowRequestType = "workflow/request";
 const approvalDecisionType = "workflow/approval-decision";
-const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
+
+const nodeLibraryI18n = {
+  defaultLocale: "en",
+  locales: {
+    en: {
+      "categories.workflow": "Workflow",
+      "nodes.approval.description": "Review and route the request.",
+      "nodes.approval.label": "Approval",
+      "nodes.start.label": "Start",
+      "ports.approved": "Approved",
+      "ports.next": "Next",
+      "ports.rejected": "Rejected",
+      "ports.request": "Request",
+    },
+    "zh-CN": {
+      "categories.workflow": "流程",
+      "nodes.approval.description": "审核并路由请求。",
+      "nodes.approval.label": "审批",
+      "nodes.start.label": "开始",
+      "ports.approved": "通过",
+      "ports.next": "下一步",
+      "ports.rejected": "驳回",
+      "ports.request": "请求",
+    },
+  },
+} as const;
 
 describe("nodegraph schema", () => {
-  it("accepts node library items with explicit multi-port definitions", () => {
+  it("accepts node library items that reference translation keys", () => {
     expect(
       nodeLibraryEnvelopeSchema.parse({
         nodes: [
           {
             type: "approval",
-            label: text("Approval"),
-            description: text("Review and route the request"),
-            category: text("workflow"),
-            inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+            labelKey: "nodes.approval.label",
+            descriptionKey: "nodes.approval.description",
+            categoryKey: "categories.workflow",
+            inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
             outputs: [
-              { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
-              { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
+              { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
+              { id: "rejected", labelKey: "ports.rejected", dataType: approvalDecisionType },
             ],
           },
         ],
+        i18n: nodeLibraryI18n,
         typeMappings: [
           {
             canonicalId: workflowRequestType,
@@ -40,7 +65,7 @@ describe("nodegraph schema", () => {
     ).toBeTruthy();
   });
 
-  it("accepts saved edge handle ids for multi-port graphs", () => {
+  it("accepts saved edge handle ids for key-based multi-port graphs", () => {
     expect(
       nodeGraphDocumentSchema.parse({
         name: "Blueprint review flow",
@@ -51,11 +76,15 @@ describe("nodegraph schema", () => {
             position: { x: 0, y: 0 },
             data: {
               label: "Approval",
+              labelKey: "nodes.approval.label",
+              description: "Review and route the request.",
+              descriptionKey: "nodes.approval.description",
+              categoryKey: "categories.workflow",
               nodeType: "approval",
-              inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+              inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
               outputs: [
-                { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
-                { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
+                { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
+                { id: "rejected", labelKey: "ports.rejected", dataType: approvalDecisionType },
               ],
             },
           },
@@ -67,8 +96,8 @@ describe("nodegraph schema", () => {
               label: "Notify",
               nodeType: "notify",
               inputs: [
-                { id: "success", label: text("Success"), dataType: approvalDecisionType },
-                { id: "failure", label: text("Failure"), dataType: approvalDecisionType },
+                { id: "success", labelKey: "ports.approved", dataType: approvalDecisionType },
+                { id: "failure", labelKey: "ports.rejected", dataType: approvalDecisionType },
               ],
               outputs: [],
             },
@@ -88,45 +117,69 @@ describe("nodegraph schema", () => {
     ).toBeTruthy();
   });
 
-  it("keeps node port data types optional for legacy libraries", () => {
+  it("keeps legacy saved node port label objects valid", () => {
     expect(
-      nodeLibraryEnvelopeSchema.parse([
-        {
-          type: "start",
-          label: text("Start"),
-          description: text("Kick off the flow"),
-          category: text("control"),
-          outputs: [{ id: "next", label: text("Next") }],
-        },
-      ]),
+      nodeGraphDocumentSchema.parse({
+        name: "Legacy graph",
+        nodes: [
+          {
+            id: "node_start",
+            type: "default",
+            position: { x: 0, y: 0 },
+            data: {
+              label: "Start",
+              nodeType: "start",
+              category: {
+                "zh-CN": "控制",
+                en: "Control",
+              },
+              outputs: [
+                {
+                  id: "next",
+                  label: {
+                    "zh-CN": "下一步",
+                    en: "Next",
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 },
+      }),
     ).toBeTruthy();
   });
 
-  it("rejects legacy languageType field names in typeMappings", () => {
+  it("rejects node libraries that omit the i18n bundle", () => {
     expect(() =>
       nodeLibraryEnvelopeSchema.parse({
-        nodes: [],
-        typeMappings: [
+        nodes: [
           {
-            canonicalId: workflowRequestType,
-            languageType: "WorkflowRequest",
+            type: "start",
+            labelKey: "nodes.start.label",
+            categoryKey: "categories.workflow",
           },
         ],
       }),
     ).toThrow();
   });
 
-  it("rejects legacy single-language node labels", () => {
+  it("rejects legacy inline localized node library labels", () => {
     expect(() =>
       nodeLibraryEnvelopeSchema.parse({
         nodes: [
           {
             type: "start",
-            label: "Start",
-            description: text("Entry node"),
-            category: text("control"),
+            label: {
+              "zh-CN": "开始",
+              en: "Start",
+            },
+            descriptionKey: "nodes.approval.description",
+            categoryKey: "categories.workflow",
           },
         ],
+        i18n: nodeLibraryI18n,
       }),
     ).toThrow();
   });
@@ -135,6 +188,7 @@ describe("nodegraph schema", () => {
     expect(() =>
       nodeLibraryEnvelopeSchema.parse({
         nodes: [],
+        i18n: nodeLibraryI18n,
         typeMappings: [
           {
             canonicalId: workflowRequestType,

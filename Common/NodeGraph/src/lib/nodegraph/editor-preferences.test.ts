@@ -15,6 +15,21 @@ describe("nodegraph editor preferences", () => {
     expect(sanitizeEditorPreferences({ locale: "fr", edgeStyle: "arc" })).toEqual(DEFAULT_EDITOR_PREFERENCES);
   });
 
+  it("accepts a persisted locale when the active session allows it", () => {
+    expect(
+      sanitizeEditorPreferences(
+        {
+          locale: "fr-FR",
+          edgeStyle: "step",
+        },
+        ["zh-CN", "en", "fr-FR"],
+      ),
+    ).toEqual({
+      locale: "fr-FR",
+      edgeStyle: "step",
+    });
+  });
+
   it("reads a persisted preference payload from storage", () => {
     const storage = {
       getItem() {
@@ -27,6 +42,22 @@ describe("nodegraph editor preferences", () => {
 
     expect(readEditorPreferences(storage)).toEqual({
       locale: "en",
+      edgeStyle: "bezier",
+    });
+  });
+
+  it("preserves a domain locale from storage when it is still allowed", () => {
+    const storage = {
+      getItem() {
+        return JSON.stringify({
+          locale: "fr-FR",
+          edgeStyle: "bezier",
+        });
+      },
+    };
+
+    expect(readEditorPreferences(storage, ["zh-CN", "en", "fr-FR"])).toEqual({
+      locale: "fr-FR",
       edgeStyle: "bezier",
     });
   });

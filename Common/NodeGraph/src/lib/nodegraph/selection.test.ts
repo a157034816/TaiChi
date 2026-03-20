@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getEditorMessages } from "@/lib/nodegraph/localization";
+import { createI18nRuntime } from "@/lib/nodegraph/localization";
 import {
   createCanvasSelectionSnapshot,
   createEmptyCanvasSelectionSnapshot,
@@ -11,14 +11,16 @@ import {
 } from "@/lib/nodegraph/selection";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
 
-const messages = getEditorMessages("en").selection;
-
+const i18n = createI18nRuntime({
+  locale: "en",
+});
 const nodes: NodeGraphNode[] = [
   {
     id: "node_start",
     position: { x: 0, y: 0 },
     data: {
       label: "Start",
+      labelKey: "nodes.start.label",
       nodeType: "trigger",
     },
   },
@@ -27,6 +29,7 @@ const nodes: NodeGraphNode[] = [
     position: { x: 240, y: 80 },
     data: {
       label: "Notify",
+      labelKey: "nodes.notify.label",
       nodeType: "action",
     },
   },
@@ -115,7 +118,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
-        messages,
+        i18n,
       ),
     ).toBe("Link Start -> Notify");
   });
@@ -129,7 +132,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
-        messages,
+        i18n,
       ),
     ).toBe("trigger");
 
@@ -141,7 +144,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
-        messages,
+        i18n,
       ),
     ).toBe("link focus");
   });

@@ -4,9 +4,14 @@ import type { CSSProperties } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
 import { useEditorI18n } from "@/components/editor/editor-i18n-context";
-import type { NodeGraphNode, NodeGraphNodeData, NodePortDefinition } from "@/lib/nodegraph/types";
 import { useTypeColors } from "@/components/editor/type-colors";
-import { resolveLocalizedText } from "@/lib/nodegraph/localization";
+import {
+  resolveNodeCategory,
+  resolveNodeDescription,
+  resolveNodeLabel,
+  resolvePortLabel,
+} from "@/lib/nodegraph/localization";
+import type { NodeGraphNode, NodeGraphNodeData, NodePortDefinition } from "@/lib/nodegraph/types";
 
 const FALLBACK_ACCENT = "#ff9d1c";
 const FALLBACK_TEXT = "#f7fbff";
@@ -49,10 +54,10 @@ function hexToRgba(color: string, alpha: number) {
 
 function formatValue(
   value: unknown,
-  messages: ReturnType<typeof useEditorI18n>["messages"]["blueprint"],
+  text: ReturnType<typeof useEditorI18n>["text"],
 ) {
   if (typeof value === "boolean") {
-    return value ? messages.enabled : messages.disabled;
+    return value ? text("editor.blueprint.enabled") : text("editor.blueprint.disabled");
   }
 
   if (typeof value === "number") {
@@ -60,18 +65,18 @@ function formatValue(
   }
 
   if (typeof value === "string") {
-    return value.trim() ? value : messages.empty;
+    return value.trim() ? value : text("editor.blueprint.empty");
   }
 
   if (Array.isArray(value)) {
-    return messages.items(value.length);
+    return text("editor.blueprint.items", { count: value.length });
   }
 
   if (value && typeof value === "object") {
-    return messages.configured;
+    return text("editor.blueprint.configured");
   }
 
-  return messages.unset;
+  return text("editor.blueprint.unset");
 }
 
 function getNodeTheme(data: NodeGraphNodeData) {
@@ -88,12 +93,15 @@ function getNodeTheme(data: NodeGraphNodeData) {
   };
 }
 
-function getPortLabel(port: NodePortDefinition, locale: ReturnType<typeof useEditorI18n>["locale"]) {
-  return resolveLocalizedText(port.label, locale).trim() || port.id;
+function getPortDisplayLabel(port: NodePortDefinition, i18n: ReturnType<typeof useEditorI18n>) {
+  return resolvePortLabel(port, i18n).trim() || port.id;
 }
 
+/**
+ * Renders the custom blueprint node body used inside the React Flow canvas.
+ */
 export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
-  const { locale, messages } = useEditorI18n();
+  const i18n = useEditorI18n();
   const typeColors = useTypeColors();
   const valueEntries = Object.entries(data.values ?? {}).slice(0, 3);
   const hiddenFieldCount = Math.max(Object.keys(data.values ?? {}).length - valueEntries.length, 0);
@@ -116,24 +124,24 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
     >
       <div className="blueprint-node__header">
         <span className="blueprint-node__category">
-          {data.category ? resolveLocalizedText(data.category, locale) : messages.blueprint.fallbackCategory}
+          {resolveNodeCategory(data, i18n) ?? i18n.text("editor.blueprint.fallbackCategory")}
         </span>
         <span className="blueprint-node__type">{data.nodeType}</span>
       </div>
 
       <div className="blueprint-node__body">
         <div className="blueprint-node__title-row">
-          <h3 className="blueprint-node__title">{data.label}</h3>
-          <span className="blueprint-node__status">{messages.blueprint.ready}</span>
+          <h3 className="blueprint-node__title">{resolveNodeLabel(data, i18n)}</h3>
+          <span className="blueprint-node__status">{i18n.text("editor.blueprint.ready")}</span>
         </div>
 
         <p className="blueprint-node__description">
-          {data.description?.trim() || messages.blueprint.fallbackDescription}
+          {resolveNodeDescription(data, i18n)?.trim() || i18n.text("editor.blueprint.fallbackDescription")}
         </p>
 
         <div className="blueprint-node__ports">
           <div className="blueprint-node__port-column">
-            <span className="blueprint-node__port-label">{messages.blueprint.inputs}</span>
+            <span className="blueprint-node__port-label">{i18n.text("editor.blueprint.inputs")}</span>
             <div className="blueprint-node__port-list">
               {inputPorts.length ? (
                 inputPorts.map((port) => (
@@ -161,18 +169,18 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                           : undefined
                       }
                     />
-                    <span className="blueprint-node__port-name">{getPortLabel(port, locale)}</span>
+                    <span className="blueprint-node__port-name">{getPortDisplayLabel(port, i18n)}</span>
                   </div>
                 ))
               ) : (
-                <div className="blueprint-node__port-empty">{messages.blueprint.noInputs}</div>
+                <div className="blueprint-node__port-empty">{i18n.text("editor.blueprint.noInputs")}</div>
               )}
             </div>
           </div>
 
           <div className="blueprint-node__port-column blueprint-node__port-column--output">
             <span className="blueprint-node__port-label blueprint-node__port-label--out">
-              {messages.blueprint.outputs}
+              {i18n.text("editor.blueprint.outputs")}
             </span>
             <div className="blueprint-node__port-list">
               {outputPorts.length ? (
@@ -187,7 +195,7 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                         : undefined,
                     }}
                   >
-                    <span className="blueprint-node__port-name">{getPortLabel(port, locale)}</span>
+                    <span className="blueprint-node__port-name">{getPortDisplayLabel(port, i18n)}</span>
                     <Handle
                       className="blueprint-node__handle blueprint-node__handle--output"
                       id={port.id}
@@ -206,7 +214,7 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                 ))
               ) : (
                 <div className="blueprint-node__port-empty blueprint-node__port-empty--out">
-                  {messages.blueprint.noOutputs}
+                  {i18n.text("editor.blueprint.noOutputs")}
                 </div>
               )}
             </div>
@@ -218,19 +226,21 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
             valueEntries.map(([key, value]) => (
               <div className="blueprint-node__field" key={key}>
                 <span className="blueprint-node__field-key">{key}</span>
-                <span className="blueprint-node__field-value">{formatValue(value, messages.blueprint)}</span>
+                <span className="blueprint-node__field-value">{formatValue(value, i18n.text)}</span>
               </div>
             ))
           ) : (
             <div className="blueprint-node__field blueprint-node__field--empty">
-              <span className="blueprint-node__field-key">{messages.blueprint.values}</span>
-              <span className="blueprint-node__field-value">{messages.blueprint.noEditableFields}</span>
+              <span className="blueprint-node__field-key">{i18n.text("editor.blueprint.values")}</span>
+              <span className="blueprint-node__field-value">{i18n.text("editor.blueprint.noEditableFields")}</span>
             </div>
           )}
         </div>
 
         {hiddenFieldCount ? (
-          <div className="blueprint-node__footer">{messages.blueprint.moreFieldRows(hiddenFieldCount)}</div>
+          <div className="blueprint-node__footer">
+            {i18n.text("editor.blueprint.moreFieldRows", { count: hiddenFieldCount })}
+          </div>
         ) : null}
       </div>
     </div>

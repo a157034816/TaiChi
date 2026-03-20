@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { completeSession, createSession, getSession } from "@/lib/server/session-service";
 import { getRuntimeStore } from "@/lib/server/store";
-
-const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 const sessionInput = {
   domain: "erp-workflow",
@@ -29,22 +26,39 @@ describe("session service", () => {
 
   it("creates a private editor session and posts the completion webhook", async () => {
     const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              nodes: [
-                {
-                  type: "start",
-                  label: text("Start"),
-                  description: text("Entry node"),
-                  category: text("control"),
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            nodes: [
+              {
+                type: "start",
+                labelKey: "nodes.start.label",
+                descriptionKey: "nodes.start.description",
+                categoryKey: "categories.control",
+              },
+            ],
+            i18n: {
+              defaultLocale: "en",
+              locales: {
+                en: {
+                  "categories.control": "Control",
+                  "nodes.start.description": "Entry node",
+                  "nodes.start.label": "Start",
+                  "ports.next": "Next",
                 },
-              ],
-            }),
-          ),
-        )
-        .mockResolvedValueOnce(new Response(null, { status: 204 }));
+                "zh-CN": {
+                  "categories.control": "控制",
+                  "nodes.start.description": "入口节点",
+                  "nodes.start.label": "开始",
+                  "ports.next": "下一步",
+                },
+              },
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const created = await createSession(
@@ -68,8 +82,9 @@ describe("session service", () => {
           position: { x: 0, y: 0 },
           data: {
             label: "Start",
+            labelKey: "nodes.start.label",
             nodeType: "start",
-            outputs: [{ id: "next", label: text("Next") }],
+            outputs: [{ id: "next", labelKey: "ports.next" }],
           },
         },
       ],
@@ -92,6 +107,10 @@ describe("session service", () => {
     expect(webhookPayload.graph.edges[0]).toMatchObject({
       sourceHandle: "next",
       targetHandle: "request",
+    });
+    expect(webhookPayload.graph.nodes[0].data).toMatchObject({
+      label: "Start",
+      labelKey: "nodes.start.label",
     });
   });
 });

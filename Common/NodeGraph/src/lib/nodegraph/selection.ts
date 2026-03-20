@@ -1,3 +1,4 @@
+import { resolveNodeLabel, type I18nRuntime } from "@/lib/nodegraph/localization";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
 
 export type CanvasSelection =
@@ -15,17 +16,14 @@ interface SelectionChangeSnapshot {
   edges: Array<Pick<NodeGraphEdge, "id">>;
 }
 
-export interface CanvasSelectionMessages {
-  defaultFocusLabel: string;
-  defaultTypeLabel: string;
-  linkFocusLabel: string;
-  formatLinkFocusLabel: (sourceLabel: string, targetLabel: string) => string;
+function getNodeLabel(nodeId: string, nodes: NodeGraphNode[], i18n: I18nRuntime) {
+  const node = nodes.find((entry) => entry.id === nodeId);
+  return node ? resolveNodeLabel(node.data, i18n) : nodeId;
 }
 
-function getNodeLabel(nodeId: string, nodes: NodeGraphNode[]) {
-  return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
-}
-
+/**
+ * Creates an empty selection payload for the canvas.
+ */
 export function createEmptyCanvasSelectionSnapshot(): CanvasSelectionSnapshot {
   return {
     nodeIds: [],
@@ -33,6 +31,9 @@ export function createEmptyCanvasSelectionSnapshot(): CanvasSelectionSnapshot {
   };
 }
 
+/**
+ * Captures the selected node and edge ids from React Flow callbacks.
+ */
 export function createCanvasSelectionSnapshot({ nodes, edges }: SelectionChangeSnapshot): CanvasSelectionSnapshot {
   return {
     nodeIds: nodes.map((node) => node.id),
@@ -40,6 +41,9 @@ export function createCanvasSelectionSnapshot({ nodes, edges }: SelectionChangeS
   };
 }
 
+/**
+ * Chooses the primary selection target from a mixed selection set.
+ */
 export function resolveCanvasSelection({ nodes, edges }: SelectionChangeSnapshot): CanvasSelection {
   const selectedNode = nodes[0];
 
@@ -62,6 +66,9 @@ export function resolveCanvasSelection({ nodes, edges }: SelectionChangeSnapshot
   return null;
 }
 
+/**
+ * Rehydrates the primary selection from a stored snapshot.
+ */
 export function resolveCanvasSelectionFromSnapshot(selection: CanvasSelectionSnapshot): CanvasSelection {
   return resolveCanvasSelection({
     nodes: selection.nodeIds.map((id) => ({ id })),
@@ -69,42 +76,54 @@ export function resolveCanvasSelectionFromSnapshot(selection: CanvasSelectionSna
   });
 }
 
+/**
+ * Builds the HUD focus label for the current selection.
+ */
 export function getCanvasFocusLabel(
   selection: CanvasSelection,
   nodes: NodeGraphNode[],
   edges: NodeGraphEdge[],
-  messages: CanvasSelectionMessages,
+  i18n: I18nRuntime,
 ) {
   if (!selection) {
-    return messages.defaultFocusLabel;
+    return i18n.text("editor.selection.defaultFocusLabel");
   }
 
   if (selection.type === "node") {
-    return nodes.find((node) => node.id === selection.id)?.data.label ?? messages.defaultFocusLabel;
+    const node = nodes.find((entry) => entry.id === selection.id);
+    return node ? resolveNodeLabel(node.data, i18n) : i18n.text("editor.selection.defaultFocusLabel");
   }
 
   const edge = edges.find((item) => item.id === selection.id);
 
   if (!edge) {
-    return messages.defaultFocusLabel;
+    return i18n.text("editor.selection.defaultFocusLabel");
   }
 
-  return messages.formatLinkFocusLabel(getNodeLabel(edge.source, nodes), getNodeLabel(edge.target, nodes));
+  return i18n.text("editor.selection.linkFocusTitle", {
+    sourceLabel: getNodeLabel(edge.source, nodes, i18n),
+    targetLabel: getNodeLabel(edge.target, nodes, i18n),
+  });
 }
 
+/**
+ * Builds the HUD type label for the current selection.
+ */
 export function getCanvasTypeLabel(
   selection: CanvasSelection,
   nodes: NodeGraphNode[],
   edges: NodeGraphEdge[],
-  messages: CanvasSelectionMessages,
+  i18n: I18nRuntime,
 ) {
   if (!selection) {
-    return messages.defaultTypeLabel;
+    return i18n.text("editor.selection.defaultTypeLabel");
   }
 
   if (selection.type === "node") {
-    return nodes.find((node) => node.id === selection.id)?.data.nodeType ?? messages.defaultTypeLabel;
+    return nodes.find((node) => node.id === selection.id)?.data.nodeType ?? i18n.text("editor.selection.defaultTypeLabel");
   }
 
-  return edges.some((edge) => edge.id === selection.id) ? messages.linkFocusLabel : messages.defaultTypeLabel;
+  return edges.some((edge) => edge.id === selection.id)
+    ? i18n.text("editor.selection.linkFocusLabel")
+    : i18n.text("editor.selection.defaultTypeLabel");
 }

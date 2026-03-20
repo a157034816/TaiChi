@@ -6,7 +6,11 @@ import { ClipboardPaste, Copy, Plus, Scissors, Trash2 } from "lucide-react";
 
 import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import type { NodeLibraryItem } from "@/lib/nodegraph/types";
-import { resolveLocalizedText } from "@/lib/nodegraph/localization";
+import {
+  resolveNodeLibraryCategory,
+  resolveNodeLibraryDescription,
+  resolveNodeLibraryLabel,
+} from "@/lib/nodegraph/localization";
 
 interface CanvasContextMenuProps {
   canCopy: boolean;
@@ -32,11 +36,11 @@ interface CanvasContextMenuProps {
   onPaste: () => void;
 }
 
-function groupItemsByCategory(items: NodeLibraryItem[], locale: ReturnType<typeof useEditorI18n>["locale"]) {
+function groupItemsByCategory(items: NodeLibraryItem[], i18n: ReturnType<typeof useEditorI18n>) {
   const groups = new Map<string, NodeLibraryItem[]>();
 
   for (const item of items) {
-    const category = resolveLocalizedText(item.category, locale);
+    const category = resolveNodeLibraryCategory(item, i18n);
     const currentGroup = groups.get(category) ?? [];
     currentGroup.push(item);
     groups.set(category, currentGroup);
@@ -71,6 +75,9 @@ function CanvasMenuAction({
   );
 }
 
+/**
+ * Renders the right-click context menu for editing and node insertion actions.
+ */
 export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuProps>(function CanvasContextMenu(
   {
     canCopy,
@@ -94,8 +101,8 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
   },
   ref,
 ) {
-  const { locale, messages } = useEditorI18n();
-  const itemGroups = groupItemsByCategory(items, locale);
+  const i18n = useEditorI18n();
+  const itemGroups = groupItemsByCategory(items, i18n);
   const editActions = [
     canCopy
       ? { key: "copy", icon: Copy, label: copyLabel, onClick: onCopy }
@@ -103,7 +110,9 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
     canCut
       ? { key: "cut", icon: Scissors, label: cutLabel, onClick: onCut }
       : null,
-    canPaste ? { key: "paste", icon: ClipboardPaste, label: messages.contextMenu.pasteNodes, onClick: onPaste } : null,
+    canPaste
+      ? { key: "paste", icon: ClipboardPaste, label: i18n.text("editor.contextMenu.pasteNodes"), onClick: onPaste }
+      : null,
     canDelete
       ? { key: "delete", icon: Trash2, label: deleteLabel, onClick: onDelete }
       : null,
@@ -123,7 +132,7 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
       {!isConnectionCreation && editActions.length ? (
         <>
           <div className="canvas-context-menu__section">
-            <p className="canvas-context-menu__label">{messages.contextMenu.edit}</p>
+            <p className="canvas-context-menu__label">{i18n.text("editor.contextMenu.edit")}</p>
             <div className="canvas-context-menu__actions">
               {editActions.map((action) => (
                 <CanvasMenuAction
@@ -163,13 +172,13 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
                           </span>
                           <span>
                             <span className="canvas-context-menu__library-title">
-                              {resolveLocalizedText(item.label, locale)}
+                              {resolveNodeLibraryLabel(item, i18n)}
                             </span>
                             <span className="canvas-context-menu__library-type">{item.type}</span>
                           </span>
                         </span>
                         <span className="canvas-context-menu__library-description">
-                          {resolveLocalizedText(item.description, locale)}
+                          {resolveNodeLibraryDescription(item, i18n)}
                         </span>
                       </button>
                     ))}

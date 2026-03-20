@@ -21,7 +21,7 @@ import {
   persistEditorPreferences,
   readEditorPreferences,
 } from "@/lib/nodegraph/editor-preferences";
-import { getEditorMessages } from "@/lib/nodegraph/localization";
+import { createI18nRuntime, getAvailableLocaleCodes, serializeNodeData } from "@/lib/nodegraph/localization";
 import type { EditorSessionPayload } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,25 @@ interface NodeGraphEditorProps {
   payload: EditorSessionPayload;
 }
 
+/**
+ * Hosts the full NodeGraph editor workbench and wires runtime i18n into the
+ * canvas, library, inspector, and save flow.
+ */
 export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const [graphName, setGraphName] = useState(payload.session.graph.name);
   const [graphDescription, setGraphDescription] = useState(payload.session.graph.description ?? "");
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [preferences, setPreferences] = useState(DEFAULT_EDITOR_PREFERENCES);
-  const messages = useMemo(() => getEditorMessages(preferences.locale), [preferences.locale]);
+  const availableLocales = useMemo(() => getAvailableLocaleCodes(payload.i18n), [payload.i18n]);
+  const i18n = useMemo(
+    () =>
+      createI18nRuntime({
+        locale: preferences.locale,
+        domainI18n: payload.i18n,
+      }),
+    [payload.i18n, preferences.locale],
+  );
   const {
     addNode,
     addNodeAtMenuPosition,
@@ -75,7 +87,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     selectionTypeLabel,
     setReactFlowInstance,
     updateSelectedNode,
-  } = useNodeGraphCanvas(payload, preferences.edgeStyle, preferences.locale, messages);
+  } = useNodeGraphCanvas(payload, preferences.edgeStyle, i18n);
 
   const typeColors = useMemo(
     () =>
@@ -112,7 +124,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     }
 
     const frameId = window.requestAnimationFrame(() => {
-      const nextPreferences = readEditorPreferences(window.localStorage);
+      const nextPreferences = readEditorPreferences(window.localStorage, availableLocales);
 
       setPreferences((currentPreferences) =>
         currentPreferences.locale === nextPreferences.locale &&
@@ -125,7 +137,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, []);
+  }, [availableLocales]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -150,7 +162,10 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
             ...payload.session.graph,
             name: graphName,
             description: graphDescription,
-            nodes,
+            nodes: nodes.map((node) => ({
+              ...node,
+              data: serializeNodeData(node.data, i18n),
+            })),
             edges,
           },
         }),
@@ -163,7 +178,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   }
 
   return (
-    <EditorI18nProvider value={{ locale: preferences.locale, messages }}>
+    <EditorI18nProvider value={i18n}>
       <TypeColorsProvider value={typeColors}>
         <div className="editor-workbench">
           <div className="grid min-h-screen gap-4 p-4 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
@@ -183,23 +198,23 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                     <div className="flex flex-wrap gap-2">
                       <Badge className="editor-chip">{payload.session.domain}</Badge>
                       <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                        {messages.accessTypeLabels[payload.session.accessType]} {messages.header.accessUrlSuffix}
+                        {i18n.text(`editor.access.${payload.session.accessType}`)} {i18n.text("editor.header.accessUrlSuffix")}
                       </Badge>
                       <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                        {messages.header.libraryNodes(payload.nodeLibrary.length)}
+                        {i18n.text("editor.header.libraryNodes", { count: payload.nodeLibrary.length })}
                       </Badge>
                     </div>
 
                     <div className="space-y-3">
-                      <p className="editor-kicker">{messages.header.activeGraphKicker}</p>
+                      <p className="editor-kicker">{i18n.text("editor.header.activeGraphKicker")}</p>
                       <h1 className="display-font text-4xl font-semibold tracking-[0.08em] text-white uppercase sm:text-5xl">
                         {graphName}
                       </h1>
                       <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                        {graphDescription?.trim() || messages.header.fallbackDescription}
+                        {graphDescription?.trim() || i18n.text("editor.header.fallbackDescription")}
                       </p>
                       <p className="text-xs uppercase tracking-[0.3em] text-[#92a3bc]">
-                        {messages.header.sessionLabel(payload.session.sessionId)}
+                        {i18n.text("editor.header.sessionLabel", { sessionId: payload.session.sessionId })}
                       </p>
                     </div>
                   </div>
@@ -207,15 +222,15 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                   <div className="flex flex-col gap-4 xl:min-w-[20rem] xl:items-end">
                     <div className="grid gap-3 sm:grid-cols-3 xl:w-full">
                       <div className="graph-stage__stat">
-                        <span className="graph-stage__stat-label">{messages.stats.nodes}</span>
+                        <span className="graph-stage__stat-label">{i18n.text("editor.stats.nodes")}</span>
                         <span className="graph-stage__stat-value">{nodes.length}</span>
                       </div>
                       <div className="graph-stage__stat">
-                        <span className="graph-stage__stat-label">{messages.stats.links}</span>
+                        <span className="graph-stage__stat-label">{i18n.text("editor.stats.links")}</span>
                         <span className="graph-stage__stat-value">{edges.length}</span>
                       </div>
                       <div className="graph-stage__stat">
-                        <span className="graph-stage__stat-label">{messages.stats.focus}</span>
+                        <span className="graph-stage__stat-label">{i18n.text("editor.stats.focus")}</span>
                         <span className="graph-stage__stat-value truncate">{focusLabel}</span>
                       </div>
                     </div>
@@ -227,7 +242,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                           role="status"
                         >
                           <CheckCircle2 className="size-4" />
-                          {messages.save.delivered}
+                          {i18n.text("editor.save.delivered")}
                         </span>
                       ) : null}
 
@@ -236,7 +251,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                           className="rounded-full border border-rose-400/20 bg-rose-500/12 px-4 py-2 text-sm text-rose-200"
                           role="alert"
                         >
-                          {messages.save.failed}
+                          {i18n.text("editor.save.failed")}
                         </span>
                       ) : null}
 
@@ -246,7 +261,9 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                         size="lg"
                       >
                         <Save className="size-4" />
-                        {saveState === "saving" ? messages.save.submitting : messages.save.completeEditing}
+                        {saveState === "saving"
+                          ? i18n.text("editor.save.submitting")
+                          : i18n.text("editor.save.completeEditing")}
                       </Button>
                     </div>
                   </div>
@@ -257,14 +274,14 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 <CardContent className="editor-grid graph-stage h-full min-h-[68vh] rounded-[1.5rem] p-0">
                   <div className="graph-stage__hud">
                     <div>
-                      <p className="editor-kicker">{messages.canvas.kicker}</p>
-                      <h2 className="graph-stage__title">{messages.canvas.title}</h2>
-                      <p className="graph-stage__subtitle">{messages.canvas.subtitle}</p>
+                      <p className="editor-kicker">{i18n.text("editor.canvas.kicker")}</p>
+                      <h2 className="graph-stage__title">{i18n.text("editor.canvas.title")}</h2>
+                      <p className="graph-stage__subtitle">{i18n.text("editor.canvas.subtitle")}</p>
                     </div>
                     <div className="graph-stage__stats">
                       <span className="graph-stage__badge">
                         <Waypoints className="size-4" />
-                        {messages.stats.activeLinks(edges.length)}
+                        {i18n.text("editor.stats.activeLinks", { count: edges.length })}
                       </span>
                       <span className="graph-stage__badge">
                         <Crosshair className="size-4" />
@@ -353,7 +370,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
               <Card className="editor-panel">
                 <CardContent className="flex flex-wrap items-center gap-3 p-5 text-sm leading-7 text-muted-foreground">
                   <Network className="size-4 text-primary" />
-                  {messages.footer.summary}
+                  {i18n.text("editor.footer.summary")}
                 </CardContent>
               </Card>
             </div>
@@ -387,6 +404,15 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                     data: {
                       ...node.data,
                       [field]: value,
+                      ...(field === "label"
+                        ? {
+                            label: value,
+                            labelOverride: value,
+                          }
+                        : {
+                            description: value,
+                            descriptionOverride: value,
+                          }),
                     },
                   }))
                 }

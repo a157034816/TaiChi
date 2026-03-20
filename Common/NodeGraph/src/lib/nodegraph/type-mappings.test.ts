@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { createLocalizedText } from "@/lib/nodegraph/localization";
-import { DEFAULT_TYPE_COLOR, buildTypeMappingIndex, normalizeTypeMappings, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
+import {
+  DEFAULT_TYPE_COLOR,
+  buildTypeMappingIndex,
+  normalizeTypeMappings,
+  validateNodeLibraryTypeMappings,
+} from "@/lib/nodegraph/type-mappings";
 import type { NodeLibraryItem, TypeMappingEntry } from "@/lib/nodegraph/types";
 
 const workflowRequestType = "workflow/request";
 const reviewTaskType = "workflow/review-task";
-const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 describe("nodegraph type mappings", () => {
   it("indexes one current-sdk type for each canonical id", () => {
@@ -91,10 +94,10 @@ describe("nodegraph type mappings", () => {
     const nodes: NodeLibraryItem[] = [
       {
         type: "approval",
-        label: text("Approval"),
-        description: text("Manual approval step"),
-        category: text("workflow"),
-        inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+        labelKey: "nodes.approval.label",
+        descriptionKey: "nodes.approval.description",
+        categoryKey: "categories.workflow",
+        inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
       },
     ];
 
@@ -114,10 +117,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "approval",
-            label: text("Approval"),
-            description: text("Manual approval step"),
-            category: text("workflow"),
-            inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+            labelKey: "nodes.approval.label",
+            descriptionKey: "nodes.approval.description",
+            categoryKey: "categories.workflow",
+            inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
           },
         ],
         [],
@@ -131,10 +134,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "start",
-            label: text("Start"),
-            description: text("Entry point"),
-            category: text("control"),
-            outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
+            labelKey: "nodes.start.label",
+            descriptionKey: "nodes.start.description",
+            categoryKey: "categories.control",
+            outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
           },
         ],
         undefined,

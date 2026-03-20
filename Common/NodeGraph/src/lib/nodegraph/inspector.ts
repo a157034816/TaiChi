@@ -1,3 +1,4 @@
+import { resolveNodeLabel, type I18nRuntime } from "@/lib/nodegraph/localization";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
 
 export interface InspectorDetailItem {
@@ -15,49 +16,37 @@ export interface EdgeInspectorDetails {
 const DEFAULT_INSPECTOR_ACCENT = "#ff9d1c";
 const EDGE_INSPECTOR_ACCENT = "#57c7ff";
 
-export interface InspectorTextMessages {
-  defaultHandleLabel: string;
-  selectedLinkLabel: string;
-  selectedNodeLabel: string;
-  selectionLabel: string;
-  connectionSubtitle: string;
-  formatEdgeDescription: (
-    sourceHandle: string,
-    sourceLabel: string,
-    targetHandle: string,
-    targetLabel: string,
-  ) => string;
-  edgeIdLabel: string;
-  sourceNodeLabel: string;
-  sourceHandleLabel: string;
-  targetNodeLabel: string;
-  targetHandleLabel: string;
+function getNodeLabel(nodeId: string, nodes: NodeGraphNode[], i18n: I18nRuntime) {
+  const node = nodes.find((entry) => entry.id === nodeId);
+  return node ? resolveNodeLabel(node.data, i18n) : nodeId;
 }
 
-function getNodeLabel(nodeId: string, nodes: NodeGraphNode[]) {
-  return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
+function formatHandleLabel(handle: string | null | undefined, i18n: I18nRuntime) {
+  return handle ?? i18n.text("editor.edgeInspector.defaultHandleLabel");
 }
 
-function formatHandleLabel(handle: string | null | undefined, messages: InspectorTextMessages) {
-  return handle ?? messages.defaultHandleLabel;
-}
-
+/**
+ * Chooses the selection tab label for the inspector.
+ */
 export function getInspectorSelectionTabLabel(
   node: NodeGraphNode | null,
   edge: NodeGraphEdge | null,
-  messages: InspectorTextMessages,
+  i18n: I18nRuntime,
 ) {
   if (edge) {
-    return messages.selectedLinkLabel;
+    return i18n.text("editor.edgeInspector.selectedLinkLabel");
   }
 
   if (node) {
-    return messages.selectedNodeLabel;
+    return i18n.text("editor.edgeInspector.selectedNodeLabel");
   }
 
-  return messages.selectionLabel;
+  return i18n.text("editor.edgeInspector.selectionLabel");
 }
 
+/**
+ * Picks the accent color used by the inspector header.
+ */
 export function getInspectorAccent(node: NodeGraphNode | null, edge: NodeGraphEdge | null) {
   if (node?.data.appearance?.borderColor) {
     return node.data.appearance.borderColor;
@@ -70,26 +59,34 @@ export function getInspectorAccent(node: NodeGraphNode | null, edge: NodeGraphEd
   return edge ? EDGE_INSPECTOR_ACCENT : DEFAULT_INSPECTOR_ACCENT;
 }
 
+/**
+ * Builds the inspector detail cards for a selected edge.
+ */
 export function buildEdgeInspectorDetails(
   edge: NodeGraphEdge,
   nodes: NodeGraphNode[],
-  messages: InspectorTextMessages,
+  i18n: I18nRuntime,
 ): EdgeInspectorDetails {
-  const sourceLabel = getNodeLabel(edge.source, nodes);
-  const targetLabel = getNodeLabel(edge.target, nodes);
-  const sourceHandle = formatHandleLabel(edge.sourceHandle, messages);
-  const targetHandle = formatHandleLabel(edge.targetHandle, messages);
+  const sourceLabel = getNodeLabel(edge.source, nodes, i18n);
+  const targetLabel = getNodeLabel(edge.target, nodes, i18n);
+  const sourceHandle = formatHandleLabel(edge.sourceHandle, i18n);
+  const targetHandle = formatHandleLabel(edge.targetHandle, i18n);
 
   return {
     title: `${sourceLabel} -> ${targetLabel}`,
-    subtitle: messages.connectionSubtitle,
-    description: messages.formatEdgeDescription(sourceHandle, sourceLabel, targetHandle, targetLabel),
+    subtitle: i18n.text("editor.edgeInspector.connectionSubtitle"),
+    description: i18n.text("editor.edgeInspector.edgeDescription", {
+      sourceHandle,
+      sourceLabel,
+      targetHandle,
+      targetLabel,
+    }),
     items: [
-      { label: messages.edgeIdLabel, value: edge.id },
-      { label: messages.sourceNodeLabel, value: `${sourceLabel} (${edge.source})` },
-      { label: messages.sourceHandleLabel, value: sourceHandle },
-      { label: messages.targetNodeLabel, value: `${targetLabel} (${edge.target})` },
-      { label: messages.targetHandleLabel, value: targetHandle },
+      { label: i18n.text("editor.edgeInspector.edgeIdLabel"), value: edge.id },
+      { label: i18n.text("editor.edgeInspector.sourceNodeLabel"), value: `${sourceLabel} (${edge.source})` },
+      { label: i18n.text("editor.edgeInspector.sourceHandleLabel"), value: sourceHandle },
+      { label: i18n.text("editor.edgeInspector.targetNodeLabel"), value: `${targetLabel} (${edge.target})` },
+      { label: i18n.text("editor.edgeInspector.targetHandleLabel"), value: targetHandle },
     ],
   };
 }

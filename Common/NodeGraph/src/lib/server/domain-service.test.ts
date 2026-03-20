@@ -1,12 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { ensureDomain } from "@/lib/server/domain-service";
 import { getRuntimeStore } from "@/lib/server/store";
 
 const workflowRequestType = "workflow/request";
 const defaultTypeColor = "#64748B";
-const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
+const libraryI18n = {
+  defaultLocale: "en",
+  locales: {
+    en: {
+      "categories.control": "Control",
+      "nodes.start.description": "Entry node",
+      "nodes.start.label": "Start",
+      "ports.next": "Next",
+    },
+    "zh-CN": {
+      "categories.control": "控制",
+      "nodes.start.description": "入口节点",
+      "nodes.start.label": "开始",
+      "ports.next": "下一步",
+    },
+  },
+} as const;
 
 const createInput = () => ({
   domain: "erp-workflow",
@@ -26,20 +41,21 @@ describe("domain service", () => {
     vi.restoreAllMocks();
   });
 
-  it("fetches and stores the node library for a first-time domain", async () => {
+  it("fetches and stores the node library plus i18n catalog for a first-time domain", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           nodes: [
             {
               type: "start",
-              label: text("Start"),
-              description: text("Entry node"),
-              category: text("control"),
+              labelKey: "nodes.start.label",
+              descriptionKey: "nodes.start.description",
+              categoryKey: "categories.control",
               inputs: [],
-              outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
+              outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
             },
           ],
+          i18n: libraryI18n,
           typeMappings: [
             {
               canonicalId: workflowRequestType,
@@ -56,8 +72,9 @@ describe("domain service", () => {
     expect(result.domainCached).toBe(false);
     expect(result.entry.nodeLibrary).toHaveLength(1);
     expect(result.entry.nodeLibrary[0].outputs).toEqual([
-      { id: "next", label: text("Next"), dataType: workflowRequestType },
+      { id: "next", labelKey: "ports.next", dataType: workflowRequestType },
     ]);
+    expect(result.entry.i18n).toEqual(libraryI18n);
     expect(result.entry.typeMappings).toEqual([
       {
         canonicalId: workflowRequestType,
@@ -71,17 +88,20 @@ describe("domain service", () => {
 
   it("reuses the in-memory cache when the endpoints are unchanged", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify([
+      new Response(
+        JSON.stringify({
+          nodes: [
             {
               type: "start",
-              label: text("Start"),
-              description: text("Entry node"),
-              category: text("control"),
+              labelKey: "nodes.start.label",
+              descriptionKey: "nodes.start.description",
+              categoryKey: "categories.control",
             },
-          ]),
-        ),
-      );
+          ],
+          i18n: libraryI18n,
+        }),
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await ensureDomain(createInput());
@@ -100,12 +120,23 @@ describe("domain service", () => {
             nodes: [
               {
                 type: "approval",
-                label: text("Approval"),
-                description: text("Manual approval step"),
-                category: text("workflow"),
-                inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+                labelKey: "nodes.approval.label",
+                descriptionKey: "nodes.approval.description",
+                categoryKey: "categories.workflow",
+                inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
               },
             ],
+            i18n: {
+              defaultLocale: "en",
+              locales: {
+                en: {
+                  "categories.workflow": "Workflow",
+                  "nodes.approval.description": "Manual approval step",
+                  "nodes.approval.label": "Approval",
+                  "ports.request": "Request",
+                },
+              },
+            },
             typeMappings: [
               {
                 canonicalId: workflowRequestType,
@@ -127,7 +158,7 @@ describe("domain service", () => {
     });
   });
 
-  it("rejects typed ports whose canonical ids are missing from typeMappings", async () => {
+  it("rejects node-library payloads whose translation keys are missing from the default locale", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -135,17 +166,27 @@ describe("domain service", () => {
           JSON.stringify({
             nodes: [
               {
-                type: "approval",
-                label: text("Approval"),
-                description: text("Manual approval step"),
-                category: text("workflow"),
-                inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+                type: "start",
+                labelKey: "nodes.start.label",
+                descriptionKey: "nodes.start.description",
+                categoryKey: "categories.control",
+                outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
               },
             ],
+            i18n: {
+              defaultLocale: "en",
+              locales: {
+                en: {
+                  "categories.control": "Control",
+                  "nodes.start.description": "Entry node",
+                  "nodes.start.label": "Start",
+                },
+              },
+            },
             typeMappings: [
               {
-                canonicalId: "workflow/review-task",
-                type: "ReviewTask",
+                canonicalId: workflowRequestType,
+                type: "WorkflowRequest",
               },
             ],
           }),
@@ -153,10 +194,7 @@ describe("domain service", () => {
       ),
     );
 
-    await expect(ensureDomain(createInput())).rejects.toMatchObject({
-      message: expect.stringContaining(`canonicalId "${workflowRequestType}"`),
-      status: 502,
-    });
+    await expect(ensureDomain(createInput())).rejects.toThrow(/ports\.next/);
   });
 
   it("rejects invalid type mapping colors", async () => {
@@ -168,12 +206,13 @@ describe("domain service", () => {
             nodes: [
               {
                 type: "start",
-                label: text("Start"),
-                description: text("Entry node"),
-                category: text("control"),
-                outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
+                labelKey: "nodes.start.label",
+                descriptionKey: "nodes.start.description",
+                categoryKey: "categories.control",
+                outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
               },
             ],
+            i18n: libraryI18n,
             typeMappings: [
               {
                 canonicalId: workflowRequestType,

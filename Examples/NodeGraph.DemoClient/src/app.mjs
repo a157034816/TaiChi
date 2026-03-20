@@ -1,4 +1,4 @@
-import { demoNodeLibrary, demoTypeMappings, createGraphDocument } from "./demo-data.mjs";
+import { demoI18n, demoNodeLibrary, demoTypeMappings, createGraphDocument } from "./demo-data.mjs";
 import { renderHomePage } from "./html.mjs";
 import { createDemoState } from "./state.mjs";
 import { getDemoConfig } from "./config.mjs";
@@ -66,6 +66,7 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
     if (request.method === "GET" && url.pathname === "/api/node-library") {
       sendJson(response, 200, {
         nodes: demoNodeLibrary,
+        i18n: demoI18n,
         typeMappings: demoTypeMappings,
       });
       return;

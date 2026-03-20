@@ -5,11 +5,15 @@ import { Layers3, Plus, Search } from "lucide-react";
 
 import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import type { NodeLibraryItem } from "@/lib/nodegraph/types";
+import {
+  resolveNodeLibraryCategory,
+  resolveNodeLibraryDescription,
+  resolveNodeLibraryLabel,
+} from "@/lib/nodegraph/localization";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { resolveLocalizedText } from "@/lib/nodegraph/localization";
 
 interface NodeLibraryPanelProps {
   items: NodeLibraryItem[];
@@ -18,26 +22,29 @@ interface NodeLibraryPanelProps {
   onAddNode: (item: NodeLibraryItem) => void;
 }
 
+/**
+ * Renders the searchable node-library panel on the left side of the editor.
+ */
 export function NodeLibraryPanel({
   items,
   searchTerm,
   onSearchTermChange,
   onAddNode,
 }: NodeLibraryPanelProps) {
-  const { locale, messages } = useEditorI18n();
+  const i18n = useEditorI18n();
   const deferredSearch = useDeferredValue(searchTerm);
   const keyword = deferredSearch.trim().toLowerCase();
   const filteredItems = !keyword
     ? items
     : items.filter((item) =>
         [
-          resolveLocalizedText(item.label, locale),
-          resolveLocalizedText(item.description, locale),
-          resolveLocalizedText(item.category, locale),
+          resolveNodeLibraryLabel(item, i18n),
+          resolveNodeLibraryDescription(item, i18n),
+          resolveNodeLibraryCategory(item, i18n),
           item.type,
-        ].some((value) =>
-          value.toLowerCase().includes(keyword),
-        ),
+        ]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => value.toLowerCase().includes(keyword)),
       );
 
   return (
@@ -45,18 +52,18 @@ export function NodeLibraryPanel({
       <CardHeader className="space-y-5 border-b border-white/6 pb-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-3">
-            <p className="editor-kicker">{messages.library.kicker}</p>
+            <p className="editor-kicker">{i18n.text("editor.library.kicker")}</p>
             <CardTitle className="display-font flex items-center gap-3 text-3xl tracking-[0.08em] text-white uppercase">
               <span className="editor-icon-shell">
                 <Layers3 className="size-5 text-primary" />
               </span>
-              {messages.library.title}
+              {i18n.text("editor.library.title")}
             </CardTitle>
-            <p className="text-sm leading-6 text-muted-foreground">{messages.library.description}</p>
+            <p className="text-sm leading-6 text-muted-foreground">{i18n.text("editor.library.description")}</p>
           </div>
 
           <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-            {messages.library.itemCount(items.length)}
+            {i18n.text("editor.library.itemCount", { count: items.length })}
           </Badge>
         </div>
 
@@ -66,7 +73,7 @@ export function NodeLibraryPanel({
             className="h-12 border-white/10 bg-black/35 pl-11 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
-            placeholder={messages.library.searchPlaceholder}
+            placeholder={i18n.text("editor.library.searchPlaceholder")}
           />
         </div>
       </CardHeader>
@@ -85,27 +92,27 @@ export function NodeLibraryPanel({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="display-font text-lg tracking-[0.06em] text-white uppercase">
-                        {resolveLocalizedText(item.label, locale)}
+                        {resolveNodeLibraryLabel(item, i18n)}
                       </p>
                       <span className="rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-[#8fa0bc]">
                         {item.type}
                       </span>
                     </div>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      {resolveLocalizedText(item.description, locale)}
+                      {resolveNodeLibraryDescription(item, i18n)}
                     </p>
                   </div>
 
                   <Badge className="border-white/10 bg-primary/12 text-primary" variant="outline">
-                    {resolveLocalizedText(item.category, locale)}
+                    {resolveNodeLibraryCategory(item, i18n)}
                   </Badge>
                 </div>
 
                 <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/6 pt-4 text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
-                  <span>{messages.library.editableFields(item.fields?.length ?? 0)}</span>
+                  <span>{i18n.text("editor.library.editableFields", { count: item.fields?.length ?? 0 })}</span>
                   <span className="inline-flex items-center gap-2 text-primary transition-transform duration-200 group-hover:translate-x-0.5">
                     <Plus className="size-3.5" />
-                    {messages.library.addNode}
+                    {i18n.text("editor.library.addNode")}
                   </span>
                 </div>
               </button>
@@ -113,7 +120,7 @@ export function NodeLibraryPanel({
 
             {!filteredItems.length ? (
               <div className="rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 p-5 text-sm leading-7 text-muted-foreground">
-                {messages.library.emptySearch}
+                {i18n.text("editor.library.emptySearch")}
               </div>
             ) : null}
           </div>

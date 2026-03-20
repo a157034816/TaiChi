@@ -47,29 +47,40 @@ const editorPayload: EditorSessionPayload = {
   nodeLibrary: [
     {
       type: "start",
-      label: {
-        "zh-CN": "开始",
-        en: "Start",
-      },
-      description: {
-        "zh-CN": "新工作流的入口节点。",
-        en: "Entry point for a new workflow.",
-      },
-      category: {
-        "zh-CN": "控制",
-        en: "Control",
-      },
+      labelKey: "nodes.start.label",
+      descriptionKey: "nodes.start.description",
+      categoryKey: "categories.control",
       outputs: [
         {
           id: "next",
-          label: {
-            "zh-CN": "下一步",
-            en: "Next",
-          },
+          labelKey: "ports.next",
         },
       ],
     },
   ],
+  i18n: {
+    defaultLocale: "en",
+    locales: {
+      en: {
+        "categories.control": "Control",
+        "nodes.start.description": "Entry point for a new workflow.",
+        "nodes.start.label": "Start",
+        "ports.next": "Next",
+      },
+      "zh-CN": {
+        "categories.control": "控制",
+        "nodes.start.description": "新工作流的入口节点。",
+        "nodes.start.label": "开始",
+        "ports.next": "下一步",
+      },
+      "fr-FR": {
+        "categories.control": "Controle",
+        "nodes.start.description": "Point d'entree d'un nouveau workflow.",
+        "nodes.start.label": "Demarrer",
+        "ports.next": "Suivant",
+      },
+    },
+  },
   typeMappings: [],
 };
 
@@ -103,6 +114,7 @@ describe("NodeGraphEditor", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+    window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -126,6 +138,34 @@ describe("NodeGraphEditor", () => {
     });
 
     expect(consoleErrors.join("\n")).not.toContain("Maximum update depth exceeded");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("restores a persisted domain locale on mount", async () => {
+    window.localStorage.setItem(
+      "nodegraph.editor.preferences.v1",
+      JSON.stringify({
+        locale: "fr-FR",
+        edgeStyle: "smoothstep",
+      }),
+    );
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<NodeGraphEditor payload={editorPayload} />);
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(document.documentElement.lang).toBe("fr-FR");
 
     await act(async () => {
       root.unmount();

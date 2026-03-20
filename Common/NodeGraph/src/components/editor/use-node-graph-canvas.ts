@@ -28,6 +28,7 @@ import {
 } from "@/lib/nodegraph/connections";
 import { buildClipboardFromSelection, pasteClipboardAtPosition, type NodeClipboardPayload } from "@/lib/nodegraph/clipboard";
 import { buildNodeStyle, createNodeFromLibrary, normalizeNodeDataPorts } from "@/lib/nodegraph/factories";
+import type { I18nRuntime } from "@/lib/nodegraph/localization";
 import {
   createCanvasSelectionSnapshot,
   createEmptyCanvasSelectionSnapshot,
@@ -40,13 +41,11 @@ import {
 } from "@/lib/nodegraph/selection";
 import type { EditorEdgeStyle } from "@/lib/nodegraph/editor-preferences";
 import { getConnectionLineType, getReactFlowEdgeType } from "@/lib/nodegraph/editor-preferences";
-import type { EditorMessages } from "@/lib/nodegraph/localization";
 import type {
   EditorSessionPayload,
   NodeGraphEdge,
   NodeGraphNode,
   NodeLibraryItem,
-  SupportedLocale,
 } from "@/lib/nodegraph/types";
 
 interface CanvasContextMenuState {
@@ -58,6 +57,18 @@ interface CanvasContextMenuState {
   pendingConnection?: PendingConnectionDraft;
   showLibrary: boolean;
   targetEdgeId?: string;
+}
+
+interface CanvasContextMenuLabels {
+  copyNode: string;
+  copySelectedNodes: string;
+  cutNode: string;
+  cutSelectedNodes: string;
+  deleteEdge: string;
+  deleteNode: string;
+  deleteSelectedEdges: string;
+  deleteSelectedNodes: string;
+  deleteSelection: string;
 }
 
 const EDGE_STROKE = "rgba(159, 179, 217, 0.94)";
@@ -217,40 +228,40 @@ function areSelectionsEqual(left: CanvasSelection, right: CanvasSelection) {
   return left.type === right.type && left.id === right.id;
 }
 
-function getCopyLabel(selection: CanvasSelectionSnapshot, messages: EditorMessages) {
+function getCopyLabel(selection: CanvasSelectionSnapshot, labels: CanvasContextMenuLabels) {
   if (selection.nodeIds.length > 1) {
-    return messages.contextMenu.copySelectedNodes;
+    return labels.copySelectedNodes;
   }
 
-  return messages.contextMenu.copyNode;
+  return labels.copyNode;
 }
 
-function getCutLabel(selection: CanvasSelectionSnapshot, messages: EditorMessages) {
+function getCutLabel(selection: CanvasSelectionSnapshot, labels: CanvasContextMenuLabels) {
   if (selection.nodeIds.length > 1) {
-    return messages.contextMenu.cutSelectedNodes;
+    return labels.cutSelectedNodes;
   }
 
-  return messages.contextMenu.cutNode;
+  return labels.cutNode;
 }
 
-function getDeleteLabel(selection: CanvasSelectionSnapshot, messages: EditorMessages, targetEdgeId?: string) {
+function getDeleteLabel(selection: CanvasSelectionSnapshot, labels: CanvasContextMenuLabels, targetEdgeId?: string) {
   if (targetEdgeId && !selection.nodeIds.length) {
-    return messages.contextMenu.deleteEdge;
+    return labels.deleteEdge;
   }
 
   if (selection.nodeIds.length > 1) {
-    return messages.contextMenu.deleteSelectedNodes;
+    return labels.deleteSelectedNodes;
   }
 
   if (selection.nodeIds.length === 1) {
-    return messages.contextMenu.deleteNode;
+    return labels.deleteNode;
   }
 
   if (selection.edgeIds.length > 1) {
-    return messages.contextMenu.deleteSelectedEdges;
+    return labels.deleteSelectedEdges;
   }
 
-  return messages.contextMenu.deleteSelection;
+  return labels.deleteSelection;
 }
 
 function getClientPosition(event: MouseEvent | TouchEvent | ReactMouseEvent) {
@@ -292,8 +303,7 @@ function isBlankCanvasDropTarget(target: EventTarget | null) {
 export function useNodeGraphCanvas(
   payload: EditorSessionPayload,
   edgeStyle: EditorEdgeStyle,
-  locale: SupportedLocale,
-  messages: EditorMessages,
+  i18n: I18nRuntime,
 ) {
   const reactFlowRef = useRef<ReactFlowInstance<NodeGraphNode, NodeGraphEdge> | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
@@ -335,8 +345,8 @@ export function useNodeGraphCanvas(
       ? (edges.find((edge) => edge.id === selectedItem.id) as NodeGraphEdge | undefined) ?? null
       : null;
   const selectedTemplate = selectedNode ? getNodeTemplate(payload.nodeLibrary, selectedNode.data.nodeType) ?? null : null;
-  const focusLabel = getCanvasFocusLabel(selectedItem, nodes, edges, messages.selection);
-  const selectionTypeLabel = getCanvasTypeLabel(selectedItem, nodes, edges, messages.selection);
+  const focusLabel = getCanvasFocusLabel(selectedItem, nodes, edges, i18n);
+  const selectionTypeLabel = getCanvasTypeLabel(selectedItem, nodes, edges, i18n);
   const canvasEdges = useMemo(
     () => edges.map((edge) => createCanvasEdge(edge, nodes, typeColors, edgeStyle)),
     [edgeStyle, edges, nodes, typeColors],
@@ -359,6 +369,20 @@ export function useNodeGraphCanvas(
     contextMenuState?.mode === "connection" && contextMenuState.pendingConnection
       ? getCompatibleNodeLibraryItems(payload.nodeLibrary, contextMenuState.pendingConnection, activeMenuPendingPort)
       : payload.nodeLibrary;
+  const contextMenuLabels = useMemo<CanvasContextMenuLabels>(
+    () => ({
+      copyNode: i18n.text("editor.contextMenu.copyNode"),
+      copySelectedNodes: i18n.text("editor.contextMenu.copySelectedNodes"),
+      cutNode: i18n.text("editor.contextMenu.cutNode"),
+      cutSelectedNodes: i18n.text("editor.contextMenu.cutSelectedNodes"),
+      deleteEdge: i18n.text("editor.contextMenu.deleteEdge"),
+      deleteNode: i18n.text("editor.contextMenu.deleteNode"),
+      deleteSelectedEdges: i18n.text("editor.contextMenu.deleteSelectedEdges"),
+      deleteSelectedNodes: i18n.text("editor.contextMenu.deleteSelectedNodes"),
+      deleteSelection: i18n.text("editor.contextMenu.deleteSelection"),
+    }),
+    [i18n],
+  );
 
   function clearPendingConnection() {
     pendingConnectionRef.current = null;
@@ -498,7 +522,7 @@ export function useNodeGraphCanvas(
   function addNode(item: EditorSessionPayload["nodeLibrary"][number]) {
     setNodes((currentNodes) => [
       ...currentNodes,
-      createNodeFromLibrary(item, getNextNodePosition(currentNodes.length), locale),
+      createNodeFromLibrary(item, getNextNodePosition(currentNodes.length), i18n),
     ]);
   }
 
@@ -507,7 +531,7 @@ export function useNodeGraphCanvas(
       return;
     }
 
-    const nextNode = createNodeFromLibrary(item, contextMenuState.flowPosition, locale);
+    const nextNode = createNodeFromLibrary(item, contextMenuState.flowPosition, i18n);
     const nextSelection = createNodeSelectionSnapshot(nextNode.id);
     const nextConnection =
       contextMenuState.mode === "connection" && contextMenuState.pendingConnection && activeMenuPendingNode
@@ -820,16 +844,16 @@ export function useNodeGraphCanvas(
           contextMenuState.mode === "default" &&
           (contextMenuState.selection.nodeIds.length > 0 || contextMenuState.selection.edgeIds.length > 0),
         canPaste: contextMenuState.mode === "default" && Boolean(clipboard),
-        copyLabel: getCopyLabel(contextMenuState.selection, messages),
-        cutLabel: getCutLabel(contextMenuState.selection, messages),
-        deleteLabel: getDeleteLabel(contextMenuState.selection, messages, contextMenuState.targetEdgeId),
+        copyLabel: getCopyLabel(contextMenuState.selection, contextMenuLabels),
+        cutLabel: getCutLabel(contextMenuState.selection, contextMenuLabels),
+        deleteLabel: getDeleteLabel(contextMenuState.selection, contextMenuLabels, contextMenuState.targetEdgeId),
         emptyStateMessage:
           contextMenuState.mode === "connection"
-            ? messages.contextMenu.noCompatibleNodes
-            : messages.contextMenu.noNodesAvailable,
+            ? i18n.text("editor.contextMenu.noCompatibleNodes")
+            : i18n.text("editor.contextMenu.noNodesAvailable"),
         libraryLabel: contextMenuState.mode === "connection"
-          ? messages.contextMenu.createConnectedNode
-          : messages.contextMenu.addNode,
+          ? i18n.text("editor.contextMenu.createConnectedNode")
+          : i18n.text("editor.contextMenu.addNode"),
         mode: contextMenuState.mode,
       }
     : null;

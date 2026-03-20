@@ -1,24 +1,32 @@
 import { z } from "zod";
 
 const nodeFieldKindSchema = z.enum(["text", "textarea", "number", "boolean"]);
-const requiredLocalizedTextSchema = z
-  .object({
-    "zh-CN": z.string().min(1),
-    en: z.string().min(1),
-  })
-  .strict();
-const optionalLocalizedTextSchema = z
-  .object({
-    "zh-CN": z.string(),
-    en: z.string(),
-  })
-  .strict();
+const translationKeySchema = z.string().min(1);
+const legacyLocalizedTextSchema = z
+  .record(z.string(), z.string())
+  .refine((value) => Object.keys(value).length > 0, "Expected at least one locale entry.");
+const legacyTextSnapshotSchema = z.union([z.string(), legacyLocalizedTextSchema]);
+const i18nBundleSchema = z.object({
+  defaultLocale: z.string().min(1).optional(),
+  locales: z.record(z.string(), z.record(z.string(), z.string())),
+});
 
-export const nodePortDefinitionSchema = z.object({
+const libraryPortDefinitionSchema = z.object({
   id: z.string().min(1),
-  label: requiredLocalizedTextSchema,
+  labelKey: translationKeySchema,
   dataType: z.string().min(1).optional(),
 });
+
+const storedPortDefinitionSchema = z.union([
+  libraryPortDefinitionSchema,
+  z.object({
+    id: z.string().min(1),
+    label: legacyTextSnapshotSchema,
+    dataType: z.string().min(1).optional(),
+  }),
+]);
+
+export const nodePortDefinitionSchema = storedPortDefinitionSchema;
 
 export const typeMappingEntrySchema = z.object({
   canonicalId: z.string().min(1),
@@ -31,9 +39,9 @@ export const typeMappingEntrySchema = z.object({
 
 export const nodeLibraryFieldSchema = z.object({
   key: z.string().min(1),
-  label: requiredLocalizedTextSchema,
+  labelKey: translationKeySchema,
   kind: nodeFieldKindSchema,
-  placeholder: optionalLocalizedTextSchema.optional(),
+  placeholderKey: translationKeySchema.optional(),
   defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
 
@@ -45,14 +53,11 @@ export const nodeAppearanceSchema = z.object({
 
 export const nodeLibraryItemSchema = z.object({
   type: z.string().min(1),
-  label: requiredLocalizedTextSchema,
-  description: optionalLocalizedTextSchema.default({
-    "zh-CN": "",
-    en: "",
-  }),
-  category: requiredLocalizedTextSchema,
-  inputs: z.array(nodePortDefinitionSchema).optional(),
-  outputs: z.array(nodePortDefinitionSchema).optional(),
+  labelKey: translationKeySchema,
+  descriptionKey: translationKeySchema.optional(),
+  categoryKey: translationKeySchema,
+  inputs: z.array(libraryPortDefinitionSchema).optional(),
+  outputs: z.array(libraryPortDefinitionSchema).optional(),
   fields: z.array(nodeLibraryFieldSchema).optional(),
   defaultData: z.record(z.string(), z.unknown()).optional(),
   appearance: nodeAppearanceSchema.optional(),
@@ -60,11 +65,16 @@ export const nodeLibraryItemSchema = z.object({
 
 export const nodeGraphNodeDataSchema = z.object({
   label: z.string().min(1),
+  labelKey: translationKeySchema.optional(),
+  labelOverride: z.string().optional(),
   description: z.string().optional(),
-  category: requiredLocalizedTextSchema.optional(),
+  descriptionKey: translationKeySchema.optional(),
+  descriptionOverride: z.string().optional(),
+  categoryKey: translationKeySchema.optional(),
+  category: legacyTextSnapshotSchema.optional(),
   nodeType: z.string().min(1),
-  inputs: z.array(nodePortDefinitionSchema).optional(),
-  outputs: z.array(nodePortDefinitionSchema).optional(),
+  inputs: z.array(storedPortDefinitionSchema).optional(),
+  outputs: z.array(storedPortDefinitionSchema).optional(),
   values: z.record(z.string(), z.unknown()).optional(),
   appearance: nodeAppearanceSchema.optional(),
 });
@@ -119,10 +129,8 @@ export const completeSessionRequestSchema = z.object({
   graph: nodeGraphDocumentSchema,
 });
 
-export const nodeLibraryEnvelopeSchema = z.union([
-  z.object({
-    nodes: z.array(nodeLibraryItemSchema),
-    typeMappings: z.array(typeMappingEntrySchema).optional(),
-  }),
-  z.array(nodeLibraryItemSchema),
-]);
+export const nodeLibraryEnvelopeSchema = z.object({
+  nodes: z.array(nodeLibraryItemSchema),
+  i18n: i18nBundleSchema,
+  typeMappings: z.array(typeMappingEntrySchema).optional(),
+});

@@ -12,9 +12,11 @@ import { editorEdgeStyles, type EditorEdgeStyle } from "@/lib/nodegraph/editor-p
 import {
   resolveFieldLabel,
   resolveFieldPlaceholder,
-  resolveLocalizedText,
+  resolveNodeDescription,
+  resolveNodeLabel,
+  resolveNodeLibraryCategory,
 } from "@/lib/nodegraph/localization";
-import type { NodeGraphEdge, NodeLibraryItem, NodeGraphNode, SupportedLocale } from "@/lib/nodegraph/types";
+import type { LocaleCode, NodeGraphEdge, NodeLibraryItem, NodeGraphNode } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,11 +31,11 @@ interface NodeInspectorPanelProps {
   node: NodeGraphNode | null;
   nodes: NodeGraphNode[];
   template: NodeLibraryItem | null;
-  locale: SupportedLocale;
+  locale: LocaleCode;
   edgeStyle: EditorEdgeStyle;
   graphName: string;
   graphDescription: string;
-  onLocaleChange: (value: SupportedLocale) => void;
+  onLocaleChange: (value: LocaleCode) => void;
   onEdgeStyleChange: (value: EditorEdgeStyle) => void;
   onGraphNameChange: (value: string) => void;
   onGraphDescriptionChange: (value: string) => void;
@@ -41,6 +43,9 @@ interface NodeInspectorPanelProps {
   onNodeValueChange: (key: string, value: string | number | boolean) => void;
 }
 
+/**
+ * Renders graph settings, editor preferences, and selection details.
+ */
 export function NodeInspectorPanel({
   edge,
   node,
@@ -57,23 +62,25 @@ export function NodeInspectorPanel({
   onNodeFieldChange,
   onNodeValueChange,
 }: NodeInspectorPanelProps) {
-  const { messages } = useEditorI18n();
+  const i18n = useEditorI18n();
   const inspectorAccent = getInspectorAccent(node, edge);
-  const selectionTabLabel = getInspectorSelectionTabLabel(node, edge, messages.edgeInspector);
-  const edgeDetails = edge ? buildEdgeInspectorDetails(edge, nodes, messages.edgeInspector) : null;
+  const selectionTabLabel = getInspectorSelectionTabLabel(node, edge, i18n);
+  const edgeDetails = edge ? buildEdgeInspectorDetails(edge, nodes, i18n) : null;
   const selectionStateKey = edge ? `edge:${edge.id}` : node ? `node:${node.id}` : "graph";
+  const resolvedNodeLabel = node ? resolveNodeLabel(node.data, i18n) : "";
+  const resolvedNodeDescription = node ? resolveNodeDescription(node.data, i18n) ?? "" : "";
 
   return (
     <Card className="editor-panel flex h-full min-h-[32rem] flex-col overflow-hidden">
       <CardHeader className="space-y-3 border-b border-white/6 pb-5">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-3">
-            <p className="editor-kicker">{messages.inspector.kicker}</p>
+            <p className="editor-kicker">{i18n.text("editor.inspector.kicker")}</p>
             <CardTitle className="display-font flex items-center gap-3 text-3xl tracking-[0.08em] text-white uppercase">
               <span className="editor-icon-shell">
                 <Settings2 className="size-5 text-primary" />
               </span>
-              {messages.inspector.title}
+              {i18n.text("editor.inspector.title")}
             </CardTitle>
           </div>
 
@@ -84,7 +91,7 @@ export function NodeInspectorPanel({
         </div>
 
         <CardDescription className="leading-6 text-muted-foreground">
-          {messages.inspector.description}
+          {i18n.text("editor.inspector.description")}
         </CardDescription>
       </CardHeader>
 
@@ -99,13 +106,13 @@ export function NodeInspectorPanel({
               className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
               value="graph"
             >
-              {messages.inspector.tabs.graph}
+              {i18n.text("editor.inspector.tabs.graph")}
             </TabsTrigger>
             <TabsTrigger
               className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
               value="settings"
             >
-              {messages.inspector.tabs.settings}
+              {i18n.text("editor.inspector.tabs.settings")}
             </TabsTrigger>
             <TabsTrigger
               className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
@@ -119,7 +126,7 @@ export function NodeInspectorPanel({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]" htmlFor="graph-name">
-                  {messages.inspector.graphName}
+                  {i18n.text("editor.inspector.graphName")}
                 </Label>
                 <Input
                   className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -134,7 +141,7 @@ export function NodeInspectorPanel({
                   className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                   htmlFor="graph-description"
                 >
-                  {messages.inspector.graphDescription}
+                  {i18n.text("editor.inspector.graphDescription")}
                 </Label>
                 <Textarea
                   className="min-h-32 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -145,7 +152,7 @@ export function NodeInspectorPanel({
               </div>
 
               <div className="rounded-[1.25rem] border border-white/8 bg-black/20 p-4 text-sm leading-7 text-muted-foreground">
-                {messages.inspector.graphHint}
+                {i18n.text("editor.inspector.graphHint")}
               </div>
             </div>
           </TabsContent>
@@ -154,17 +161,23 @@ export function NodeInspectorPanel({
             <ScrollArea className="h-full pr-2">
               <div className="space-y-4">
                 <div className="rounded-[1.25rem] border border-white/8 bg-black/20 p-4 text-sm leading-7 text-muted-foreground">
-                  <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.settingsTitle}</p>
-                  <p className="mt-3">{messages.inspector.settingsDescription}</p>
+                  <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
+                    {i18n.text("editor.inspector.settingsTitle")}
+                  </p>
+                  <p className="mt-3">{i18n.text("editor.inspector.settingsDescription")}</p>
                 </div>
 
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.languageLabel}</p>
-                    <p className="text-sm leading-6 text-muted-foreground">{messages.inspector.languageDescription}</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
+                      {i18n.text("editor.inspector.languageLabel")}
+                    </p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {i18n.text("editor.inspector.languageDescription")}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {(Object.keys(messages.localeNames) as SupportedLocale[]).map((nextLocale) => {
+                    {i18n.availableLocales.map((nextLocale) => {
                       const isActive = locale === nextLocale;
                       return (
                         <button
@@ -177,7 +190,7 @@ export function NodeInspectorPanel({
                           onClick={() => onLocaleChange(nextLocale)}
                           type="button"
                         >
-                          <span className="block text-sm font-medium">{messages.localeNames[nextLocale]}</span>
+                          <span className="block text-sm font-medium">{i18n.getLocaleLabel(nextLocale)}</span>
                           <span className="mt-1 block text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                             {nextLocale}
                           </span>
@@ -191,8 +204,12 @@ export function NodeInspectorPanel({
 
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.edgeStyleLabel}</p>
-                    <p className="text-sm leading-6 text-muted-foreground">{messages.inspector.edgeStyleDescription}</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
+                      {i18n.text("editor.inspector.edgeStyleLabel")}
+                    </p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {i18n.text("editor.inspector.edgeStyleDescription")}
+                    </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {editorEdgeStyles.map((nextEdgeStyle) => {
@@ -208,7 +225,9 @@ export function NodeInspectorPanel({
                           onClick={() => onEdgeStyleChange(nextEdgeStyle)}
                           type="button"
                         >
-                          <span className="block text-sm font-medium">{messages.edgeStyleNames[nextEdgeStyle]}</span>
+                          <span className="block text-sm font-medium">
+                            {i18n.text(`editor.edgeStyle.${nextEdgeStyle}`)}
+                          </span>
                           <span className="mt-1 block text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                             {nextEdgeStyle}
                           </span>
@@ -231,29 +250,29 @@ export function NodeInspectorPanel({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-2">
-                        <p className="display-font text-lg tracking-[0.06em] text-white uppercase">{node.data.label}</p>
+                        <p className="display-font text-lg tracking-[0.06em] text-white uppercase">{resolvedNodeLabel}</p>
                         <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{node.data.nodeType}</p>
                       </div>
                       {template ? (
                         <Badge className="border-white/10 bg-primary/12 text-primary" variant="outline">
-                          {resolveLocalizedText(template.category, locale)}
+                          {resolveNodeLibraryCategory(template, i18n)}
                         </Badge>
                       ) : null}
                     </div>
 
                     <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {node.data.description?.trim() || messages.inspector.fallbackNodeDescription}
+                      {resolvedNodeDescription.trim() || i18n.text("editor.inspector.fallbackNodeDescription")}
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]" htmlFor="node-label">
-                      {messages.inspector.nodeLabel}
+                      {i18n.text("editor.inspector.nodeLabel")}
                     </Label>
                     <Input
                       className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
                       id="node-label"
-                      value={node.data.label}
+                      value={resolvedNodeLabel}
                       onChange={(event) => onNodeFieldChange("label", event.target.value)}
                     />
                   </div>
@@ -263,12 +282,12 @@ export function NodeInspectorPanel({
                       className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                       htmlFor="node-description"
                     >
-                      {messages.inspector.nodeDescription}
+                      {i18n.text("editor.inspector.nodeDescription")}
                     </Label>
                     <Textarea
                       className="min-h-28 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
                       id="node-description"
-                      value={node.data.description ?? ""}
+                      value={resolvedNodeDescription}
                       onChange={(event) => onNodeFieldChange("description", event.target.value)}
                     />
                   </div>
@@ -279,7 +298,7 @@ export function NodeInspectorPanel({
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                           <FilePenLine className="size-4 text-primary" />
-                          {messages.inspector.editableFields}
+                          {i18n.text("editor.inspector.editableFields")}
                         </div>
 
                         {template.fields.map((field) => {
@@ -291,7 +310,7 @@ export function NodeInspectorPanel({
                                 key={field.key}
                                 className="flex cursor-pointer items-center justify-between rounded-[1rem] border border-white/8 bg-black/25 px-4 py-3 text-sm text-[#edf3ff]"
                               >
-                                <span className="font-medium">{resolveFieldLabel(field, locale)}</span>
+                                <span className="font-medium">{resolveFieldLabel(field, i18n)}</span>
                                 <input
                                   checked={Boolean(currentValue)}
                                   className="size-4 rounded border-white/20 bg-transparent accent-[#ff9d1c]"
@@ -308,12 +327,12 @@ export function NodeInspectorPanel({
                                 className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                                 htmlFor={field.key}
                               >
-                                {resolveFieldLabel(field, locale)}
+                                {resolveFieldLabel(field, i18n)}
                               </Label>
                               <Input
                                 className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
                                 id={field.key}
-                                placeholder={resolveFieldPlaceholder(field, locale)}
+                                placeholder={resolveFieldPlaceholder(field, i18n)}
                                 type={field.kind === "number" ? "number" : "text"}
                                 value={String(currentValue ?? "")}
                                 onChange={(event) =>
@@ -346,7 +365,7 @@ export function NodeInspectorPanel({
                         <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{edgeDetails.subtitle}</p>
                       </div>
                       <Badge className="border-white/10 bg-[#57c7ff]/12 text-[#8fdcff]" variant="outline">
-                        {messages.inspector.linkBadge}
+                        {i18n.text("editor.inspector.linkBadge")}
                       </Badge>
                     </div>
 
@@ -358,7 +377,7 @@ export function NodeInspectorPanel({
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                       <FilePenLine className="size-4 text-primary" />
-                      {messages.inspector.linkDetails}
+                      {i18n.text("editor.inspector.linkDetails")}
                     </div>
 
                     {edgeDetails.items.map((item) => (
@@ -375,7 +394,7 @@ export function NodeInspectorPanel({
               </ScrollArea>
             ) : (
               <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 p-5 text-sm leading-7 text-muted-foreground">
-                {messages.inspector.emptySelection}
+                {i18n.text("editor.inspector.emptySelection")}
               </div>
             )}
           </TabsContent>

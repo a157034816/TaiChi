@@ -2,26 +2,27 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { EditorMessages } from "@/lib/nodegraph/localization";
-import type { SupportedLocale } from "@/lib/nodegraph/types";
+import type { I18nRuntime } from "@/lib/nodegraph/localization";
 
-interface EditorI18nValue {
-  locale: SupportedLocale;
-  messages: EditorMessages;
-}
+const EditorI18nContext = createContext<I18nRuntime | null>(null);
 
-const EditorI18nContext = createContext<EditorI18nValue | null>(null);
-
+/**
+ * Shares the resolved editor i18n runtime across all localized components.
+ */
 export function EditorI18nProvider({
   children,
   value,
 }: {
   children: ReactNode;
-  value: EditorI18nValue;
+  value: I18nRuntime;
 }) {
   return <EditorI18nContext.Provider value={value}>{children}</EditorI18nContext.Provider>;
 }
 
+/**
+ * Reads the active editor i18n runtime and fails fast when the provider is
+ * missing from the component tree.
+ */
 export function useEditorI18n() {
   const value = useContext(EditorI18nContext);
 

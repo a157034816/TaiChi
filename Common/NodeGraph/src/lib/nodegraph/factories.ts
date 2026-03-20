@@ -1,4 +1,5 @@
 import type {
+  I18nBundle,
   NodeAppearance,
   NodeGraphDocument,
   NodeGraphNode,
@@ -6,24 +7,37 @@ import type {
   NodeLibraryField,
   NodeLibraryItem,
   NodePortDefinition,
-  SupportedLocale,
 } from "@/lib/nodegraph/types";
 import {
-  createLocalizedText,
+  createI18nRuntime,
   DEFAULT_LOCALE,
-  getEditorMessages,
-  resolveLocalizedText,
+  resolveNodeLibraryDescription,
+  resolveNodeLibraryLabel,
 } from "@/lib/nodegraph/localization";
 
-const DEFAULT_INPUT_PORTS: NodePortDefinition[] = [{ id: "in", label: createLocalizedText("输入", "Input") }];
-const DEFAULT_OUTPUT_PORTS: NodePortDefinition[] = [{ id: "out", label: createLocalizedText("输出", "Output") }];
+const DEFAULT_INPUT_PORTS: NodePortDefinition[] = [{ id: "in", labelKey: "editor.defaults.port.input" }];
+const DEFAULT_OUTPUT_PORTS: NodePortDefinition[] = [{ id: "out", labelKey: "editor.defaults.port.output" }];
 
-export function createEmptyGraph(domain: string): NodeGraphDocument {
-  const messages = getEditorMessages(DEFAULT_LOCALE);
+function cloneLegacyTextValue(value: NodePortDefinition["label"]) {
+  if (!value || typeof value === "string") {
+    return value;
+  }
+
+  return { ...value };
+}
+
+/**
+ * Creates a new empty graph document with locale-aware default copy.
+ */
+export function createEmptyGraph(domain: string, domainI18n?: I18nBundle): NodeGraphDocument {
+  const i18n = createI18nRuntime({
+    locale: DEFAULT_LOCALE,
+    domainI18n,
+  });
 
   return {
-    name: messages.graphDefaults.name(domain),
-    description: messages.graphDefaults.description,
+    name: i18n.text("editor.graphDefaults.name", { domain }),
+    description: i18n.text("editor.graphDefaults.description"),
     nodes: [],
     edges: [],
     viewport: {
@@ -34,6 +48,9 @@ export function createEmptyGraph(domain: string): NodeGraphDocument {
   };
 }
 
+/**
+ * Builds default values for editable node fields.
+ */
 export function buildFieldDefaults(fields?: NodeLibraryField[]) {
   if (!fields?.length) {
     return {};
@@ -56,9 +73,15 @@ function getFallbackValue(kind: NodeLibraryField["kind"]) {
 }
 
 function clonePorts(ports: NodePortDefinition[]) {
-  return ports.map((port) => ({ ...port }));
+  return ports.map((port) => ({
+    ...port,
+    label: cloneLegacyTextValue(port.label),
+  }));
 }
 
+/**
+ * Ensures every node has a stable input and output shape.
+ */
 export function buildPortSnapshot(item?: Pick<NodeLibraryItem, "inputs" | "outputs">) {
   return {
     inputs: clonePorts(item?.inputs ?? DEFAULT_INPUT_PORTS),
@@ -66,6 +89,9 @@ export function buildPortSnapshot(item?: Pick<NodeLibraryItem, "inputs" | "outpu
   };
 }
 
+/**
+ * Hydrates saved nodes with template ports when older payloads omitted them.
+ */
 export function normalizeNodeDataPorts(
   data: NodeGraphNodeData,
   item?: Pick<NodeLibraryItem, "inputs" | "outputs">,
@@ -79,6 +105,9 @@ export function normalizeNodeDataPorts(
   };
 }
 
+/**
+ * Produces the shell style consumed by the custom blueprint node renderer.
+ */
 export function buildNodeStyle(appearance?: NodeAppearance) {
   return {
     background: "transparent",
@@ -92,16 +121,24 @@ export function buildNodeStyle(appearance?: NodeAppearance) {
   };
 }
 
+/**
+ * Converts a library template into an editor node, preserving translation keys
+ * alongside compatibility snapshots.
+ */
 export function createNodeFromLibrary(
   item: NodeLibraryItem,
   position: { x: number; y: number },
-  locale: SupportedLocale = DEFAULT_LOCALE,
+  i18n = createI18nRuntime({
+    locale: DEFAULT_LOCALE,
+  }),
 ): NodeGraphNode {
   const portSnapshot = buildPortSnapshot(item);
   const data: NodeGraphNodeData = {
-    label: resolveLocalizedText(item.label, locale),
-    description: resolveLocalizedText(item.description, locale),
-    category: item.category,
+    label: resolveNodeLibraryLabel(item, i18n),
+    labelKey: item.labelKey,
+    description: resolveNodeLibraryDescription(item, i18n),
+    descriptionKey: item.descriptionKey,
+    categoryKey: item.categoryKey,
     nodeType: item.type,
     inputs: portSnapshot.inputs,
     outputs: portSnapshot.outputs,
