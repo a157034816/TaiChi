@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { nodeGraphDocumentSchema, nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
 
 const workflowRequestType = "workflow/request";
 const approvalDecisionType = "workflow/approval-decision";
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 describe("nodegraph schema", () => {
   it("accepts node library items with explicit multi-port definitions", () => {
@@ -12,13 +14,13 @@ describe("nodegraph schema", () => {
         nodes: [
           {
             type: "approval",
-            label: "Approval",
-            description: "Review and route the request",
-            category: "workflow",
-            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+            label: text("Approval"),
+            description: text("Review and route the request"),
+            category: text("workflow"),
+            inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
             outputs: [
-              { id: "approved", label: "Approved", dataType: approvalDecisionType },
-              { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+              { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+              { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
             ],
           },
         ],
@@ -50,10 +52,10 @@ describe("nodegraph schema", () => {
             data: {
               label: "Approval",
               nodeType: "approval",
-              inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+              inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
               outputs: [
-                { id: "approved", label: "Approved", dataType: approvalDecisionType },
-                { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+                { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+                { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
               ],
             },
           },
@@ -65,8 +67,8 @@ describe("nodegraph schema", () => {
               label: "Notify",
               nodeType: "notify",
               inputs: [
-                { id: "success", label: "Success", dataType: approvalDecisionType },
-                { id: "failure", label: "Failure", dataType: approvalDecisionType },
+                { id: "success", label: text("Success"), dataType: approvalDecisionType },
+                { id: "failure", label: text("Failure"), dataType: approvalDecisionType },
               ],
               outputs: [],
             },
@@ -91,10 +93,10 @@ describe("nodegraph schema", () => {
       nodeLibraryEnvelopeSchema.parse([
         {
           type: "start",
-          label: "Start",
-          description: "Kick off the flow",
-          category: "control",
-          outputs: [{ id: "next", label: "Next" }],
+          label: text("Start"),
+          description: text("Kick off the flow"),
+          category: text("control"),
+          outputs: [{ id: "next", label: text("Next") }],
         },
       ]),
     ).toBeTruthy();
@@ -108,6 +110,21 @@ describe("nodegraph schema", () => {
           {
             canonicalId: workflowRequestType,
             languageType: "WorkflowRequest",
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("rejects legacy single-language node labels", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "start",
+            label: "Start",
+            description: text("Entry node"),
+            category: text("control"),
           },
         ],
       }),

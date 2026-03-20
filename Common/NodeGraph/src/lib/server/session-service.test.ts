@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { completeSession, createSession, getSession } from "@/lib/server/session-service";
 import { getRuntimeStore } from "@/lib/server/store";
+
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 const sessionInput = {
   domain: "erp-workflow",
@@ -33,9 +36,9 @@ describe("session service", () => {
               nodes: [
                 {
                   type: "start",
-                  label: "Start",
-                  description: "Entry node",
-                  category: "control",
+                  label: text("Start"),
+                  description: text("Entry node"),
+                  category: text("control"),
                 },
               ],
             }),
@@ -66,7 +69,7 @@ describe("session service", () => {
           data: {
             label: "Start",
             nodeType: "start",
-            outputs: [{ id: "next", label: "Next" }],
+            outputs: [{ id: "next", label: text("Next") }],
           },
         },
       ],

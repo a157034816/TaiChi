@@ -1,10 +1,22 @@
 import { z } from "zod";
 
 const nodeFieldKindSchema = z.enum(["text", "textarea", "number", "boolean"]);
+const requiredLocalizedTextSchema = z
+  .object({
+    "zh-CN": z.string().min(1),
+    en: z.string().min(1),
+  })
+  .strict();
+const optionalLocalizedTextSchema = z
+  .object({
+    "zh-CN": z.string(),
+    en: z.string(),
+  })
+  .strict();
 
 export const nodePortDefinitionSchema = z.object({
   id: z.string().min(1),
-  label: z.string().min(1),
+  label: requiredLocalizedTextSchema,
   dataType: z.string().min(1).optional(),
 });
 
@@ -19,9 +31,9 @@ export const typeMappingEntrySchema = z.object({
 
 export const nodeLibraryFieldSchema = z.object({
   key: z.string().min(1),
-  label: z.string().min(1),
+  label: requiredLocalizedTextSchema,
   kind: nodeFieldKindSchema,
-  placeholder: z.string().optional(),
+  placeholder: optionalLocalizedTextSchema.optional(),
   defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
 
@@ -33,9 +45,12 @@ export const nodeAppearanceSchema = z.object({
 
 export const nodeLibraryItemSchema = z.object({
   type: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().default(""),
-  category: z.string().min(1),
+  label: requiredLocalizedTextSchema,
+  description: optionalLocalizedTextSchema.default({
+    "zh-CN": "",
+    en: "",
+  }),
+  category: requiredLocalizedTextSchema,
   inputs: z.array(nodePortDefinitionSchema).optional(),
   outputs: z.array(nodePortDefinitionSchema).optional(),
   fields: z.array(nodeLibraryFieldSchema).optional(),
@@ -46,7 +61,7 @@ export const nodeLibraryItemSchema = z.object({
 export const nodeGraphNodeDataSchema = z.object({
   label: z.string().min(1),
   description: z.string().optional(),
-  category: z.string().optional(),
+  category: requiredLocalizedTextSchema.optional(),
   nodeType: z.string().min(1),
   inputs: z.array(nodePortDefinitionSchema).optional(),
   outputs: z.array(nodePortDefinitionSchema).optional(),

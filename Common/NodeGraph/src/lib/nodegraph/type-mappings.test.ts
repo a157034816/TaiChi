@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { DEFAULT_TYPE_COLOR, buildTypeMappingIndex, normalizeTypeMappings, validateNodeLibraryTypeMappings } from "@/lib/nodegraph/type-mappings";
 import type { NodeLibraryItem, TypeMappingEntry } from "@/lib/nodegraph/types";
 
 const workflowRequestType = "workflow/request";
 const reviewTaskType = "workflow/review-task";
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 describe("nodegraph type mappings", () => {
   it("indexes one current-sdk type for each canonical id", () => {
@@ -89,10 +91,10 @@ describe("nodegraph type mappings", () => {
     const nodes: NodeLibraryItem[] = [
       {
         type: "approval",
-        label: "Approval",
-        description: "Manual approval step",
-        category: "workflow",
-        inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+        label: text("Approval"),
+        description: text("Manual approval step"),
+        category: text("workflow"),
+        inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
       },
     ];
 
@@ -112,10 +114,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "approval",
-            label: "Approval",
-            description: "Manual approval step",
-            category: "workflow",
-            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+            label: text("Approval"),
+            description: text("Manual approval step"),
+            category: text("workflow"),
+            inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
           },
         ],
         [],
@@ -129,10 +131,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "start",
-            label: "Start",
-            description: "Entry point",
-            category: "control",
-            outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+            label: text("Start"),
+            description: text("Entry point"),
+            category: text("control"),
+            outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
           },
         ],
         undefined,

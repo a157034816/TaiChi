@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { getEditorMessages } from "@/lib/nodegraph/localization";
 import {
   createCanvasSelectionSnapshot,
   createEmptyCanvasSelectionSnapshot,
@@ -9,6 +10,8 @@ import {
   resolveCanvasSelectionFromSnapshot,
 } from "@/lib/nodegraph/selection";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
+
+const messages = getEditorMessages("en").selection;
 
 const nodes: NodeGraphNode[] = [
   {
@@ -112,6 +115,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
+        messages,
       ),
     ).toBe("Link Start -> Notify");
   });
@@ -125,6 +129,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
+        messages,
       ),
     ).toBe("trigger");
 
@@ -136,6 +141,7 @@ describe("nodegraph selection", () => {
         },
         nodes,
         edges,
+        messages,
       ),
     ).toBe("link focus");
   });

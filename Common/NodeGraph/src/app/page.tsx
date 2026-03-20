@@ -122,6 +122,11 @@ export default function Home() {
                 an object shaped like <code>{`{ "nodes": [...] }`}</code>.
               </p>
               <p>
+                Node-definition presentation fields now use bilingual objects. Provide both{" "}
+                <code>zh-CN</code> and <code>en</code> for node labels, descriptions, categories,
+                port labels, and field template labels/placeholders.
+              </p>
+              <p>
                 Each node definition may optionally declare <code>inputs</code> and{" "}
                 <code>outputs</code> for Blueprint-style multi-port nodes. If they are omitted,
                 NodeGraph falls back to one input and one output.
@@ -148,6 +153,10 @@ export default function Home() {
               <p>
                 Persisted edges may include <code>sourceHandle</code> and <code>targetHandle</code>{" "}
                 so the editor can restore which specific port each link used.
+              </p>
+              <p>
+                Editor language and connection-line style are browser-local preferences. They
+                affect rendering only and are not written into the submitted graph document.
               </p>
               <p>
                 Set <code>NODEGRAPH_PUBLIC_BASE_URL</code> and{" "}

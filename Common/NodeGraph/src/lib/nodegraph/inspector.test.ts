@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { getEditorMessages } from "@/lib/nodegraph/localization";
 import {
   buildEdgeInspectorDetails,
   getInspectorAccent,
   getInspectorSelectionTabLabel,
 } from "@/lib/nodegraph/inspector";
 import type { NodeGraphEdge, NodeGraphNode } from "@/lib/nodegraph/types";
+
+const messages = getEditorMessages("en").edgeInspector;
 
 const nodes: NodeGraphNode[] = [
   {
@@ -42,13 +45,13 @@ const edge: NodeGraphEdge = {
 
 describe("nodegraph inspector helpers", () => {
   it("returns a link-specific tab label when an edge is selected", () => {
-    expect(getInspectorSelectionTabLabel(null, edge)).toBe("Selected link");
-    expect(getInspectorSelectionTabLabel(nodes[0], null)).toBe("Selected node");
-    expect(getInspectorSelectionTabLabel(null, null)).toBe("Selection");
+    expect(getInspectorSelectionTabLabel(null, edge, messages)).toBe("Selected link");
+    expect(getInspectorSelectionTabLabel(nodes[0], null, messages)).toBe("Selected node");
+    expect(getInspectorSelectionTabLabel(null, null, messages)).toBe("Selection");
   });
 
   it("builds readable edge inspector details with fallback handle labels", () => {
-    expect(buildEdgeInspectorDetails(edge, nodes)).toEqual({
+    expect(buildEdgeInspectorDetails(edge, nodes, messages)).toEqual({
       title: "Start -> Notify",
       subtitle: "Connection",
       description: "This link routes next from Start into Default port on Notify.",

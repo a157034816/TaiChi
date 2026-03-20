@@ -10,6 +10,8 @@
 - 用户在编辑器完成提交后，NodeGraph 会主动调用 client webhook，并回传最终节点图数据。
 - 编辑器画布支持右键自定义菜单：空白处可快速添加节点，选中节点后可复制、剪切、粘贴和删除。
 - 从 input 或 output 把连接线拖到空白处时，会弹出兼容节点创建菜单，并在创建后自动补齐这条连接。
+- 编辑器支持浏览器本地全局偏好：可切换连接线风格（如贝塞尔曲线、平滑折线、直线、阶梯折线）与界面语言。
+- 编辑器内置简体中文 / English 双语切换，默认简体中文；节点库标签、描述、分类、端口与字段模板展示也会随语言切换。
 
 ## 目录结构
 
@@ -85,13 +87,27 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 [
   {
     "type": "approval",
-    "label": "Approval",
-    "description": "A manual approval step",
-    "category": "workflow",
-    "inputs": [{ "id": "request", "label": "Request", "dataType": "workflow/request" }],
+    "label": { "zh-CN": "审批", "en": "Approval" },
+    "description": { "zh-CN": "一个人工审批步骤", "en": "A manual approval step" },
+    "category": { "zh-CN": "流程", "en": "workflow" },
+    "inputs": [
+      {
+        "id": "request",
+        "label": { "zh-CN": "请求", "en": "Request" },
+        "dataType": "workflow/request"
+      }
+    ],
     "outputs": [
-      { "id": "approved", "label": "Approved", "dataType": "workflow/approval-decision" },
-      { "id": "rejected", "label": "Rejected", "dataType": "workflow/approval-decision" }
+      {
+        "id": "approved",
+        "label": { "zh-CN": "通过", "en": "Approved" },
+        "dataType": "workflow/approval-decision"
+      },
+      {
+        "id": "rejected",
+        "label": { "zh-CN": "驳回", "en": "Rejected" },
+        "dataType": "workflow/approval-decision"
+      }
     ]
   }
 ]
@@ -104,13 +120,27 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
   "nodes": [
     {
       "type": "approval",
-      "label": "Approval",
-      "description": "A manual approval step",
-      "category": "workflow",
-      "inputs": [{ "id": "request", "label": "Request", "dataType": "workflow/request" }],
+      "label": { "zh-CN": "审批", "en": "Approval" },
+      "description": { "zh-CN": "一个人工审批步骤", "en": "A manual approval step" },
+      "category": { "zh-CN": "流程", "en": "workflow" },
+      "inputs": [
+        {
+          "id": "request",
+          "label": { "zh-CN": "请求", "en": "Request" },
+          "dataType": "workflow/request"
+        }
+      ],
       "outputs": [
-        { "id": "approved", "label": "Approved", "dataType": "workflow/approval-decision" },
-        { "id": "rejected", "label": "Rejected", "dataType": "workflow/approval-decision" }
+        {
+          "id": "approved",
+          "label": { "zh-CN": "通过", "en": "Approved" },
+          "dataType": "workflow/approval-decision"
+        },
+        {
+          "id": "rejected",
+          "label": { "zh-CN": "驳回", "en": "Rejected" },
+          "dataType": "workflow/approval-decision"
+        }
       ]
     }
   ],
@@ -131,6 +161,7 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 
 说明：
 
+- `label` / `description` / `category` / 端口 `label` / 字段 `label` 与 `placeholder` 现统一使用多语言对象，必须同时提供 `zh-CN` 与 `en`。
 - `inputs` / `outputs` 省略时，NodeGraph 会兼容回退为单输入和单输出。
 - `inputs: []` 或 `outputs: []` 表示该方向没有可连接端口。
 - `dataType` 为可选字段，但语义上只表示跨语言共享的 canonical id，例如 `workflow/request`、`workflow/review-task`、`workflow/approval-decision`。
@@ -140,6 +171,7 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 - 只要返回了 `typeMappings`，节点库中所有端口上出现的 `dataType` 都必须能在 `typeMappings.canonicalId` 中找到对应项；旧节点库如果不返回 `typeMappings`，仍然可以继续使用。
 - 编辑器会在拖线到空白处时使用 `dataType` 过滤兼容节点，并在创建后自动选择匹配的对侧端口；NodeGraph 不会解析 `.NET List<T>`、Rust `Vec<T>` 这类语言类型字符串。
 - 若端口未声明 `dataType`，编辑器会回退使用端口 `id` 和端口顺序进行匹配，以兼容旧节点库。
+- 编辑器本地偏好使用浏览器 `localStorage` 保存，不会写入 `NodeGraphDocument` 或 completion webhook 结果。
 
 ## 验证
 

@@ -3,6 +3,7 @@ import { ApprovalDecision, ReviewTask, WorkflowRequest } from "./contracts.mjs";
 const workflowRequestType = "workflow/request";
 const reviewTaskType = "workflow/review-task";
 const approvalDecisionType = "workflow/approval-decision";
+const text = (zhCN, en) => ({ "zh-CN": zhCN, en });
 
 export const demoTypeMappings = [
   {
@@ -25,15 +26,15 @@ export const demoTypeMappings = [
 export const demoNodeLibrary = [
   {
     type: "start",
-    label: "Start",
-    description: "Entry point for a new workflow.",
-    category: "control",
+    label: text("开始", "Start"),
+    description: text("新工作流的入口节点。", "Entry point for a new workflow."),
+    category: text("控制", "control"),
     inputs: [],
-    outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+    outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
     fields: [
       {
         key: "note",
-        label: "Opening note",
+        label: text("开场说明", "Opening note"),
         kind: "text",
         defaultValue: "Kick off the workflow",
       },
@@ -46,19 +47,19 @@ export const demoNodeLibrary = [
   },
   {
     type: "parallel_split",
-    label: "Parallel Split",
-    description: "Fan out one trigger into multiple review branches.",
-    category: "control",
-    inputs: [{ id: "trigger", label: "Trigger", dataType: workflowRequestType }],
+    label: text("并行分发", "Parallel Split"),
+    description: text("把一个触发拆分成多个并行评审分支。", "Fan out one trigger into multiple review branches."),
+    category: text("控制", "control"),
+    inputs: [{ id: "trigger", label: text("触发", "Trigger"), dataType: workflowRequestType }],
     outputs: [
-      { id: "finance", label: "Finance", dataType: reviewTaskType },
-      { id: "legal", label: "Legal", dataType: reviewTaskType },
-      { id: "security", label: "Security", dataType: reviewTaskType },
+      { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
+      { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
+      { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
     ],
     fields: [
       {
         key: "strategy",
-        label: "Dispatch strategy",
+        label: text("分发策略", "Dispatch strategy"),
         kind: "text",
         defaultValue: "broadcast",
       },
@@ -71,19 +72,19 @@ export const demoNodeLibrary = [
   },
   {
     type: "merge",
-    label: "Merge",
-    description: "Collect multiple upstream branches before continuing.",
-    category: "control",
+    label: text("汇合", "Merge"),
+    description: text("在继续前汇集多个上游分支。", "Collect multiple upstream branches before continuing."),
+    category: text("控制", "control"),
     inputs: [
-      { id: "finance", label: "Finance", dataType: reviewTaskType },
-      { id: "legal", label: "Legal", dataType: reviewTaskType },
-      { id: "security", label: "Security", dataType: reviewTaskType },
+      { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
+      { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
+      { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
     ],
-    outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+    outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
     fields: [
       {
         key: "waitForAll",
-        label: "Wait for all branches",
+        label: text("等待全部分支", "Wait for all branches"),
         kind: "boolean",
         defaultValue: true,
       },
@@ -96,24 +97,24 @@ export const demoNodeLibrary = [
   },
   {
     type: "approval",
-    label: "Approval",
-    description: "Manual approval step with explicit approved and rejected exits.",
-    category: "workflow",
-    inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+    label: text("审批", "Approval"),
+    description: text("带有明确通过与驳回出口的人工审批步骤。", "Manual approval step with explicit approved and rejected exits."),
+    category: text("流程", "workflow"),
+    inputs: [{ id: "request", label: text("请求", "Request"), dataType: workflowRequestType }],
     outputs: [
-      { id: "approved", label: "Approved", dataType: approvalDecisionType },
-      { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+      { id: "approved", label: text("通过", "Approved"), dataType: approvalDecisionType },
+      { id: "rejected", label: text("驳回", "Rejected"), dataType: approvalDecisionType },
     ],
     fields: [
       {
         key: "owner",
-        label: "Owner",
+        label: text("负责人", "Owner"),
         kind: "text",
         defaultValue: "finance.manager",
       },
       {
         key: "slaHours",
-        label: "SLA hours",
+        label: text("SLA 小时", "SLA hours"),
         kind: "number",
         defaultValue: 24,
       },
@@ -126,24 +127,24 @@ export const demoNodeLibrary = [
   },
   {
     type: "notify",
-    label: "Notify",
-    description: "Send success or failure notifications after approval completes.",
-    category: "integration",
+    label: text("通知", "Notify"),
+    description: text("审批结束后发送成功或失败通知。", "Send success or failure notifications after approval completes."),
+    category: text("集成", "integration"),
     inputs: [
-      { id: "success", label: "Success", dataType: approvalDecisionType },
-      { id: "failure", label: "Failure", dataType: approvalDecisionType },
+      { id: "success", label: text("成功", "Success"), dataType: approvalDecisionType },
+      { id: "failure", label: text("失败", "Failure"), dataType: approvalDecisionType },
     ],
     outputs: [],
     fields: [
       {
         key: "channel",
-        label: "Channel",
+        label: text("通道", "Channel"),
         kind: "text",
         defaultValue: "email",
       },
       {
         key: "includeSummary",
-        label: "Include summary",
+        label: text("包含摘要", "Include summary"),
         kind: "boolean",
         defaultValue: true,
       },
@@ -187,10 +188,10 @@ function createExistingGraph(graphName) {
         data: {
           label: "Start",
           description: "Receive the original request.",
-          category: "control",
+          category: text("控制", "control"),
           nodeType: "start",
           inputs: [],
-          outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+          outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
           values: {
             note: "Request entered from the demo client",
           },
@@ -210,13 +211,13 @@ function createExistingGraph(graphName) {
         data: {
           label: "Parallel Split",
           description: "Dispatch the request to finance, legal, and security reviewers.",
-          category: "control",
+          category: text("控制", "control"),
           nodeType: "parallel_split",
-          inputs: [{ id: "trigger", label: "Trigger", dataType: workflowRequestType }],
+          inputs: [{ id: "trigger", label: text("触发", "Trigger"), dataType: workflowRequestType }],
           outputs: [
-            { id: "finance", label: "Finance", dataType: reviewTaskType },
-            { id: "legal", label: "Legal", dataType: reviewTaskType },
-            { id: "security", label: "Security", dataType: reviewTaskType },
+            { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
+            { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
+            { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
           ],
           values: {
             strategy: "broadcast",
@@ -237,14 +238,14 @@ function createExistingGraph(graphName) {
         data: {
           label: "Merge",
           description: "Wait for the parallel checks before sending the consolidated request forward.",
-          category: "control",
+          category: text("控制", "control"),
           nodeType: "merge",
           inputs: [
-            { id: "finance", label: "Finance", dataType: reviewTaskType },
-            { id: "legal", label: "Legal", dataType: reviewTaskType },
-            { id: "security", label: "Security", dataType: reviewTaskType },
+            { id: "finance", label: text("财务", "Finance"), dataType: reviewTaskType },
+            { id: "legal", label: text("法务", "Legal"), dataType: reviewTaskType },
+            { id: "security", label: text("安全", "Security"), dataType: reviewTaskType },
           ],
-          outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+          outputs: [{ id: "next", label: text("下一步", "Next"), dataType: workflowRequestType }],
           values: {
             waitForAll: true,
           },
@@ -264,12 +265,12 @@ function createExistingGraph(graphName) {
         data: {
           label: "Approval",
           description: "Manager checks the aggregated review bundle.",
-          category: "workflow",
+          category: text("流程", "workflow"),
           nodeType: "approval",
-          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          inputs: [{ id: "request", label: text("请求", "Request"), dataType: workflowRequestType }],
           outputs: [
-            { id: "approved", label: "Approved", dataType: approvalDecisionType },
-            { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+            { id: "approved", label: text("通过", "Approved"), dataType: approvalDecisionType },
+            { id: "rejected", label: text("驳回", "Rejected"), dataType: approvalDecisionType },
           ],
           values: {
             owner: "finance.manager",
@@ -291,11 +292,11 @@ function createExistingGraph(graphName) {
         data: {
           label: "Notify",
           description: "Tell the requester whether the request was approved or rejected.",
-          category: "integration",
+          category: text("集成", "integration"),
           nodeType: "notify",
           inputs: [
-            { id: "success", label: "Success", dataType: approvalDecisionType },
-            { id: "failure", label: "Failure", dataType: approvalDecisionType },
+            { id: "success", label: text("成功", "Success"), dataType: approvalDecisionType },
+            { id: "failure", label: text("失败", "Failure"), dataType: approvalDecisionType },
           ],
           outputs: [],
           values: {

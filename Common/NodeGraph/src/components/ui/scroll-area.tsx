@@ -1,38 +1,55 @@
 import * as React from "react";
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 import { cn } from "@/lib/utils";
 
-const ScrollArea = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="size-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
-    <ScrollBar />
-    <ScrollAreaPrimitive.Corner />
-  </ScrollAreaPrimitive.Root>
-));
-ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
+interface ScrollAreaProps extends React.HTMLAttributes<HTMLDivElement> {}
 
-const ScrollBar = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
->(({ className, orientation = "vertical", ...props }, ref) => (
-  <ScrollAreaPrimitive.ScrollAreaScrollbar
-    ref={ref}
-    orientation={orientation}
-    className={cn(
-      "flex touch-none select-none p-1 transition-colors",
-      orientation === "vertical" && "h-full w-3 border-l border-l-transparent",
-      orientation === "horizontal" && "h-3 flex-col border-t border-t-transparent",
-      className,
-    )}
-    {...props}
-  >
-    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-  </ScrollAreaPrimitive.ScrollAreaScrollbar>
-));
-ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
+interface ScrollBarProps extends React.HTMLAttributes<HTMLDivElement> {
+  orientation?: "horizontal" | "vertical";
+}
+
+/**
+ * Radix ScrollArea currently triggers a callback-ref update loop in this
+ * React 19 / Next 16 stack, so the editor falls back to native scrolling while
+ * keeping the same component API for callers.
+ */
+const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
+  ({ className, children, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "relative overflow-auto overscroll-contain rounded-[inherit]",
+        "[scrollbar-color:rgba(143,160,188,0.45)_transparent] [scrollbar-width:thin]",
+        "[&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3",
+        "[&::-webkit-scrollbar-track]:bg-transparent",
+        "[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border",
+        "[&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent",
+        "[&::-webkit-scrollbar-thumb]:bg-clip-padding",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  ),
+);
+ScrollArea.displayName = "ScrollArea";
+
+/**
+ * Kept as a no-op compatibility export because callers import it from the
+ * shared UI module, even though the editor now relies on native scrollbars.
+ */
+const ScrollBar = React.forwardRef<HTMLDivElement, ScrollBarProps>(
+  ({ className, orientation = "vertical", ...props }, ref) => (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      className={cn("hidden", className)}
+      data-orientation={orientation}
+      {...props}
+    />
+  ),
+);
+ScrollBar.displayName = "ScrollBar";
 
 export { ScrollArea, ScrollBar };

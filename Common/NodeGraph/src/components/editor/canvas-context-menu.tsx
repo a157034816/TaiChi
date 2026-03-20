@@ -4,7 +4,9 @@ import { forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { ClipboardPaste, Copy, Plus, Scissors, Trash2 } from "lucide-react";
 
+import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import type { NodeLibraryItem } from "@/lib/nodegraph/types";
+import { resolveLocalizedText } from "@/lib/nodegraph/localization";
 
 interface CanvasContextMenuProps {
   canCopy: boolean;
@@ -30,13 +32,14 @@ interface CanvasContextMenuProps {
   onPaste: () => void;
 }
 
-function groupItemsByCategory(items: NodeLibraryItem[]) {
+function groupItemsByCategory(items: NodeLibraryItem[], locale: ReturnType<typeof useEditorI18n>["locale"]) {
   const groups = new Map<string, NodeLibraryItem[]>();
 
   for (const item of items) {
-    const currentGroup = groups.get(item.category) ?? [];
+    const category = resolveLocalizedText(item.category, locale);
+    const currentGroup = groups.get(category) ?? [];
     currentGroup.push(item);
-    groups.set(item.category, currentGroup);
+    groups.set(category, currentGroup);
   }
 
   return Array.from(groups.entries());
@@ -91,7 +94,8 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
   },
   ref,
 ) {
-  const itemGroups = groupItemsByCategory(items);
+  const { locale, messages } = useEditorI18n();
+  const itemGroups = groupItemsByCategory(items, locale);
   const editActions = [
     canCopy
       ? { key: "copy", icon: Copy, label: copyLabel, onClick: onCopy }
@@ -99,9 +103,7 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
     canCut
       ? { key: "cut", icon: Scissors, label: cutLabel, onClick: onCut }
       : null,
-    canPaste
-      ? { key: "paste", icon: ClipboardPaste, label: "Paste nodes", onClick: onPaste }
-      : null,
+    canPaste ? { key: "paste", icon: ClipboardPaste, label: messages.contextMenu.pasteNodes, onClick: onPaste } : null,
     canDelete
       ? { key: "delete", icon: Trash2, label: deleteLabel, onClick: onDelete }
       : null,
@@ -121,7 +123,7 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
       {!isConnectionCreation && editActions.length ? (
         <>
           <div className="canvas-context-menu__section">
-            <p className="canvas-context-menu__label">Edit</p>
+            <p className="canvas-context-menu__label">{messages.contextMenu.edit}</p>
             <div className="canvas-context-menu__actions">
               {editActions.map((action) => (
                 <CanvasMenuAction
@@ -160,11 +162,15 @@ export const CanvasContextMenu = forwardRef<HTMLDivElement, CanvasContextMenuPro
                             <Plus className="size-4" />
                           </span>
                           <span>
-                            <span className="canvas-context-menu__library-title">{item.label}</span>
+                            <span className="canvas-context-menu__library-title">
+                              {resolveLocalizedText(item.label, locale)}
+                            </span>
                             <span className="canvas-context-menu__library-type">{item.type}</span>
                           </span>
                         </span>
-                        <span className="canvas-context-menu__library-description">{item.description}</span>
+                        <span className="canvas-context-menu__library-description">
+                          {resolveLocalizedText(item.description, locale)}
+                        </span>
                       </button>
                     ))}
                   </div>

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   BackgroundVariant,
-  ConnectionLineType,
   Controls,
   MiniMap,
   ReactFlow,
@@ -12,14 +11,17 @@ import {
 import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react";
 
 import { CanvasContextMenu } from "@/components/editor/canvas-context-menu";
+import { EditorI18nProvider } from "@/components/editor/editor-i18n-context";
 import { NodeInspectorPanel } from "@/components/editor/node-inspector-panel";
 import { NodeLibraryPanel } from "@/components/editor/node-library-panel";
 import { TypeColorsProvider } from "@/components/editor/type-colors";
+import { editorNodeTypes, useNodeGraphCanvas } from "@/components/editor/use-node-graph-canvas";
 import {
-  defaultEdgeOptions,
-  editorNodeTypes,
-  useNodeGraphCanvas,
-} from "@/components/editor/use-node-graph-canvas";
+  DEFAULT_EDITOR_PREFERENCES,
+  persistEditorPreferences,
+  readEditorPreferences,
+} from "@/lib/nodegraph/editor-preferences";
+import { getEditorMessages } from "@/lib/nodegraph/localization";
 import type { EditorSessionPayload } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,16 +36,21 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const [graphDescription, setGraphDescription] = useState(payload.session.graph.description ?? "");
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [preferences, setPreferences] = useState(DEFAULT_EDITOR_PREFERENCES);
+  const messages = useMemo(() => getEditorMessages(preferences.locale), [preferences.locale]);
   const {
     addNode,
     addNodeAtMenuPosition,
+    canvasEdges,
     contextMenuItems,
     contextMenuRef,
     contextMenuMeta,
     contextMenuState,
+    connectionLineType,
     copyCurrentSelection,
     cutCurrentSelection,
     deleteCurrentSelection,
+    defaultEdgeOptions,
     edges,
     focusLabel,
     handleConnect,
@@ -68,13 +75,66 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     selectionTypeLabel,
     setReactFlowInstance,
     updateSelectedNode,
-  } = useNodeGraphCanvas(payload);
+  } = useNodeGraphCanvas(payload, preferences.edgeStyle, preferences.locale, messages);
 
-  const typeColors = new Map(
-    (payload.typeMappings ?? [])
-      .filter((mapping) => Boolean(mapping.color))
-      .map((mapping) => [mapping.canonicalId, String(mapping.color)] as const),
+  const typeColors = useMemo(
+    () =>
+      new Map(
+        (payload.typeMappings ?? [])
+          .filter((mapping) => Boolean(mapping.color))
+          .map((mapping) => [mapping.canonicalId, String(mapping.color)] as const),
+      ),
+    [payload.typeMappings],
   );
+  const deleteKeyCode = useMemo(() => ["Delete", "Backspace"], []);
+  const fitViewOptions = useMemo(() => ({ padding: 0.18 }), []);
+  const handleCanvasEdgeClick = useCallback(
+    (_event: unknown, edge: { id: string }) => {
+      handleEdgeClick(edge.id);
+    },
+    [handleEdgeClick],
+  );
+  const handleCanvasNodeClick = useCallback(
+    (_event: unknown, node: { id: string }) => {
+      handleNodeClick(node.id);
+    },
+    [handleNodeClick],
+  );
+  const miniMapNodeColor = useCallback(
+    (node: { style?: { borderColor?: string } }) =>
+      String(node.style?.borderColor ?? "#ff9d1c"),
+    [],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const nextPreferences = readEditorPreferences(window.localStorage);
+
+      setPreferences((currentPreferences) =>
+        currentPreferences.locale === nextPreferences.locale &&
+        currentPreferences.edgeStyle === nextPreferences.edgeStyle
+          ? currentPreferences
+          : nextPreferences,
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    persistEditorPreferences(window.localStorage, preferences);
+    document.documentElement.lang = preferences.locale;
+  }, [preferences]);
 
   async function saveGraph() {
     setSaveState("saving");
@@ -103,241 +163,251 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   }
 
   return (
-    <TypeColorsProvider value={typeColors}>
-      <div className="editor-workbench">
-      <div className="grid min-h-screen gap-4 p-4 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
-        <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
-          <NodeLibraryPanel
-            items={payload.nodeLibrary}
-            onAddNode={addNode}
-            onSearchTermChange={setSearchTerm}
-            searchTerm={searchTerm}
-          />
-        </div>
+    <EditorI18nProvider value={{ locale: preferences.locale, messages }}>
+      <TypeColorsProvider value={typeColors}>
+        <div className="editor-workbench">
+          <div className="grid min-h-screen gap-4 p-4 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
+            <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
+              <NodeLibraryPanel
+                items={payload.nodeLibrary}
+                onAddNode={addNode}
+                onSearchTermChange={setSearchTerm}
+                searchTerm={searchTerm}
+              />
+            </div>
 
-        <div className="flex min-h-[72vh] flex-col gap-4">
-          <Card className="editor-panel overflow-hidden">
-            <CardContent className="flex flex-col gap-6 p-6 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="editor-chip">{payload.session.domain}</Badge>
-                  <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                    {payload.session.accessType} URL
-                  </Badge>
-                  <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                    {payload.nodeLibrary.length} library nodes
-                  </Badge>
-                </div>
+            <div className="flex min-h-[72vh] flex-col gap-4">
+              <Card className="editor-panel overflow-hidden">
+                <CardContent className="flex flex-col gap-6 p-6 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="editor-chip">{payload.session.domain}</Badge>
+                      <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
+                        {messages.accessTypeLabels[payload.session.accessType]} {messages.header.accessUrlSuffix}
+                      </Badge>
+                      <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
+                        {messages.header.libraryNodes(payload.nodeLibrary.length)}
+                      </Badge>
+                    </div>
 
-                <div className="space-y-3">
-                  <p className="editor-kicker">Active graph</p>
-                  <h1 className="display-font text-4xl font-semibold tracking-[0.08em] text-white uppercase sm:text-5xl">
-                    {graphName}
-                  </h1>
-                  <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                    {graphDescription?.trim() ||
-                      "Build and review the session graph here, then push the final document back through the completion webhook."}
-                  </p>
-                  <p className="text-xs uppercase tracking-[0.3em] text-[#92a3bc]">
-                    Session {payload.session.sessionId}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4 xl:min-w-[20rem] xl:items-end">
-                <div className="grid gap-3 sm:grid-cols-3 xl:w-full">
-                  <div className="graph-stage__stat">
-                    <span className="graph-stage__stat-label">Nodes</span>
-                    <span className="graph-stage__stat-value">{nodes.length}</span>
+                    <div className="space-y-3">
+                      <p className="editor-kicker">{messages.header.activeGraphKicker}</p>
+                      <h1 className="display-font text-4xl font-semibold tracking-[0.08em] text-white uppercase sm:text-5xl">
+                        {graphName}
+                      </h1>
+                      <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                        {graphDescription?.trim() || messages.header.fallbackDescription}
+                      </p>
+                      <p className="text-xs uppercase tracking-[0.3em] text-[#92a3bc]">
+                        {messages.header.sessionLabel(payload.session.sessionId)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="graph-stage__stat">
-                    <span className="graph-stage__stat-label">Links</span>
-                    <span className="graph-stage__stat-value">{edges.length}</span>
+
+                  <div className="flex flex-col gap-4 xl:min-w-[20rem] xl:items-end">
+                    <div className="grid gap-3 sm:grid-cols-3 xl:w-full">
+                      <div className="graph-stage__stat">
+                        <span className="graph-stage__stat-label">{messages.stats.nodes}</span>
+                        <span className="graph-stage__stat-value">{nodes.length}</span>
+                      </div>
+                      <div className="graph-stage__stat">
+                        <span className="graph-stage__stat-label">{messages.stats.links}</span>
+                        <span className="graph-stage__stat-value">{edges.length}</span>
+                      </div>
+                      <div className="graph-stage__stat">
+                        <span className="graph-stage__stat-label">{messages.stats.focus}</span>
+                        <span className="graph-stage__stat-value truncate">{focusLabel}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                      {saveState === "saved" ? (
+                        <span
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
+                          role="status"
+                        >
+                          <CheckCircle2 className="size-4" />
+                          {messages.save.delivered}
+                        </span>
+                      ) : null}
+
+                      {saveState === "error" ? (
+                        <span
+                          className="rounded-full border border-rose-400/20 bg-rose-500/12 px-4 py-2 text-sm text-rose-200"
+                          role="alert"
+                        >
+                          {messages.save.failed}
+                        </span>
+                      ) : null}
+
+                      <Button
+                        className="h-12 rounded-2xl border border-amber-300/10 bg-[linear-gradient(135deg,#ff9d1c,#ffb44c)] px-6 text-[#1d1305] shadow-[0_18px_38px_rgba(255,157,28,0.2)] hover:bg-[linear-gradient(135deg,#ffad38,#ffc261)]"
+                        onClick={saveGraph}
+                        size="lg"
+                      >
+                        <Save className="size-4" />
+                        {saveState === "saving" ? messages.save.submitting : messages.save.completeEditing}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="graph-stage__stat">
-                    <span className="graph-stage__stat-label">Focus</span>
-                    <span className="graph-stage__stat-value truncate">{focusLabel}</span>
+                </CardContent>
+              </Card>
+
+              <Card className="editor-panel min-h-[60vh] flex-1 overflow-hidden">
+                <CardContent className="editor-grid graph-stage h-full min-h-[68vh] rounded-[1.5rem] p-0">
+                  <div className="graph-stage__hud">
+                    <div>
+                      <p className="editor-kicker">{messages.canvas.kicker}</p>
+                      <h2 className="graph-stage__title">{messages.canvas.title}</h2>
+                      <p className="graph-stage__subtitle">{messages.canvas.subtitle}</p>
+                    </div>
+                    <div className="graph-stage__stats">
+                      <span className="graph-stage__badge">
+                        <Waypoints className="size-4" />
+                        {messages.stats.activeLinks(edges.length)}
+                      </span>
+                      <span className="graph-stage__badge">
+                        <Crosshair className="size-4" />
+                        {selectionTypeLabel}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                  {saveState === "saved" ? (
-                    <span
-                      className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
-                      role="status"
-                    >
-                      <CheckCircle2 className="size-4" />
-                      Webhook delivered
-                    </span>
-                  ) : null}
-
-                  {saveState === "error" ? (
-                    <span
-                      className="rounded-full border border-rose-400/20 bg-rose-500/12 px-4 py-2 text-sm text-rose-200"
-                      role="alert"
-                    >
-                      The completion webhook failed. Adjust the data and try again.
-                    </span>
-                  ) : null}
-
-                  <Button
-                    className="h-12 rounded-2xl border border-amber-300/10 bg-[linear-gradient(135deg,#ff9d1c,#ffb44c)] px-6 text-[#1d1305] shadow-[0_18px_38px_rgba(255,157,28,0.2)] hover:bg-[linear-gradient(135deg,#ffad38,#ffc261)]"
-                    onClick={saveGraph}
-                    size="lg"
+                  <ReactFlow
+                    className="graph-flow"
+                    colorMode="dark"
+                    connectionLineStyle={defaultEdgeOptions.style}
+                    connectionLineType={connectionLineType}
+                    defaultEdgeOptions={defaultEdgeOptions}
+                    deleteKeyCode={deleteKeyCode}
+                    edges={canvasEdges}
+                    elevateEdgesOnSelect
+                    fitView
+                    fitViewOptions={fitViewOptions}
+                    nodeTypes={editorNodeTypes}
+                    nodes={nodes}
+                    onConnect={handleConnect}
+                    onConnectEnd={handleConnectEnd}
+                    onConnectStart={handleConnectStart}
+                    onDelete={handleDelete}
+                    onEdgeClick={handleCanvasEdgeClick}
+                    onEdgeContextMenu={handleEdgeContextMenu}
+                    onEdgesChange={onEdgesChange}
+                    onInit={setReactFlowInstance}
+                    onNodeClick={handleCanvasNodeClick}
+                    onNodeContextMenu={handleNodeContextMenu}
+                    onNodesChange={onNodesChange}
+                    onPaneClick={handlePaneClick}
+                    onPaneContextMenu={handlePaneContextMenu}
+                    onSelectionChange={handleSelectionChange}
+                    onSelectionContextMenu={handleSelectionContextMenu}
                   >
-                    <Save className="size-4" />
-                    {saveState === "saving" ? "Submitting..." : "Complete editing"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <Background
+                      color="rgba(125, 142, 173, 0.08)"
+                      gap={24}
+                      id="minor-grid"
+                      variant={BackgroundVariant.Lines}
+                    />
+                    <Background
+                      color="rgba(255, 157, 28, 0.09)"
+                      gap={120}
+                      id="major-grid"
+                      lineWidth={1.4}
+                      variant={BackgroundVariant.Lines}
+                    />
+                    <Controls className="graph-controls" position="bottom-left" />
+                    <MiniMap
+                      className="graph-minimap"
+                      pannable
+                      zoomable
+                      nodeColor={miniMapNodeColor}
+                    />
+                  </ReactFlow>
 
-          <Card className="editor-panel min-h-[60vh] flex-1 overflow-hidden">
-            <CardContent className="editor-grid graph-stage h-full min-h-[68vh] rounded-[1.5rem] p-0">
-              <div className="graph-stage__hud">
-                <div>
-                  <p className="editor-kicker">Blueprint workspace</p>
-                  <h2 className="graph-stage__title">Node canvas</h2>
-                  <p className="graph-stage__subtitle">
-                    Drag to position nodes, connect outputs into inputs, or drop a link on empty space to create the next compatible node in place.
-                  </p>
-                </div>
-                <div className="graph-stage__stats">
-                  <span className="graph-stage__badge">
-                    <Waypoints className="size-4" />
-                    {edges.length} active links
-                  </span>
-                  <span className="graph-stage__badge">
-                    <Crosshair className="size-4" />
-                    {selectionTypeLabel}
-                  </span>
-                </div>
-              </div>
+                  {contextMenuState && contextMenuMeta ? (
+                    <CanvasContextMenu
+                      ref={contextMenuRef}
+                      canCopy={contextMenuMeta.canCopy}
+                      canCut={contextMenuMeta.canCut}
+                      canDelete={contextMenuMeta.canDelete}
+                      canPaste={contextMenuMeta.canPaste}
+                      copyLabel={contextMenuMeta.copyLabel}
+                      cutLabel={contextMenuMeta.cutLabel}
+                      deleteLabel={contextMenuMeta.deleteLabel}
+                      emptyStateMessage={contextMenuMeta.emptyStateMessage}
+                      isConnectionCreation={contextMenuMeta.mode === "connection"}
+                      items={contextMenuItems}
+                      libraryLabel={contextMenuMeta.libraryLabel}
+                      onAddNode={addNodeAtMenuPosition}
+                      onCopy={copyCurrentSelection}
+                      onCut={cutCurrentSelection}
+                      onDelete={deleteCurrentSelection}
+                      onPaste={pasteClipboardAtMenuPosition}
+                      position={contextMenuState.position}
+                      showLibrary={contextMenuState.showLibrary}
+                    />
+                  ) : null}
+                </CardContent>
+              </Card>
 
-              <ReactFlow
-                className="graph-flow"
-                colorMode="dark"
-                connectionLineStyle={defaultEdgeOptions.style}
-                connectionLineType={ConnectionLineType.SmoothStep}
-                defaultEdgeOptions={defaultEdgeOptions}
-                deleteKeyCode={["Delete", "Backspace"]}
-                edges={edges}
-                elevateEdgesOnSelect
-                fitView
-                fitViewOptions={{ padding: 0.18 }}
-                nodeTypes={editorNodeTypes}
+              <Card className="editor-panel">
+                <CardContent className="flex flex-wrap items-center gap-3 p-5 text-sm leading-7 text-muted-foreground">
+                  <Network className="size-4 text-primary" />
+                  {messages.footer.summary}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
+              <NodeInspectorPanel
+                edge={selectedEdge}
+                edgeStyle={preferences.edgeStyle}
+                graphDescription={graphDescription}
+                graphName={graphName}
+                locale={preferences.locale}
+                node={selectedNode}
                 nodes={nodes}
-                onConnect={handleConnect}
-                onConnectEnd={handleConnectEnd}
-                onConnectStart={handleConnectStart}
-                onDelete={handleDelete}
-                onEdgeClick={(_, edge) => handleEdgeClick(edge.id)}
-                onEdgeContextMenu={handleEdgeContextMenu}
-                onEdgesChange={onEdgesChange}
-                onInit={setReactFlowInstance}
-                onNodeClick={(_, node) => handleNodeClick(node.id)}
-                onNodeContextMenu={handleNodeContextMenu}
-                onNodesChange={onNodesChange}
-                onPaneClick={handlePaneClick}
-                onPaneContextMenu={handlePaneContextMenu}
-                onSelectionChange={handleSelectionChange}
-                onSelectionContextMenu={handleSelectionContextMenu}
-              >
-                <Background
-                  color="rgba(125, 142, 173, 0.08)"
-                  gap={24}
-                  id="minor-grid"
-                  variant={BackgroundVariant.Lines}
-                />
-                <Background
-                  color="rgba(255, 157, 28, 0.09)"
-                  gap={120}
-                  id="major-grid"
-                  lineWidth={1.4}
-                  variant={BackgroundVariant.Lines}
-                />
-                <Controls className="graph-controls" position="bottom-left" />
-                <MiniMap
-                  className="graph-minimap"
-                  pannable
-                  zoomable
-                  nodeColor={(node) =>
-                    String((node.style as { borderColor?: string } | undefined)?.borderColor ?? "#ff9d1c")
-                  }
-                />
-              </ReactFlow>
-
-              {contextMenuState && contextMenuMeta ? (
-                <CanvasContextMenu
-                  ref={contextMenuRef}
-                  canCopy={contextMenuMeta.canCopy}
-                  canCut={contextMenuMeta.canCut}
-                  canDelete={contextMenuMeta.canDelete}
-                  canPaste={contextMenuMeta.canPaste}
-                  copyLabel={contextMenuMeta.copyLabel}
-                  cutLabel={contextMenuMeta.cutLabel}
-                  deleteLabel={contextMenuMeta.deleteLabel}
-                  emptyStateMessage={contextMenuMeta.emptyStateMessage}
-                  isConnectionCreation={contextMenuMeta.mode === "connection"}
-                  items={contextMenuItems}
-                  libraryLabel={contextMenuMeta.libraryLabel}
-                  onAddNode={addNodeAtMenuPosition}
-                  onCopy={copyCurrentSelection}
-                  onCut={cutCurrentSelection}
-                  onDelete={deleteCurrentSelection}
-                  onPaste={pasteClipboardAtMenuPosition}
-                  position={contextMenuState.position}
-                  showLibrary={contextMenuState.showLibrary}
-                />
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="editor-panel">
-            <CardContent className="flex flex-wrap items-center gap-3 p-5 text-sm leading-7 text-muted-foreground">
-              <Network className="size-4 text-primary" />
-              This refit keeps the existing session workflow intact: add nodes from the library,
-              wire them on the canvas, inspect field values on the right, then submit the finished graph.
-            </CardContent>
-          </Card>
+                onEdgeStyleChange={(nextEdgeStyle) =>
+                  setPreferences((current) => ({
+                    ...current,
+                    edgeStyle: nextEdgeStyle,
+                  }))
+                }
+                onGraphDescriptionChange={setGraphDescription}
+                onGraphNameChange={setGraphName}
+                onLocaleChange={(nextLocale) =>
+                  setPreferences((current) => ({
+                    ...current,
+                    locale: nextLocale,
+                  }))
+                }
+                onNodeFieldChange={(field, value) =>
+                  updateSelectedNode((node) => ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      [field]: value,
+                    },
+                  }))
+                }
+                onNodeValueChange={(key, value) =>
+                  updateSelectedNode((node) => ({
+                    ...node,
+                    data: {
+                      ...node.data,
+                      values: {
+                        ...(node.data.values ?? {}),
+                        [key]: value,
+                      },
+                    },
+                  }))
+                }
+                template={selectedTemplate}
+              />
+            </div>
+          </div>
         </div>
-
-        <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
-          <NodeInspectorPanel
-            edge={selectedEdge}
-            graphDescription={graphDescription}
-            graphName={graphName}
-            node={selectedNode}
-            nodes={nodes}
-            onGraphDescriptionChange={setGraphDescription}
-            onGraphNameChange={setGraphName}
-            onNodeFieldChange={(field, value) =>
-              updateSelectedNode((node) => ({
-                ...node,
-                data: {
-                  ...node.data,
-                  [field]: value,
-                },
-              }))
-            }
-            onNodeValueChange={(key, value) =>
-              updateSelectedNode((node) => ({
-                ...node,
-                data: {
-                  ...node.data,
-                  values: {
-                    ...(node.data.values ?? {}),
-                    [key]: value,
-                  },
-                },
-              }))
-            }
-            template={selectedTemplate}
-          />
-        </div>
-      </div>
-      </div>
-    </TypeColorsProvider>
+      </TypeColorsProvider>
+    </EditorI18nProvider>
   );
 }

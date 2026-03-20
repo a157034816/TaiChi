@@ -2,12 +2,19 @@
 
 import { FilePenLine, Settings2 } from "lucide-react";
 
+import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import {
   buildEdgeInspectorDetails,
   getInspectorAccent,
   getInspectorSelectionTabLabel,
 } from "@/lib/nodegraph/inspector";
-import type { NodeGraphEdge, NodeLibraryItem, NodeGraphNode } from "@/lib/nodegraph/types";
+import { editorEdgeStyles, type EditorEdgeStyle } from "@/lib/nodegraph/editor-preferences";
+import {
+  resolveFieldLabel,
+  resolveFieldPlaceholder,
+  resolveLocalizedText,
+} from "@/lib/nodegraph/localization";
+import type { NodeGraphEdge, NodeLibraryItem, NodeGraphNode, SupportedLocale } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,8 +29,12 @@ interface NodeInspectorPanelProps {
   node: NodeGraphNode | null;
   nodes: NodeGraphNode[];
   template: NodeLibraryItem | null;
+  locale: SupportedLocale;
+  edgeStyle: EditorEdgeStyle;
   graphName: string;
   graphDescription: string;
+  onLocaleChange: (value: SupportedLocale) => void;
+  onEdgeStyleChange: (value: EditorEdgeStyle) => void;
   onGraphNameChange: (value: string) => void;
   onGraphDescriptionChange: (value: string) => void;
   onNodeFieldChange: (field: "label" | "description", value: string) => void;
@@ -35,16 +46,21 @@ export function NodeInspectorPanel({
   node,
   nodes,
   template,
+  locale,
+  edgeStyle,
   graphName,
   graphDescription,
+  onLocaleChange,
+  onEdgeStyleChange,
   onGraphNameChange,
   onGraphDescriptionChange,
   onNodeFieldChange,
   onNodeValueChange,
 }: NodeInspectorPanelProps) {
+  const { messages } = useEditorI18n();
   const inspectorAccent = getInspectorAccent(node, edge);
-  const selectionTabLabel = getInspectorSelectionTabLabel(node, edge);
-  const edgeDetails = edge ? buildEdgeInspectorDetails(edge, nodes) : null;
+  const selectionTabLabel = getInspectorSelectionTabLabel(node, edge, messages.edgeInspector);
+  const edgeDetails = edge ? buildEdgeInspectorDetails(edge, nodes, messages.edgeInspector) : null;
   const selectionStateKey = edge ? `edge:${edge.id}` : node ? `node:${node.id}` : "graph";
 
   return (
@@ -52,12 +68,12 @@ export function NodeInspectorPanel({
       <CardHeader className="space-y-3 border-b border-white/6 pb-5">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-3">
-            <p className="editor-kicker">Dock</p>
+            <p className="editor-kicker">{messages.inspector.kicker}</p>
             <CardTitle className="display-font flex items-center gap-3 text-3xl tracking-[0.08em] text-white uppercase">
               <span className="editor-icon-shell">
                 <Settings2 className="size-5 text-primary" />
               </span>
-              Inspector
+              {messages.inspector.title}
             </CardTitle>
           </div>
 
@@ -68,7 +84,7 @@ export function NodeInspectorPanel({
         </div>
 
         <CardDescription className="leading-6 text-muted-foreground">
-          Adjust graph metadata and inspect the currently selected node or link without leaving the canvas workflow.
+          {messages.inspector.description}
         </CardDescription>
       </CardHeader>
 
@@ -78,12 +94,18 @@ export function NodeInspectorPanel({
           defaultValue={node || edge ? "selection" : "graph"}
           key={selectionStateKey}
         >
-          <TabsList className="grid h-auto grid-cols-2 rounded-[1.2rem] border border-white/6 bg-black/25 p-1">
+          <TabsList className="grid h-auto grid-cols-3 rounded-[1.2rem] border border-white/6 bg-black/25 p-1">
             <TabsTrigger
               className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
               value="graph"
             >
-              Graph
+              {messages.inspector.tabs.graph}
+            </TabsTrigger>
+            <TabsTrigger
+              className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
+              value="settings"
+            >
+              {messages.inspector.tabs.settings}
             </TabsTrigger>
             <TabsTrigger
               className="rounded-[1rem] data-[state=active]:bg-white/10 data-[state=active]:text-white"
@@ -97,7 +119,7 @@ export function NodeInspectorPanel({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]" htmlFor="graph-name">
-                  Graph name
+                  {messages.inspector.graphName}
                 </Label>
                 <Input
                   className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -112,7 +134,7 @@ export function NodeInspectorPanel({
                   className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                   htmlFor="graph-description"
                 >
-                  Graph description
+                  {messages.inspector.graphDescription}
                 </Label>
                 <Textarea
                   className="min-h-32 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -123,10 +145,80 @@ export function NodeInspectorPanel({
               </div>
 
               <div className="rounded-[1.25rem] border border-white/8 bg-black/20 p-4 text-sm leading-7 text-muted-foreground">
-                Use the graph tab for session-level naming and summary text. Node and link details
-                stay in the adjacent selection tab.
+                {messages.inspector.graphHint}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-4 min-h-0 flex-1">
+            <ScrollArea className="h-full pr-2">
+              <div className="space-y-4">
+                <div className="rounded-[1.25rem] border border-white/8 bg-black/20 p-4 text-sm leading-7 text-muted-foreground">
+                  <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.settingsTitle}</p>
+                  <p className="mt-3">{messages.inspector.settingsDescription}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.languageLabel}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">{messages.inspector.languageDescription}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(Object.keys(messages.localeNames) as SupportedLocale[]).map((nextLocale) => {
+                      const isActive = locale === nextLocale;
+                      return (
+                        <button
+                          className={`rounded-[1rem] border px-4 py-3 text-left transition-colors ${
+                            isActive
+                              ? "border-primary/50 bg-primary/12 text-white"
+                              : "border-white/8 bg-black/25 text-[#edf3ff] hover:border-white/15"
+                          }`}
+                          key={nextLocale}
+                          onClick={() => onLocaleChange(nextLocale)}
+                          type="button"
+                        >
+                          <span className="block text-sm font-medium">{messages.localeNames[nextLocale]}</span>
+                          <span className="mt-1 block text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
+                            {nextLocale}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Separator className="bg-white/6" />
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{messages.inspector.edgeStyleLabel}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">{messages.inspector.edgeStyleDescription}</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {editorEdgeStyles.map((nextEdgeStyle) => {
+                      const isActive = edgeStyle === nextEdgeStyle;
+                      return (
+                        <button
+                          className={`rounded-[1rem] border px-4 py-3 text-left transition-colors ${
+                            isActive
+                              ? "border-primary/50 bg-primary/12 text-white"
+                              : "border-white/8 bg-black/25 text-[#edf3ff] hover:border-white/15"
+                          }`}
+                          key={nextEdgeStyle}
+                          onClick={() => onEdgeStyleChange(nextEdgeStyle)}
+                          type="button"
+                        >
+                          <span className="block text-sm font-medium">{messages.edgeStyleNames[nextEdgeStyle]}</span>
+                          <span className="mt-1 block text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
+                            {nextEdgeStyle}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="selection" className="mt-4 min-h-0 flex-1">
@@ -144,19 +236,19 @@ export function NodeInspectorPanel({
                       </div>
                       {template ? (
                         <Badge className="border-white/10 bg-primary/12 text-primary" variant="outline">
-                          {template.category}
+                          {resolveLocalizedText(template.category, locale)}
                         </Badge>
                       ) : null}
                     </div>
 
                     <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {node.data.description?.trim() || "This node is ready for field-level adjustments."}
+                      {node.data.description?.trim() || messages.inspector.fallbackNodeDescription}
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]" htmlFor="node-label">
-                      Label
+                      {messages.inspector.nodeLabel}
                     </Label>
                     <Input
                       className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -171,7 +263,7 @@ export function NodeInspectorPanel({
                       className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                       htmlFor="node-description"
                     >
-                      Description
+                      {messages.inspector.nodeDescription}
                     </Label>
                     <Textarea
                       className="min-h-28 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
@@ -187,7 +279,7 @@ export function NodeInspectorPanel({
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                           <FilePenLine className="size-4 text-primary" />
-                          Editable fields
+                          {messages.inspector.editableFields}
                         </div>
 
                         {template.fields.map((field) => {
@@ -199,7 +291,7 @@ export function NodeInspectorPanel({
                                 key={field.key}
                                 className="flex cursor-pointer items-center justify-between rounded-[1rem] border border-white/8 bg-black/25 px-4 py-3 text-sm text-[#edf3ff]"
                               >
-                                <span className="font-medium">{field.label}</span>
+                                <span className="font-medium">{resolveFieldLabel(field, locale)}</span>
                                 <input
                                   checked={Boolean(currentValue)}
                                   className="size-4 rounded border-white/20 bg-transparent accent-[#ff9d1c]"
@@ -216,12 +308,12 @@ export function NodeInspectorPanel({
                                 className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]"
                                 htmlFor={field.key}
                               >
-                                {field.label}
+                                {resolveFieldLabel(field, locale)}
                               </Label>
                               <Input
                                 className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
                                 id={field.key}
-                                placeholder={field.placeholder}
+                                placeholder={resolveFieldPlaceholder(field, locale)}
                                 type={field.kind === "number" ? "number" : "text"}
                                 value={String(currentValue ?? "")}
                                 onChange={(event) =>
@@ -254,7 +346,7 @@ export function NodeInspectorPanel({
                         <p className="text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">{edgeDetails.subtitle}</p>
                       </div>
                       <Badge className="border-white/10 bg-[#57c7ff]/12 text-[#8fdcff]" variant="outline">
-                        Link
+                        {messages.inspector.linkBadge}
                       </Badge>
                     </div>
 
@@ -266,7 +358,7 @@ export function NodeInspectorPanel({
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[#8fa0bc]">
                       <FilePenLine className="size-4 text-primary" />
-                      Link details
+                      {messages.inspector.linkDetails}
                     </div>
 
                     {edgeDetails.items.map((item) => (
@@ -283,7 +375,7 @@ export function NodeInspectorPanel({
               </ScrollArea>
             ) : (
               <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 p-5 text-sm leading-7 text-muted-foreground">
-                Select a node or link on the canvas to inspect its details here.
+                {messages.inspector.emptySelection}
               </div>
             )}
           </TabsContent>

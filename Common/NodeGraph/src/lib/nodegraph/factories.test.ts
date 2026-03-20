@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import {
   buildFieldDefaults,
   buildNodeStyle,
@@ -10,15 +11,16 @@ import {
 
 const workflowRequestType = "workflow/request";
 const approvalDecisionType = "workflow/approval-decision";
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 describe("nodegraph factories", () => {
   it("builds defaults for supported field kinds", () => {
     expect(
       buildFieldDefaults([
-        { key: "owner", label: "Owner", kind: "text" },
-        { key: "notes", label: "Notes", kind: "textarea" },
-        { key: "retries", label: "Retries", kind: "number" },
-        { key: "required", label: "Required", kind: "boolean" },
+        { key: "owner", label: text("Owner"), kind: "text" },
+        { key: "notes", label: text("Notes"), kind: "textarea" },
+        { key: "retries", label: text("Retries"), kind: "number" },
+        { key: "required", label: text("Required"), kind: "boolean" },
       ]),
     ).toEqual({
       owner: "",
@@ -46,8 +48,8 @@ describe("nodegraph factories", () => {
 
   it("builds default single ports when a template omits them", () => {
     expect(buildPortSnapshot()).toEqual({
-      inputs: [{ id: "in", label: "Input" }],
-      outputs: [{ id: "out", label: "Output" }],
+      inputs: [{ id: "in", label: text("输入", "Input") }],
+      outputs: [{ id: "out", label: text("输出", "Output") }],
     });
   });
 
@@ -56,15 +58,15 @@ describe("nodegraph factories", () => {
       buildPortSnapshot({
         inputs: [],
         outputs: [
-          { id: "approved", label: "Approved", dataType: approvalDecisionType },
-          { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+          { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+          { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
         ],
       }),
     ).toEqual({
       inputs: [],
       outputs: [
-        { id: "approved", label: "Approved", dataType: approvalDecisionType },
-        { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+        { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+        { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
       ],
     });
   });
@@ -77,18 +79,18 @@ describe("nodegraph factories", () => {
           nodeType: "approval",
         },
         {
-          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
           outputs: [
-            { id: "approved", label: "Approved", dataType: approvalDecisionType },
-            { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+            { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+            { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
           ],
         },
       ),
     ).toMatchObject({
-      inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+      inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
       outputs: [
-        { id: "approved", label: "Approved", dataType: approvalDecisionType },
-        { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+        { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+        { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
       ],
     });
   });
@@ -97,17 +99,17 @@ describe("nodegraph factories", () => {
     const node = createNodeFromLibrary(
       {
         type: "approval",
-        label: "Approval",
-        description: "Manual approval step",
-        category: "workflow",
-        inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+        label: text("Approval"),
+        description: text("Manual approval step"),
+        category: text("workflow"),
+        inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
         outputs: [
-          { id: "approved", label: "Approved", dataType: approvalDecisionType },
-          { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+          { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+          { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
         ],
         fields: [
-          { key: "owner", label: "Owner", kind: "text" },
-          { key: "sla", label: "SLA", kind: "number", defaultValue: 48 },
+          { key: "owner", label: text("Owner"), kind: "text" },
+          { key: "sla", label: text("SLA"), kind: "number", defaultValue: 48 },
         ],
         defaultData: {
           channel: "email",
@@ -121,10 +123,10 @@ describe("nodegraph factories", () => {
 
     expect(node.type).toBe("default");
     expect(node.position).toEqual({ x: 120, y: 80 });
-    expect(node.data.inputs).toEqual([{ id: "request", label: "Request", dataType: workflowRequestType }]);
+    expect(node.data.inputs).toEqual([{ id: "request", label: text("Request"), dataType: workflowRequestType }]);
     expect(node.data.outputs).toEqual([
-      { id: "approved", label: "Approved", dataType: approvalDecisionType },
-      { id: "rejected", label: "Rejected", dataType: approvalDecisionType },
+      { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
+      { id: "rejected", label: text("Rejected"), dataType: approvalDecisionType },
     ]);
     expect(node.data.values).toEqual({
       owner: "",

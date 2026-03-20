@@ -2,13 +2,22 @@ import type { Edge, Node } from "@xyflow/react";
 
 export type AccessType = "public" | "private";
 
+export const supportedLocales = ["zh-CN", "en"] as const;
+
+export type SupportedLocale = (typeof supportedLocales)[number];
+
+export interface LocalizedText {
+  "zh-CN": string;
+  en: string;
+}
+
 export type NodeFieldKind = "text" | "textarea" | "number" | "boolean";
 
 export interface NodeLibraryField {
   key: string;
-  label: string;
+  label: LocalizedText;
   kind: NodeFieldKind;
-  placeholder?: string;
+  placeholder?: LocalizedText;
   defaultValue?: string | number | boolean;
 }
 
@@ -20,7 +29,7 @@ export interface NodeAppearance {
 
 export interface NodePortDefinition {
   id: string;
-  label: string;
+  label: LocalizedText;
   /** Canonical type identifier shared across languages, e.g. workflow/request. */
   dataType?: string;
 }
@@ -33,9 +42,9 @@ export interface TypeMappingEntry {
 
 export interface NodeLibraryItem {
   type: string;
-  label: string;
-  description: string;
-  category: string;
+  label: LocalizedText;
+  description: LocalizedText;
+  category: LocalizedText;
   inputs?: NodePortDefinition[];
   outputs?: NodePortDefinition[];
   fields?: NodeLibraryField[];
@@ -46,7 +55,7 @@ export interface NodeLibraryItem {
 export interface NodeGraphNodeData extends Record<string, unknown> {
   label: string;
   description?: string;
-  category?: string;
+  category?: LocalizedText;
   nodeType: string;
   inputs?: NodePortDefinition[];
   outputs?: NodePortDefinition[];

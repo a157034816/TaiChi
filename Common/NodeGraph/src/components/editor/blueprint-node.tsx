@@ -3,8 +3,10 @@
 import type { CSSProperties } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
+import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import type { NodeGraphNode, NodeGraphNodeData, NodePortDefinition } from "@/lib/nodegraph/types";
 import { useTypeColors } from "@/components/editor/type-colors";
+import { resolveLocalizedText } from "@/lib/nodegraph/localization";
 
 const FALLBACK_ACCENT = "#ff9d1c";
 const FALLBACK_TEXT = "#f7fbff";
@@ -45,9 +47,12 @@ function hexToRgba(color: string, alpha: number) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function formatValue(value: unknown) {
+function formatValue(
+  value: unknown,
+  messages: ReturnType<typeof useEditorI18n>["messages"]["blueprint"],
+) {
   if (typeof value === "boolean") {
-    return value ? "Enabled" : "Disabled";
+    return value ? messages.enabled : messages.disabled;
   }
 
   if (typeof value === "number") {
@@ -55,18 +60,18 @@ function formatValue(value: unknown) {
   }
 
   if (typeof value === "string") {
-    return value.trim() ? value : "Empty";
+    return value.trim() ? value : messages.empty;
   }
 
   if (Array.isArray(value)) {
-    return `${value.length} items`;
+    return messages.items(value.length);
   }
 
   if (value && typeof value === "object") {
-    return "Configured";
+    return messages.configured;
   }
 
-  return "Unset";
+  return messages.unset;
 }
 
 function getNodeTheme(data: NodeGraphNodeData) {
@@ -83,11 +88,12 @@ function getNodeTheme(data: NodeGraphNodeData) {
   };
 }
 
-function getPortLabel(port: NodePortDefinition) {
-  return port.label.trim() || port.id;
+function getPortLabel(port: NodePortDefinition, locale: ReturnType<typeof useEditorI18n>["locale"]) {
+  return resolveLocalizedText(port.label, locale).trim() || port.id;
 }
 
 export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
+  const { locale, messages } = useEditorI18n();
   const typeColors = useTypeColors();
   const valueEntries = Object.entries(data.values ?? {}).slice(0, 3);
   const hiddenFieldCount = Math.max(Object.keys(data.values ?? {}).length - valueEntries.length, 0);
@@ -109,23 +115,25 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
       style={nodeStyle}
     >
       <div className="blueprint-node__header">
-        <span className="blueprint-node__category">{data.category ?? "Node"}</span>
+        <span className="blueprint-node__category">
+          {data.category ? resolveLocalizedText(data.category, locale) : messages.blueprint.fallbackCategory}
+        </span>
         <span className="blueprint-node__type">{data.nodeType}</span>
       </div>
 
       <div className="blueprint-node__body">
         <div className="blueprint-node__title-row">
           <h3 className="blueprint-node__title">{data.label}</h3>
-          <span className="blueprint-node__status">Ready</span>
+          <span className="blueprint-node__status">{messages.blueprint.ready}</span>
         </div>
 
         <p className="blueprint-node__description">
-          {data.description?.trim() || "This node is ready for field-driven configuration."}
+          {data.description?.trim() || messages.blueprint.fallbackDescription}
         </p>
 
         <div className="blueprint-node__ports">
           <div className="blueprint-node__port-column">
-            <span className="blueprint-node__port-label">Inputs</span>
+            <span className="blueprint-node__port-label">{messages.blueprint.inputs}</span>
             <div className="blueprint-node__port-list">
               {inputPorts.length ? (
                 inputPorts.map((port) => (
@@ -153,17 +161,19 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                           : undefined
                       }
                     />
-                    <span className="blueprint-node__port-name">{getPortLabel(port)}</span>
+                    <span className="blueprint-node__port-name">{getPortLabel(port, locale)}</span>
                   </div>
                 ))
               ) : (
-                <div className="blueprint-node__port-empty">No inputs</div>
+                <div className="blueprint-node__port-empty">{messages.blueprint.noInputs}</div>
               )}
             </div>
           </div>
 
           <div className="blueprint-node__port-column blueprint-node__port-column--output">
-            <span className="blueprint-node__port-label blueprint-node__port-label--out">Outputs</span>
+            <span className="blueprint-node__port-label blueprint-node__port-label--out">
+              {messages.blueprint.outputs}
+            </span>
             <div className="blueprint-node__port-list">
               {outputPorts.length ? (
                 outputPorts.map((port) => (
@@ -177,7 +187,7 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                         : undefined,
                     }}
                   >
-                    <span className="blueprint-node__port-name">{getPortLabel(port)}</span>
+                    <span className="blueprint-node__port-name">{getPortLabel(port, locale)}</span>
                     <Handle
                       className="blueprint-node__handle blueprint-node__handle--output"
                       id={port.id}
@@ -195,7 +205,9 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
                   </div>
                 ))
               ) : (
-                <div className="blueprint-node__port-empty blueprint-node__port-empty--out">No outputs</div>
+                <div className="blueprint-node__port-empty blueprint-node__port-empty--out">
+                  {messages.blueprint.noOutputs}
+                </div>
               )}
             </div>
           </div>
@@ -206,19 +218,19 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
             valueEntries.map(([key, value]) => (
               <div className="blueprint-node__field" key={key}>
                 <span className="blueprint-node__field-key">{key}</span>
-                <span className="blueprint-node__field-value">{formatValue(value)}</span>
+                <span className="blueprint-node__field-value">{formatValue(value, messages.blueprint)}</span>
               </div>
             ))
           ) : (
             <div className="blueprint-node__field blueprint-node__field--empty">
-              <span className="blueprint-node__field-key">Values</span>
-              <span className="blueprint-node__field-value">No editable fields</span>
+              <span className="blueprint-node__field-key">{messages.blueprint.values}</span>
+              <span className="blueprint-node__field-value">{messages.blueprint.noEditableFields}</span>
             </div>
           )}
         </div>
 
         {hiddenFieldCount ? (
-          <div className="blueprint-node__footer">+{hiddenFieldCount} more field rows in inspector</div>
+          <div className="blueprint-node__footer">{messages.blueprint.moreFieldRows(hiddenFieldCount)}</div>
         ) : null}
       </div>
     </div>

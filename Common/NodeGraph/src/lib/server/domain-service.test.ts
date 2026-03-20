@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import { ensureDomain } from "@/lib/server/domain-service";
 import { getRuntimeStore } from "@/lib/server/store";
 
 const workflowRequestType = "workflow/request";
 const defaultTypeColor = "#64748B";
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 const createInput = () => ({
   domain: "erp-workflow",
@@ -31,11 +33,11 @@ describe("domain service", () => {
           nodes: [
             {
               type: "start",
-              label: "Start",
-              description: "Entry node",
-              category: "control",
+              label: text("Start"),
+              description: text("Entry node"),
+              category: text("control"),
               inputs: [],
-              outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+              outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
             },
           ],
           typeMappings: [
@@ -54,7 +56,7 @@ describe("domain service", () => {
     expect(result.domainCached).toBe(false);
     expect(result.entry.nodeLibrary).toHaveLength(1);
     expect(result.entry.nodeLibrary[0].outputs).toEqual([
-      { id: "next", label: "Next", dataType: workflowRequestType },
+      { id: "next", label: text("Next"), dataType: workflowRequestType },
     ]);
     expect(result.entry.typeMappings).toEqual([
       {
@@ -73,9 +75,9 @@ describe("domain service", () => {
           JSON.stringify([
             {
               type: "start",
-              label: "Start",
-              description: "Entry node",
-              category: "control",
+              label: text("Start"),
+              description: text("Entry node"),
+              category: text("control"),
             },
           ]),
         ),
@@ -98,10 +100,10 @@ describe("domain service", () => {
             nodes: [
               {
                 type: "approval",
-                label: "Approval",
-                description: "Manual approval step",
-                category: "workflow",
-                inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+                label: text("Approval"),
+                description: text("Manual approval step"),
+                category: text("workflow"),
+                inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
               },
             ],
             typeMappings: [
@@ -134,10 +136,10 @@ describe("domain service", () => {
             nodes: [
               {
                 type: "approval",
-                label: "Approval",
-                description: "Manual approval step",
-                category: "workflow",
-                inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+                label: text("Approval"),
+                description: text("Manual approval step"),
+                category: text("workflow"),
+                inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
               },
             ],
             typeMappings: [
@@ -166,10 +168,10 @@ describe("domain service", () => {
             nodes: [
               {
                 type: "start",
-                label: "Start",
-                description: "Entry node",
-                category: "control",
-                outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+                label: text("Start"),
+                description: text("Entry node"),
+                category: text("control"),
+                outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
               },
             ],
             typeMappings: [

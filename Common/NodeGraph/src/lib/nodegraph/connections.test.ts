@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createLocalizedText } from "@/lib/nodegraph/localization";
 import {
   buildConnectionForInsertedNode,
   findCompatibleOppositePort,
@@ -10,6 +11,7 @@ import {
 
 const workflowRequestType = "workflow/request";
 const approvalDecisionType = "workflow/approval-decision";
+const text = (zhCN: string, en = zhCN) => createLocalizedText(zhCN, en);
 
 describe("nodegraph connections", () => {
   it("removes an existing edge when a new connection targets the same input handle", () => {
@@ -82,15 +84,15 @@ describe("nodegraph connections", () => {
     expect(
       getPortForHandle(
         {
-          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
-          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
+          inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: text("Approved"), dataType: approvalDecisionType }],
         },
         "source",
         "approved",
       ),
     ).toEqual({
       id: "approved",
-      label: "Approved",
+      label: text("Approved"),
       dataType: approvalDecisionType,
     });
   });
@@ -100,19 +102,19 @@ describe("nodegraph connections", () => {
       findCompatibleOppositePort(
         {
           inputs: [
-            { id: "request", label: "Request", dataType: workflowRequestType },
-            { id: "fallback", label: "Fallback", dataType: "OtherType" },
+            { id: "request", label: text("Request"), dataType: workflowRequestType },
+            { id: "fallback", label: text("Fallback"), dataType: "OtherType" },
           ],
           outputs: [],
         },
         {
           handleType: "source",
-          startPort: { id: "next", label: "Next", dataType: workflowRequestType },
+          startPort: { id: "next", label: text("Next"), dataType: workflowRequestType },
         },
       ),
     ).toEqual({
       id: "request",
-      label: "Request",
+      label: text("Request"),
       dataType: workflowRequestType,
     });
   });
@@ -122,19 +124,19 @@ describe("nodegraph connections", () => {
       findCompatibleOppositePort(
         {
           inputs: [
-            { id: "approved", label: "Approved" },
-            { id: "rejected", label: "Rejected" },
+            { id: "approved", label: text("Approved") },
+            { id: "rejected", label: text("Rejected") },
           ],
           outputs: [],
         },
         {
           handleType: "source",
-          startPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
+          startPort: { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
         },
       ),
     ).toEqual({
       id: "approved",
-      label: "Approved",
+      label: text("Approved"),
     });
   });
 
@@ -144,25 +146,25 @@ describe("nodegraph connections", () => {
         [
           {
             type: "notify",
-            label: "Notify",
-            description: "Send a notification",
-            category: "integration",
-            inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
+            label: text("Notify"),
+            description: text("Send a notification"),
+            category: text("integration"),
+            inputs: [{ id: "success", label: text("Success"), dataType: approvalDecisionType }],
             outputs: [],
           },
           {
             type: "merge",
-            label: "Merge",
-            description: "Collect branches",
-            category: "control",
-            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
-            outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
+            label: text("Merge"),
+            description: text("Collect branches"),
+            category: text("control"),
+            inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+            outputs: [{ id: "next", label: text("Next"), dataType: workflowRequestType }],
           },
         ],
         {
           handleType: "source",
         },
-        { id: "approved", label: "Approved", dataType: approvalDecisionType },
+        { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
       ).map((item) => item.type),
     ).toEqual(["notify"]);
   });
@@ -173,10 +175,10 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_approval",
         existingHandleId: "approved",
         existingHandleType: "source",
-        existingPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
+        existingPort: { id: "approved", label: text("Approved"), dataType: approvalDecisionType },
         insertedNodeId: "node_notify",
         insertedNodeData: {
-          inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
+          inputs: [{ id: "success", label: text("Success"), dataType: approvalDecisionType }],
           outputs: [],
         },
       }),
@@ -194,11 +196,11 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_notify",
         existingHandleId: "success",
         existingHandleType: "target",
-        existingPort: { id: "success", label: "Success", dataType: approvalDecisionType },
+        existingPort: { id: "success", label: text("Success"), dataType: approvalDecisionType },
         insertedNodeId: "node_approval",
         insertedNodeData: {
-          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
-          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
+          inputs: [{ id: "request", label: text("Request"), dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: text("Approved"), dataType: approvalDecisionType }],
         },
       }),
     ).toEqual({

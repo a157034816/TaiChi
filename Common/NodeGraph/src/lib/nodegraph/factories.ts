@@ -6,15 +6,24 @@ import type {
   NodeLibraryField,
   NodeLibraryItem,
   NodePortDefinition,
+  SupportedLocale,
 } from "@/lib/nodegraph/types";
+import {
+  createLocalizedText,
+  DEFAULT_LOCALE,
+  getEditorMessages,
+  resolveLocalizedText,
+} from "@/lib/nodegraph/localization";
 
-const DEFAULT_INPUT_PORTS: NodePortDefinition[] = [{ id: "in", label: "Input" }];
-const DEFAULT_OUTPUT_PORTS: NodePortDefinition[] = [{ id: "out", label: "Output" }];
+const DEFAULT_INPUT_PORTS: NodePortDefinition[] = [{ id: "in", label: createLocalizedText("输入", "Input") }];
+const DEFAULT_OUTPUT_PORTS: NodePortDefinition[] = [{ id: "out", label: createLocalizedText("输出", "Output") }];
 
 export function createEmptyGraph(domain: string): NodeGraphDocument {
+  const messages = getEditorMessages(DEFAULT_LOCALE);
+
   return {
-    name: `${domain} flow`,
-    description: "A new node graph session created by NodeGraph.",
+    name: messages.graphDefaults.name(domain),
+    description: messages.graphDefaults.description,
     nodes: [],
     edges: [],
     viewport: {
@@ -86,11 +95,12 @@ export function buildNodeStyle(appearance?: NodeAppearance) {
 export function createNodeFromLibrary(
   item: NodeLibraryItem,
   position: { x: number; y: number },
+  locale: SupportedLocale = DEFAULT_LOCALE,
 ): NodeGraphNode {
   const portSnapshot = buildPortSnapshot(item);
   const data: NodeGraphNodeData = {
-    label: item.label,
-    description: item.description,
+    label: resolveLocalizedText(item.label, locale),
+    description: resolveLocalizedText(item.description, locale),
     category: item.category,
     nodeType: item.type,
     inputs: portSnapshot.inputs,

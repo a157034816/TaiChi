@@ -14,26 +14,48 @@ export interface EdgeInspectorDetails {
 
 const DEFAULT_INSPECTOR_ACCENT = "#ff9d1c";
 const EDGE_INSPECTOR_ACCENT = "#57c7ff";
-const DEFAULT_HANDLE_LABEL = "Default port";
+
+export interface InspectorTextMessages {
+  defaultHandleLabel: string;
+  selectedLinkLabel: string;
+  selectedNodeLabel: string;
+  selectionLabel: string;
+  connectionSubtitle: string;
+  formatEdgeDescription: (
+    sourceHandle: string,
+    sourceLabel: string,
+    targetHandle: string,
+    targetLabel: string,
+  ) => string;
+  edgeIdLabel: string;
+  sourceNodeLabel: string;
+  sourceHandleLabel: string;
+  targetNodeLabel: string;
+  targetHandleLabel: string;
+}
 
 function getNodeLabel(nodeId: string, nodes: NodeGraphNode[]) {
   return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
 }
 
-function formatHandleLabel(handle: string | null | undefined) {
-  return handle ?? DEFAULT_HANDLE_LABEL;
+function formatHandleLabel(handle: string | null | undefined, messages: InspectorTextMessages) {
+  return handle ?? messages.defaultHandleLabel;
 }
 
-export function getInspectorSelectionTabLabel(node: NodeGraphNode | null, edge: NodeGraphEdge | null) {
+export function getInspectorSelectionTabLabel(
+  node: NodeGraphNode | null,
+  edge: NodeGraphEdge | null,
+  messages: InspectorTextMessages,
+) {
   if (edge) {
-    return "Selected link";
+    return messages.selectedLinkLabel;
   }
 
   if (node) {
-    return "Selected node";
+    return messages.selectedNodeLabel;
   }
 
-  return "Selection";
+  return messages.selectionLabel;
 }
 
 export function getInspectorAccent(node: NodeGraphNode | null, edge: NodeGraphEdge | null) {
@@ -48,22 +70,26 @@ export function getInspectorAccent(node: NodeGraphNode | null, edge: NodeGraphEd
   return edge ? EDGE_INSPECTOR_ACCENT : DEFAULT_INSPECTOR_ACCENT;
 }
 
-export function buildEdgeInspectorDetails(edge: NodeGraphEdge, nodes: NodeGraphNode[]): EdgeInspectorDetails {
+export function buildEdgeInspectorDetails(
+  edge: NodeGraphEdge,
+  nodes: NodeGraphNode[],
+  messages: InspectorTextMessages,
+): EdgeInspectorDetails {
   const sourceLabel = getNodeLabel(edge.source, nodes);
   const targetLabel = getNodeLabel(edge.target, nodes);
-  const sourceHandle = formatHandleLabel(edge.sourceHandle);
-  const targetHandle = formatHandleLabel(edge.targetHandle);
+  const sourceHandle = formatHandleLabel(edge.sourceHandle, messages);
+  const targetHandle = formatHandleLabel(edge.targetHandle, messages);
 
   return {
     title: `${sourceLabel} -> ${targetLabel}`,
-    subtitle: "Connection",
-    description: `This link routes ${sourceHandle} from ${sourceLabel} into ${targetHandle} on ${targetLabel}.`,
+    subtitle: messages.connectionSubtitle,
+    description: messages.formatEdgeDescription(sourceHandle, sourceLabel, targetHandle, targetLabel),
     items: [
-      { label: "Edge id", value: edge.id },
-      { label: "Source node", value: `${sourceLabel} (${edge.source})` },
-      { label: "Source handle", value: sourceHandle },
-      { label: "Target node", value: `${targetLabel} (${edge.target})` },
-      { label: "Target handle", value: targetHandle },
+      { label: messages.edgeIdLabel, value: edge.id },
+      { label: messages.sourceNodeLabel, value: `${sourceLabel} (${edge.source})` },
+      { label: messages.sourceHandleLabel, value: sourceHandle },
+      { label: messages.targetNodeLabel, value: `${targetLabel} (${edge.target})` },
+      { label: messages.targetHandleLabel, value: targetHandle },
     ],
   };
 }

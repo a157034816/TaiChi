@@ -15,8 +15,12 @@ interface SelectionChangeSnapshot {
   edges: Array<Pick<NodeGraphEdge, "id">>;
 }
 
-const DEFAULT_FOCUS_LABEL = "Canvas";
-const DEFAULT_TYPE_LABEL = "canvas focus";
+export interface CanvasSelectionMessages {
+  defaultFocusLabel: string;
+  defaultTypeLabel: string;
+  linkFocusLabel: string;
+  formatLinkFocusLabel: (sourceLabel: string, targetLabel: string) => string;
+}
 
 function getNodeLabel(nodeId: string, nodes: NodeGraphNode[]) {
   return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
@@ -69,36 +73,38 @@ export function getCanvasFocusLabel(
   selection: CanvasSelection,
   nodes: NodeGraphNode[],
   edges: NodeGraphEdge[],
+  messages: CanvasSelectionMessages,
 ) {
   if (!selection) {
-    return DEFAULT_FOCUS_LABEL;
+    return messages.defaultFocusLabel;
   }
 
   if (selection.type === "node") {
-    return nodes.find((node) => node.id === selection.id)?.data.label ?? DEFAULT_FOCUS_LABEL;
+    return nodes.find((node) => node.id === selection.id)?.data.label ?? messages.defaultFocusLabel;
   }
 
   const edge = edges.find((item) => item.id === selection.id);
 
   if (!edge) {
-    return DEFAULT_FOCUS_LABEL;
+    return messages.defaultFocusLabel;
   }
 
-  return `Link ${getNodeLabel(edge.source, nodes)} -> ${getNodeLabel(edge.target, nodes)}`;
+  return messages.formatLinkFocusLabel(getNodeLabel(edge.source, nodes), getNodeLabel(edge.target, nodes));
 }
 
 export function getCanvasTypeLabel(
   selection: CanvasSelection,
   nodes: NodeGraphNode[],
   edges: NodeGraphEdge[],
+  messages: CanvasSelectionMessages,
 ) {
   if (!selection) {
-    return DEFAULT_TYPE_LABEL;
+    return messages.defaultTypeLabel;
   }
 
   if (selection.type === "node") {
-    return nodes.find((node) => node.id === selection.id)?.data.nodeType ?? DEFAULT_TYPE_LABEL;
+    return nodes.find((node) => node.id === selection.id)?.data.nodeType ?? messages.defaultTypeLabel;
   }
 
-  return edges.some((edge) => edge.id === selection.id) ? "link focus" : DEFAULT_TYPE_LABEL;
+  return edges.some((edge) => edge.id === selection.id) ? messages.linkFocusLabel : messages.defaultTypeLabel;
 }
