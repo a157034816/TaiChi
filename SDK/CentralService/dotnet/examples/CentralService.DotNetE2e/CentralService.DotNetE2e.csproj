@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CentralService.Service\CentralService.Service.csproj" />
+    <ProjectReference Include="..\..\src\CentralService.Client\CentralService.Client.csproj" />
+    <Compile Include="..\Shared\CentralServiceE2ERunner.cs" Link="CentralServiceE2ERunner.cs" />
+  </ItemGroup>
+
+</Project>

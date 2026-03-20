@@ -1,0 +1,15 @@
+{
+  "id": "",
+  "name": "demo-service",
+  "host": "127.0.0.1",
+  "port": 8081,
+  "serviceType": "Web",
+  "healthCheckUrl": "/health",
+  "healthCheckPort": 0,
+  "healthCheckType": "Http",
+  "weight": 1,
+  "metadata": {
+    "env": "dev"
+  }
+}
+

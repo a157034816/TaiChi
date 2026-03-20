@@ -1,0 +1,4 @@
+data
+
+# CentralService runtime SQLite database
+data/*.db*

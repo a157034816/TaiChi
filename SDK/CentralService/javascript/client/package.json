@@ -1,0 +1,11 @@
+{
+  "name": "@ensoai/erp-centralservice-client",
+  "version": "0.1.0",
+  "description": "CentralService 客户端 SDK（服务列表 / 服务发现 / 网络评估）。",
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "license": "MIT"
+}

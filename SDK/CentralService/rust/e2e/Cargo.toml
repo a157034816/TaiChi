@@ -1,0 +1,10 @@
+[package]
+name = "centralservice_sdk_e2e"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+centralservice_service = { path = "../service" }
+centralservice_client = { path = "../client" }
+

@@ -1,0 +1,12 @@
+[package]
+name = "centralservice_service"
+version = "0.1.0"
+edition = "2021"
+description = "CentralService 服务提供方 Rust SDK，用于服务注册、心跳与注销。"
+
+[lib]
+name = "centralservice_service"
+path = "src/lib.rs"
+
+[dependencies]
+
