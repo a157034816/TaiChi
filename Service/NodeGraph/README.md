@@ -1,6 +1,6 @@
 # NodeGraph
 
-`Common/NodeGraph` 是一个面向 SDK 使用者的全栈节点图编辑服务，基于 `Next.js + TypeScript + Tailwind CSS + React Flow + shadcn/ui` 实现。
+`Service/NodeGraph` 是一个面向 SDK 使用者的全栈节点图编辑服务，基于 `Next.js + TypeScript + Tailwind CSS + React Flow + shadcn/ui` 实现。
 
 ## 核心能力
 

@@ -24,10 +24,10 @@
 
 ## 启动前提
 
-先启动 `Common/NodeGraph`：
+先启动 `Service/NodeGraph`：
 
 ```bash
-cd Common/NodeGraph
+cd Service/NodeGraph
 npm install
 npm run dev
 ```
@@ -59,7 +59,7 @@ npm start
 
 这两个入口都会转调 `Examples/NodeGraph.DemoClient/scripts/interactive-demo.py`，因此会继承现有联调脚本的行为，包括：
 
-1. 自动启动 `Common/NodeGraph` 与 demo client
+1. 自动启动 `Service/NodeGraph` 与 demo client
 2. 默认端口被占用时自动让步到新的可用端口
 3. 把实际启动出来的 `NODEGRAPH_BASE_URL` 传给 demo client，保证它始终连到正确的 NodeGraph 地址
 4. 自动创建一个演示 session，并在终端打印 `editorUrl`
@@ -73,7 +73,7 @@ npm run demo:interactive
 
 这个命令现在默认走 Python 版联调脚本。它会做 4 件事：
 
-1. 启动 `Common/NodeGraph`，默认端口 `3300`
+1. 启动 `Service/NodeGraph`，默认端口 `3300`
 2. 启动 demo client，默认端口 `3101`
 3. 自动创建一个演示 session
 4. 在终端打印 `editorUrl`，等你手动打开编辑页面试玩并保存

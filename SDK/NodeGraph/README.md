@@ -1,6 +1,6 @@
 # NodeGraph SDK
 
-`SDK/NodeGraph` 提供对 `Common/NodeGraph` 服务的多语言客户端封装，目标是让业务系统可以快速发起节点图编辑流程。
+`SDK/NodeGraph` 提供对 `Service/NodeGraph` 服务的多语言客户端封装，目标是让业务系统可以快速发起节点图编辑流程。
 
 ## 统一契约
 

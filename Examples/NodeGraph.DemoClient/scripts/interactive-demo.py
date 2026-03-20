@@ -22,7 +22,7 @@ from urllib import error, request
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEMO_CLIENT_DIR = SCRIPT_DIR.parent
 REPO_ROOT = DEMO_CLIENT_DIR.parent.parent
-NODEGRAPH_DIR = REPO_ROOT / "Common" / "NodeGraph"
+NODEGRAPH_DIR = REPO_ROOT / "Service" / "NodeGraph"
 NPM_COMMAND = "npm.cmd" if os.name == "nt" else "npm"
 
 
@@ -275,7 +275,7 @@ def main() -> int:
         signal.signal(signal.SIGTERM, handle_interrupt)
 
     try:
-        print("[Interactive Demo] starting Common/NodeGraph and Demo Client...")
+        print("[Interactive Demo] starting Service/NodeGraph and Demo Client...")
         print(f"[Interactive Demo] NodeGraph will listen on {config['nodegraph_base_url']}")
         print(f"[Interactive Demo] Demo Client will listen on {config['demo_client_base_url']}")
         if reuse_nodegraph:

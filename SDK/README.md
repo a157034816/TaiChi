@@ -12,6 +12,6 @@
 
 ## 设计原则
 
-- 所有 SDK 都围绕 `Common/NodeGraph` 暴露的 HTTP API 进行封装。
+- 所有 SDK 都围绕 `Service/NodeGraph` 暴露的 HTTP API 进行封装。
 - SDK 不负责替代业务系统保存节点图结果，而是帮助业务侧快速创建编辑会话并读取结果状态。
 - 编辑完成后的最终节点图数据由 NodeGraph 回调业务方提供的 webhook，业务方按自身领域逻辑处理。
