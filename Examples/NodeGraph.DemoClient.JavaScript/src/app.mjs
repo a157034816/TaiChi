@@ -125,7 +125,7 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
           graph: createGraphDocument(graphName, graphMode),
           metadata: {
             graphMode,
-            source: "NodeGraph.DemoClient",
+            source: "NodeGraph.DemoClient.JavaScript",
           },
         });
 

@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDirectory
-$launcherScript = Join-Path $repoRoot "Examples/NodeGraph.DemoClient/scripts/interactive-demo.py"
+$launcherScript = Join-Path $repoRoot "Examples/NodeGraph.DemoClient.JavaScript/scripts/interactive-demo.py"
 
 if (-not (Test-Path $launcherScript)) {
     throw "Cannot find launcher script: $launcherScript"

@@ -1,6 +1,6 @@
 # NodeGraph Demo Client
 
-`Examples/NodeGraph.DemoClient` 是一个“业务侧 client”演示项目，用来完整模拟 NodeGraph 的接入方。
+`Examples/NodeGraph.DemoClient.JavaScript` 是一个“业务侧 client”演示项目，用来完整模拟 NodeGraph 的接入方。
 
 它同时扮演 3 个角色：
 
@@ -20,7 +20,7 @@
 
 当前示例节点库已经内置 Blueprint 风格的多输入/多输出节点，包括分流、汇聚、审批通过/拒绝双出口，以及成功/失败双入口通知节点。
 
-示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient/src/contracts.mjs` 中定义。
+示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient.JavaScript/src/contracts.mjs` 中定义。
 
 ## 启动前提
 
@@ -37,7 +37,7 @@ npm run dev
 ## 启动 demo client
 
 ```bash
-cd Examples/NodeGraph.DemoClient
+cd Examples/NodeGraph.DemoClient.JavaScript
 npm start
 ```
 
@@ -57,7 +57,7 @@ npm start
 .tools\start-nodegraph-demo.cmd
 ```
 
-这两个入口都会转调 `Examples/NodeGraph.DemoClient/scripts/interactive-demo.py`，因此会继承现有联调脚本的行为，包括：
+这两个入口都会转调 `Examples/NodeGraph.DemoClient.JavaScript/scripts/interactive-demo.py`，因此会继承现有联调脚本的行为，包括：
 
 1. 自动启动 `Service/NodeGraph` 与 demo client
 2. 默认端口被占用时自动让步到新的可用端口
@@ -67,7 +67,7 @@ npm start
 如果你仍然希望从示例目录内启动，也可以继续运行：
 
 ```bash
-cd Examples/NodeGraph.DemoClient
+cd Examples/NodeGraph.DemoClient.JavaScript
 npm run demo:interactive
 ```
 

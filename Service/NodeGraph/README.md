@@ -34,7 +34,7 @@ npm run dev
 - 主页：`http://localhost:3000`
 - 健康检查：`http://localhost:3000/api/health`
 
-如果你要直接体验完整联调链路，可以在 [Examples/NodeGraph.DemoClient/README.md](../../Examples/NodeGraph.DemoClient/README.md) 使用 `npm run demo:interactive`。该脚本会启动当前服务、demo client，并自动生成一个可手动访问的 `editorUrl`。
+如果你要直接体验完整联调链路，可以在 [Examples/NodeGraph.DemoClient.JavaScript/README.md](../../Examples/NodeGraph.DemoClient.JavaScript/README.md) 使用 `npm run demo:interactive`。该脚本会启动当前服务、demo client，并自动生成一个可手动访问的 `editorUrl`。
 
 ## 环境变量
 
