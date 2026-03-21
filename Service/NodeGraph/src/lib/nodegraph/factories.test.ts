@@ -43,13 +43,25 @@ describe("nodegraph factories", () => {
       buildFieldDefaults([
         { key: "owner", labelKey: "fields.owner.label", kind: "text" },
         { key: "notes", labelKey: "fields.notes.label", kind: "textarea" },
-        { key: "retries", labelKey: "fields.retries.label", kind: "number" },
+        { key: "priority", labelKey: "fields.priority.label", kind: "select", optionsEndpoint: "https://client.example.com/options/priorities" },
+        { key: "dueDate", labelKey: "fields.dueDate.label", kind: "date" },
+        { key: "theme", labelKey: "fields.theme.label", kind: "color" },
+        { key: "retries", labelKey: "fields.retries.label", kind: "int" },
+        { key: "score", labelKey: "fields.score.label", kind: "float" },
+        { key: "ratio", labelKey: "fields.ratio.label", kind: "double" },
+        { key: "budget", labelKey: "fields.budget.label", kind: "decimal" },
         { key: "required", labelKey: "fields.required.label", kind: "boolean" },
       ]),
     ).toEqual({
       owner: "",
       notes: "",
+      priority: "",
+      dueDate: "",
+      theme: "",
       retries: 0,
+      score: 0,
+      ratio: 0,
+      budget: "",
       required: false,
     });
   });
@@ -137,7 +149,20 @@ describe("nodegraph factories", () => {
         ],
         fields: [
           { key: "owner", labelKey: "fields.owner.label", kind: "text" },
-          { key: "sla", labelKey: "fields.sla.label", kind: "number", defaultValue: 48 },
+          { key: "sla", labelKey: "fields.sla.label", kind: "int", defaultValue: 48 },
+          {
+            key: "priority",
+            labelKey: "fields.priority.label",
+            kind: "select",
+            optionsEndpoint: "https://client.example.com/options/priorities",
+            defaultValue: "email",
+          },
+          {
+            key: "budget",
+            labelKey: "fields.budget.label",
+            kind: "decimal",
+            defaultValue: "99.90",
+          },
         ],
         defaultData: {
           channel: "email",
@@ -165,6 +190,8 @@ describe("nodegraph factories", () => {
     expect(node.data.values).toEqual({
       owner: "",
       sla: 48,
+      priority: "email",
+      budget: "99.90",
       channel: "email",
     });
     expect(node.style).toMatchObject({

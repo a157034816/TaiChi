@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-const nodeFieldKindSchema = z.enum(["text", "textarea", "number", "boolean"]);
 const translationKeySchema = z.string().min(1);
+const colorHexSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Expected a hex color like "#RRGGBB".');
+const dateValueSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a date like "2026-03-21".');
 const legacyLocalizedTextSchema = z
   .record(z.string(), z.string())
   .refine((value) => Object.keys(value).length > 0, "Expected at least one locale entry.");
@@ -31,19 +32,54 @@ export const nodePortDefinitionSchema = storedPortDefinitionSchema;
 export const typeMappingEntrySchema = z.object({
   canonicalId: z.string().min(1),
   type: z.string().min(1),
-  color: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/i, 'Expected a hex color like "#RRGGBB".')
-    .optional(),
+  color: colorHexSchema.optional(),
 });
 
-export const nodeLibraryFieldSchema = z.object({
+const nodeLibraryFieldBaseSchema = z.object({
   key: z.string().min(1),
   labelKey: translationKeySchema,
-  kind: nodeFieldKindSchema,
   placeholderKey: translationKeySchema.optional(),
-  defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
+
+const nodeLibraryStringFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.enum(["text", "textarea", "decimal"]),
+  defaultValue: z.string().optional(),
+});
+
+const nodeLibraryDateFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.literal("date"),
+  defaultValue: dateValueSchema.optional(),
+});
+
+const nodeLibraryColorFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.literal("color"),
+  defaultValue: colorHexSchema.optional(),
+});
+
+const nodeLibraryBooleanFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.literal("boolean"),
+  defaultValue: z.boolean().optional(),
+});
+
+const nodeLibraryNumericFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.enum(["int", "float", "double"]),
+  defaultValue: z.number().optional(),
+});
+
+const nodeLibrarySelectFieldSchema = nodeLibraryFieldBaseSchema.extend({
+  kind: z.literal("select"),
+  optionsEndpoint: z.string().url(),
+  defaultValue: z.string().optional(),
+});
+
+export const nodeLibraryFieldSchema = z.discriminatedUnion("kind", [
+  nodeLibraryStringFieldSchema,
+  nodeLibraryDateFieldSchema,
+  nodeLibraryColorFieldSchema,
+  nodeLibraryBooleanFieldSchema,
+  nodeLibraryNumericFieldSchema,
+  nodeLibrarySelectFieldSchema,
+]);
 
 export const nodeAppearanceSchema = z.object({
   bgColor: z.string().optional(),
@@ -133,4 +169,13 @@ export const nodeLibraryEnvelopeSchema = z.object({
   nodes: z.array(nodeLibraryItemSchema),
   i18n: i18nBundleSchema,
   typeMappings: z.array(typeMappingEntrySchema).optional(),
+});
+
+export const nodeFieldOptionsResponseSchema = z.object({
+  options: z.array(
+    z.object({
+      value: z.string(),
+      label: z.string(),
+    }),
+  ),
 });

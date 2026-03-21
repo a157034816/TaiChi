@@ -118,13 +118,14 @@ export default function Home() {
             <Separator />
             <div className="space-y-2 text-sm leading-7 text-muted-foreground">
               <p>
-                The client node-library endpoint can return either an array of node definitions or
-                an object shaped like <code>{`{ "nodes": [...] }`}</code>.
+                The client node-library endpoint now returns a key-based envelope shaped like{" "}
+                <code>{`{ "nodes": [...], "i18n": {...}, "typeMappings"?: [...] }`}</code>.
               </p>
               <p>
-                Node-definition presentation fields now use bilingual objects. Provide both{" "}
-                <code>zh-CN</code> and <code>en</code> for node labels, descriptions, categories,
-                port labels, and field template labels/placeholders.
+                Node definitions reference translations through <code>labelKey</code>,{" "}
+                <code>descriptionKey</code>, <code>categoryKey</code>, port{" "}
+                <code>labelKey</code>, and field <code>labelKey</code>/<code>placeholderKey</code>.
+                Provide the actual localized text inside the accompanying <code>i18n</code> bundle.
               </p>
               <p>
                 Each node definition may optionally declare <code>inputs</code> and{" "}
@@ -143,6 +144,24 @@ export default function Home() {
                 entries shaped like <code>{`{ canonicalId, type }`}</code>. The editor still
                 matches ports by canonical id only, while the mapping lets the current SDK attach
                 its own runtime type name without bloating <code>dataType</code>.
+              </p>
+              <p>
+                Field templates support <code>text</code>, <code>textarea</code>,{" "}
+                <code>boolean</code>, <code>select</code>, <code>date</code>,{" "}
+                <code>color</code>, <code>int</code>, <code>float</code>, <code>double</code>,
+                and <code>decimal</code>. The old <code>number</code> kind has been removed.
+              </p>
+              <p>
+                <code>select</code> fields must provide an external <code>optionsEndpoint</code>.
+                The editor asks NodeGraph to proxy that endpoint and forwards <code>domain</code>,{" "}
+                <code>nodeType</code>, <code>fieldKey</code>, and <code>locale</code>. The remote
+                source should respond with <code>{`{ options: [{ value, label }] }`}</code>.
+              </p>
+              <p>
+                <code>date</code> values use <code>YYYY-MM-DD</code>, <code>color</code> values use{" "}
+                <code>#RRGGBB</code>, <code>decimal</code> values stay as strings to preserve
+                precision, and <code>int</code>/<code>float</code>/<code>double</code> are stored
+                as JSON numbers.
               </p>
               <p>
                 Each type mapping may also optionally include <code>color</code> in the form{" "}

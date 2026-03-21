@@ -75,75 +75,100 @@ npm run dev
 
 供编辑页读取初始会话数据与对应 domain 节点库。
 
+### `GET /api/editor/sessions/{sessionId}/field-options`
+
+供编辑器内部为 `select` 字段代理远端选项数据。请求参数：
+
+- `nodeType`：当前节点类型
+- `fieldKey`：字段 key
+- `locale`：当前编辑器语言
+
 ### `POST /api/editor/sessions/{sessionId}/complete`
 
 提交最终节点图，并触发 completion webhook。
 
 ## client 节点库返回格式
 
-client 的 `nodeLibraryEndpoint` 支持以下两种返回：
-
-```json
-[
-  {
-    "type": "approval",
-    "label": { "zh-CN": "审批", "en": "Approval" },
-    "description": { "zh-CN": "一个人工审批步骤", "en": "A manual approval step" },
-    "category": { "zh-CN": "流程", "en": "workflow" },
-    "inputs": [
-      {
-        "id": "request",
-        "label": { "zh-CN": "请求", "en": "Request" },
-        "dataType": "workflow/request"
-      }
-    ],
-    "outputs": [
-      {
-        "id": "approved",
-        "label": { "zh-CN": "通过", "en": "Approved" },
-        "dataType": "workflow/approval-decision"
-      },
-      {
-        "id": "rejected",
-        "label": { "zh-CN": "驳回", "en": "Rejected" },
-        "dataType": "workflow/approval-decision"
-      }
-    ]
-  }
-]
-```
-
-或：
+client 的 `nodeLibraryEndpoint` 必须返回如下 envelope：
 
 ```json
 {
   "nodes": [
     {
       "type": "approval",
-      "label": { "zh-CN": "审批", "en": "Approval" },
-      "description": { "zh-CN": "一个人工审批步骤", "en": "A manual approval step" },
-      "category": { "zh-CN": "流程", "en": "workflow" },
+      "labelKey": "nodes.approval.label",
+      "descriptionKey": "nodes.approval.description",
+      "categoryKey": "categories.workflow",
       "inputs": [
         {
           "id": "request",
-          "label": { "zh-CN": "请求", "en": "Request" },
+          "labelKey": "ports.request",
           "dataType": "workflow/request"
         }
       ],
       "outputs": [
         {
           "id": "approved",
-          "label": { "zh-CN": "通过", "en": "Approved" },
+          "labelKey": "ports.approved",
           "dataType": "workflow/approval-decision"
         },
         {
           "id": "rejected",
-          "label": { "zh-CN": "驳回", "en": "Rejected" },
+          "labelKey": "ports.rejected",
           "dataType": "workflow/approval-decision"
+        }
+      ],
+      "fields": [
+        {
+          "key": "priority",
+          "labelKey": "fields.priority.label",
+          "placeholderKey": "fields.priority.placeholder",
+          "kind": "select",
+          "optionsEndpoint": "https://client.example.com/nodegraph/options/priorities"
+        },
+        {
+          "key": "dueDate",
+          "labelKey": "fields.dueDate.label",
+          "kind": "date"
+        },
+        {
+          "key": "budget",
+          "labelKey": "fields.budget.label",
+          "kind": "decimal",
+          "defaultValue": "99.90"
         }
       ]
     }
   ],
+  "i18n": {
+    "defaultLocale": "zh-CN",
+    "locales": {
+      "zh-CN": {
+        "categories.workflow": "流程",
+        "fields.budget.label": "预算",
+        "fields.dueDate.label": "截止日期",
+        "fields.priority.label": "优先级",
+        "fields.priority.placeholder": "请选择优先级",
+        "nodes.approval.description": "一个人工审批步骤",
+        "nodes.approval.label": "审批",
+        "ports.approved": "通过",
+        "ports.rejected": "驳回",
+        "ports.request": "请求"
+      },
+      "en": {
+        "categories.workflow": "Workflow",
+        "fields.budget.label": "Budget",
+        "fields.dueDate.label": "Due date",
+        "fields.priority.label": "Priority",
+        "fields.priority.placeholder": "Select a priority",
+        "nodes.approval.description": "A manual approval step",
+        "nodes.approval.label": "Approval",
+        "ports.approved": "Approved",
+        "ports.rejected": "Rejected",
+        "ports.request": "Request"
+      }
+    }
+  },
   "typeMappings": [
     {
       "canonicalId": "workflow/request",
@@ -161,7 +186,13 @@ client 的 `nodeLibraryEndpoint` 支持以下两种返回：
 
 说明：
 
-- `label` / `description` / `category` / 端口 `label` / 字段 `label` 与 `placeholder` 现统一使用多语言对象，必须同时提供 `zh-CN` 与 `en`。
+- 节点库必须返回 `nodes + i18n`，不再接受旧的数组根节点格式。
+- `labelKey` / `descriptionKey` / `categoryKey` / 端口 `labelKey` / 字段 `labelKey` 与 `placeholderKey` 统一引用 `i18n.locales` 中的扁平 key。
+- `fields.kind` 支持 `text`、`textarea`、`boolean`、`select`、`date`、`color`、`int`、`float`、`double`、`decimal`。
+- 旧的 `kind: "number"` 已移除，节点库需要迁移到 `int / float / double / decimal` 之一。
+- `select` 字段必须提供 `optionsEndpoint`，NodeGraph 会通过 `GET /api/editor/sessions/{sessionId}/field-options` 代理请求，并自动附带 `domain`、`nodeType`、`fieldKey`、`locale` 查询参数。
+- `select` 远端接口需要返回 `{ "options": [{ "value": "high", "label": "High" }] }`，其中 `label` 已经是当前语言下可直接显示的文本。
+- `date` 字段的值使用 `YYYY-MM-DD`；`color` 使用 `#RRGGBB`；`decimal` 在图谱中按字符串保存以避免精度漂移；`int / float / double` 按 JSON number 保存。
 - `inputs` / `outputs` 省略时，NodeGraph 会兼容回退为单输入和单输出。
 - `inputs: []` 或 `outputs: []` 表示该方向没有可连接端口。
 - `dataType` 为可选字段，但语义上只表示跨语言共享的 canonical id，例如 `workflow/request`、`workflow/review-task`、`workflow/approval-decision`。

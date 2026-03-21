@@ -199,4 +199,240 @@ describe("nodegraph schema", () => {
       }),
     ).toThrow();
   });
+
+  it("accepts typed field definitions for editors beyond plain text", () => {
+    expect(
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "approval",
+            labelKey: "nodes.approval.label",
+            descriptionKey: "nodes.approval.description",
+            categoryKey: "categories.workflow",
+            fields: [
+              {
+                key: "assignee",
+                labelKey: "fields.assignee.label",
+                kind: "text",
+                placeholderKey: "fields.assignee.placeholder",
+              },
+              {
+                key: "notes",
+                labelKey: "fields.notes.label",
+                kind: "textarea",
+              },
+              {
+                key: "active",
+                labelKey: "fields.active.label",
+                kind: "boolean",
+                defaultValue: true,
+              },
+              {
+                key: "priority",
+                labelKey: "fields.priority.label",
+                kind: "select",
+                optionsEndpoint: "https://client.example.com/options/priorities",
+                defaultValue: "high",
+              },
+              {
+                key: "dueDate",
+                labelKey: "fields.dueDate.label",
+                kind: "date",
+                defaultValue: "2026-03-21",
+              },
+              {
+                key: "theme",
+                labelKey: "fields.theme.label",
+                kind: "color",
+                defaultValue: "#ff9d1c",
+              },
+              {
+                key: "retries",
+                labelKey: "fields.retries.label",
+                kind: "int",
+                defaultValue: 3,
+              },
+              {
+                key: "score",
+                labelKey: "fields.score.label",
+                kind: "float",
+                defaultValue: 1.5,
+              },
+              {
+                key: "ratio",
+                labelKey: "fields.ratio.label",
+                kind: "double",
+                defaultValue: 0.125,
+              },
+              {
+                key: "budget",
+                labelKey: "fields.budget.label",
+                kind: "decimal",
+                defaultValue: "99.90",
+              },
+            ],
+          },
+        ],
+        i18n: {
+          defaultLocale: "en",
+          locales: {
+            en: {
+              ...nodeLibraryI18n.locales.en,
+              "fields.active.label": "Active",
+              "fields.assignee.label": "Assignee",
+              "fields.assignee.placeholder": "Enter assignee",
+              "fields.budget.label": "Budget",
+              "fields.dueDate.label": "Due date",
+              "fields.notes.label": "Notes",
+              "fields.priority.label": "Priority",
+              "fields.ratio.label": "Ratio",
+              "fields.retries.label": "Retries",
+              "fields.score.label": "Score",
+              "fields.theme.label": "Theme",
+            },
+            "zh-CN": {
+              ...nodeLibraryI18n.locales["zh-CN"],
+              "fields.active.label": "启用",
+              "fields.assignee.label": "负责人",
+              "fields.assignee.placeholder": "请输入负责人",
+              "fields.budget.label": "预算",
+              "fields.dueDate.label": "截止日期",
+              "fields.notes.label": "备注",
+              "fields.priority.label": "优先级",
+              "fields.ratio.label": "比例",
+              "fields.retries.label": "重试次数",
+              "fields.score.label": "评分",
+              "fields.theme.label": "主题色",
+            },
+          },
+        },
+      }),
+    ).toBeTruthy();
+  });
+
+  it("rejects legacy number field kinds after the numeric split", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "approval",
+            labelKey: "nodes.approval.label",
+            categoryKey: "categories.workflow",
+            fields: [
+              {
+                key: "retries",
+                labelKey: "fields.retries.label",
+                kind: "number",
+              },
+            ],
+          },
+        ],
+        i18n: {
+          defaultLocale: "en",
+          locales: {
+            en: {
+              "categories.workflow": "Workflow",
+              "fields.retries.label": "Retries",
+              "nodes.approval.label": "Approval",
+            },
+          },
+        },
+      }),
+    ).toThrow(/Invalid input/i);
+  });
+
+  it("rejects select fields without an options endpoint", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "approval",
+            labelKey: "nodes.approval.label",
+            categoryKey: "categories.workflow",
+            fields: [
+              {
+                key: "priority",
+                labelKey: "fields.priority.label",
+                kind: "select",
+              },
+            ],
+          },
+        ],
+        i18n: {
+          defaultLocale: "en",
+          locales: {
+            en: {
+              "categories.workflow": "Workflow",
+              "fields.priority.label": "Priority",
+              "nodes.approval.label": "Approval",
+            },
+          },
+        },
+      }),
+    ).toThrow(/optionsEndpoint/i);
+  });
+
+  it("rejects decimal defaults that are not stored as strings", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "approval",
+            labelKey: "nodes.approval.label",
+            categoryKey: "categories.workflow",
+            fields: [
+              {
+                key: "budget",
+                labelKey: "fields.budget.label",
+                kind: "decimal",
+                defaultValue: 12.5,
+              },
+            ],
+          },
+        ],
+        i18n: {
+          defaultLocale: "en",
+          locales: {
+            en: {
+              "categories.workflow": "Workflow",
+              "fields.budget.label": "Budget",
+              "nodes.approval.label": "Approval",
+            },
+          },
+        },
+      }),
+    ).toThrow(/expected string/i);
+  });
+
+  it("rejects color defaults that are not hex strings", () => {
+    expect(() =>
+      nodeLibraryEnvelopeSchema.parse({
+        nodes: [
+          {
+            type: "approval",
+            labelKey: "nodes.approval.label",
+            categoryKey: "categories.workflow",
+            fields: [
+              {
+                key: "theme",
+                labelKey: "fields.theme.label",
+                kind: "color",
+                defaultValue: "orange",
+              },
+            ],
+          },
+        ],
+        i18n: {
+          defaultLocale: "en",
+          locales: {
+            en: {
+              "categories.workflow": "Workflow",
+              "fields.theme.label": "Theme",
+              "nodes.approval.label": "Approval",
+            },
+          },
+        },
+      }),
+    ).toThrow(/RRGGBB/i);
+  });
 });

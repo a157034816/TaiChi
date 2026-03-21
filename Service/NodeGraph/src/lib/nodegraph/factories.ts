@@ -63,7 +63,9 @@ export function buildFieldDefaults(fields?: NodeLibraryField[]) {
 
 function getFallbackValue(kind: NodeLibraryField["kind"]) {
   switch (kind) {
-    case "number":
+    case "int":
+    case "float":
+    case "double":
       return 0;
     case "boolean":
       return false;

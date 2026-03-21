@@ -30,18 +30,70 @@ export interface I18nBundle {
  */
 export type LegacyLocalizedText = Record<string, string>;
 
-export type NodeFieldKind = "text" | "textarea" | "number" | "boolean";
+export type NodeFieldKind =
+  | "text"
+  | "textarea"
+  | "boolean"
+  | "select"
+  | "date"
+  | "color"
+  | "int"
+  | "float"
+  | "double"
+  | "decimal";
+
+/**
+ * 字段远端选项在编辑器中统一使用已本地化的 label。
+ */
+export interface NodeFieldOption {
+  value: string;
+  label: string;
+}
+
+interface NodeLibraryFieldBase {
+  key: string;
+  labelKey: string;
+  placeholderKey?: string;
+}
+
+type NodeLibraryStringFieldKind = "text" | "textarea" | "date" | "decimal";
+type NodeLibraryNumericFieldKind = "int" | "float" | "double";
+
+interface NodeLibraryStringField extends NodeLibraryFieldBase {
+  kind: NodeLibraryStringFieldKind;
+  defaultValue?: string;
+}
+
+interface NodeLibraryColorField extends NodeLibraryFieldBase {
+  kind: "color";
+  defaultValue?: string;
+}
+
+interface NodeLibraryBooleanField extends NodeLibraryFieldBase {
+  kind: "boolean";
+  defaultValue?: boolean;
+}
+
+interface NodeLibraryNumericField extends NodeLibraryFieldBase {
+  kind: NodeLibraryNumericFieldKind;
+  defaultValue?: number;
+}
+
+interface NodeLibrarySelectField extends NodeLibraryFieldBase {
+  kind: "select";
+  optionsEndpoint: string;
+  defaultValue?: string;
+}
 
 /**
  * Node field metadata now points at translation keys instead of inline values.
  */
-export interface NodeLibraryField {
-  key: string;
-  labelKey: string;
-  kind: NodeFieldKind;
-  placeholderKey?: string;
-  defaultValue?: string | number | boolean;
-}
+export type NodeLibraryField =
+  | NodeLibraryStringField
+  | NodeLibraryColorField
+  | NodeLibraryBooleanField
+  | NodeLibraryNumericField
+  | NodeLibrarySelectField;
 
 /**
  * Visual styling for a node card inside the editor.
@@ -178,6 +230,13 @@ export interface EditorSessionPayload {
   nodeLibrary: NodeLibraryItem[];
   i18n: I18nBundle;
   typeMappings?: TypeMappingEntry[];
+}
+
+/**
+ * Select 字段的代理接口返回当前语言下可直接渲染的选项列表。
+ */
+export interface NodeFieldOptionsResponse {
+  options: NodeFieldOption[];
 }
 
 export interface CompletionWebhookPayload {

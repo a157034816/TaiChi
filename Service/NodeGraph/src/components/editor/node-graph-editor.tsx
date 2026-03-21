@@ -428,6 +428,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                     },
                   }))
                 }
+                sessionId={payload.session.sessionId}
                 template={selectedTemplate}
               />
             </div>

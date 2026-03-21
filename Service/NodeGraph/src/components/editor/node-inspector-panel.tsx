@@ -3,6 +3,7 @@
 import { FilePenLine, Settings2 } from "lucide-react";
 
 import { useEditorI18n } from "@/components/editor/editor-i18n-context";
+import { NodeFieldEditor } from "@/components/editor/node-field-editor";
 import {
   buildEdgeInspectorDetails,
   getInspectorAccent,
@@ -11,7 +12,6 @@ import {
 import { editorEdgeStyles, type EditorEdgeStyle } from "@/lib/nodegraph/editor-preferences";
 import {
   resolveFieldLabel,
-  resolveFieldPlaceholder,
   resolveNodeDescription,
   resolveNodeLabel,
   resolveNodeLibraryCategory,
@@ -30,6 +30,7 @@ interface NodeInspectorPanelProps {
   edge: NodeGraphEdge | null;
   node: NodeGraphNode | null;
   nodes: NodeGraphNode[];
+  sessionId: string;
   template: NodeLibraryItem | null;
   locale: LocaleCode;
   edgeStyle: EditorEdgeStyle;
@@ -50,6 +51,7 @@ export function NodeInspectorPanel({
   edge,
   node,
   nodes,
+  sessionId,
   template,
   locale,
   edgeStyle,
@@ -311,11 +313,14 @@ export function NodeInspectorPanel({
                                 className="flex cursor-pointer items-center justify-between rounded-[1rem] border border-white/8 bg-black/25 px-4 py-3 text-sm text-[#edf3ff]"
                               >
                                 <span className="font-medium">{resolveFieldLabel(field, i18n)}</span>
-                                <input
-                                  checked={Boolean(currentValue)}
-                                  className="size-4 rounded border-white/20 bg-transparent accent-[#ff9d1c]"
-                                  onChange={(event) => onNodeValueChange(field.key, event.target.checked)}
-                                  type="checkbox"
+                                <NodeFieldEditor
+                                  field={field}
+                                  inputId={field.key}
+                                  locale={locale}
+                                  nodeType={node.data.nodeType}
+                                  onChange={(value) => onNodeValueChange(field.key, value)}
+                                  sessionId={sessionId}
+                                  value={currentValue as boolean | number | string | undefined}
                                 />
                               </label>
                             );
@@ -329,20 +334,14 @@ export function NodeInspectorPanel({
                               >
                                 {resolveFieldLabel(field, i18n)}
                               </Label>
-                              <Input
-                                className="h-12 border-white/10 bg-black/35 text-[#edf3ff] shadow-none placeholder:text-[#73839f]"
-                                id={field.key}
-                                placeholder={resolveFieldPlaceholder(field, i18n)}
-                                type={field.kind === "number" ? "number" : "text"}
-                                value={String(currentValue ?? "")}
-                                onChange={(event) =>
-                                  onNodeValueChange(
-                                    field.key,
-                                    field.kind === "number"
-                                      ? Number(event.target.value || 0)
-                                      : event.target.value,
-                                  )
-                                }
+                              <NodeFieldEditor
+                                field={field}
+                                inputId={field.key}
+                                locale={locale}
+                                nodeType={node.data.nodeType}
+                                onChange={(value) => onNodeValueChange(field.key, value)}
+                                sessionId={sessionId}
+                                value={currentValue as boolean | number | string | undefined}
                               />
                             </div>
                           );
