@@ -3,8 +3,18 @@ using System.Text;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// 宿主进程异常退出的集成测试：验证 CentralService 宿主被强制终止后，托管站点及其子进程不会遗留在系统中。
+/// </summary>
+/// <remarks>
+/// 该测试需要 Windows + PowerShell，并会启动独立 dotnet 进程与托管脚本进程。
+/// 非 Windows 环境直接跳过。
+/// </remarks>
 public sealed class ManagedWebAppHostDeathIntegrationTests
 {
+    /// <summary>
+    /// 验证当 CentralService 宿主进程被 Kill 时，托管站点进程及其子进程也应被正确终止。
+    /// </summary>
     [Fact]
     public async Task ManagedWebAppSupervisor_ShouldTerminateManagedSite_WhenHostProcessDiesUnexpectedly()
     {
@@ -86,11 +96,25 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
             }
             catch
             {
-                // ignore
+                // 忽略清理过程中的异常（例如文件被占用）。
             }
         }
     }
 
+    /// <summary>
+    /// 启动一个独立的 CentralService 宿主进程，并通过命令行配置托管站点脚本与测试用数据库。
+    /// </summary>
+    /// <param name="servicePort">宿主监听端口。</param>
+    /// <param name="managedPort">托管站点监听端口。</param>
+    /// <param name="dbPath">测试用 Sqlite 数据库路径。</param>
+    /// <param name="workingDirectory">托管站点工作目录。</param>
+    /// <param name="prepareScriptPath">Prepare 脚本路径。</param>
+    /// <param name="siteScriptPath">托管站点脚本路径。</param>
+    /// <param name="managedSitePidPath">站点 PID 文件路径。</param>
+    /// <param name="managedChildPidPath">站点子进程 PID 文件路径。</param>
+    /// <param name="stdout">收集标准输出。</param>
+    /// <param name="stderr">收集标准错误。</param>
+    /// <returns>宿主进程实例。</returns>
     private static Process StartCentralServiceHost(
         int servicePort,
         int managedPort,
@@ -179,12 +203,24 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         return process;
     }
 
+    /// <summary>
+    /// 向 <see cref="ProcessStartInfo.ArgumentList"/> 追加一个 <c>--key value</c> 形式的命令行配置项。
+    /// </summary>
+    /// <param name="startInfo">进程启动信息。</param>
+    /// <param name="key">配置键。</param>
+    /// <param name="value">配置值。</param>
     private static void AddCommandLineSetting(ProcessStartInfo startInfo, string key, string value)
     {
         startInfo.ArgumentList.Add($"--{key}");
         startInfo.ArgumentList.Add(value);
     }
 
+    /// <summary>
+    /// 在限定时间内等待指定 URL 返回 2xx（用于等待宿主/托管站点就绪）。
+    /// </summary>
+    /// <param name="httpClient">HTTP 客户端。</param>
+    /// <param name="url">待探测 URL。</param>
+    /// <param name="timeout">超时时间。</param>
     private static async Task WaitUntilHttpOkAsync(HttpClient httpClient, string url, TimeSpan timeout)
     {
         await WaitUntilAsync(async () =>
@@ -194,6 +230,12 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         }, timeout, $"等待 HTTP 就绪超时: {url}");
     }
 
+    /// <summary>
+    /// 在限定时间内等待 PID 文件写入有效的进程号。
+    /// </summary>
+    /// <param name="path">PID 文件路径。</param>
+    /// <param name="timeout">超时时间。</param>
+    /// <returns>读取到的 PID。</returns>
     private static async Task<int> WaitUntilPidFileAsync(string path, TimeSpan timeout)
     {
         var pid = 0;
@@ -210,6 +252,11 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         return pid;
     }
 
+    /// <summary>
+    /// 判断指定 PID 的进程是否仍存活。
+    /// </summary>
+    /// <param name="pid">进程号。</param>
+    /// <returns>存活返回 true；不存在或已退出返回 false。</returns>
     private static bool IsProcessAlive(int pid)
     {
         try
@@ -223,6 +270,12 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         }
     }
 
+    /// <summary>
+    /// 在限定时间内轮询条件，满足则返回，否则抛出带失败消息的异常。
+    /// </summary>
+    /// <param name="condition">同步条件。</param>
+    /// <param name="timeout">超时时间。</param>
+    /// <param name="failureMessage">超时后的失败消息。</param>
     private static async Task WaitUntilAsync(
         Func<bool> condition,
         TimeSpan timeout,
@@ -231,6 +284,12 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         await WaitUntilAsync(() => Task.FromResult(condition()), timeout, failureMessage);
     }
 
+    /// <summary>
+    /// 在限定时间内轮询条件，满足则返回，否则抛出带失败消息的异常。
+    /// </summary>
+    /// <param name="condition">异步条件。</param>
+    /// <param name="timeout">超时时间。</param>
+    /// <param name="failureMessage">超时后的失败消息。</param>
     private static async Task WaitUntilAsync(
         Func<Task<bool>> condition,
         TimeSpan timeout,
@@ -264,6 +323,11 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         throw new Xunit.Sdk.XunitException(failureMessage);
     }
 
+    /// <summary>
+    /// 尝试终止指定进程。
+    /// </summary>
+    /// <param name="process">进程实例。</param>
+    /// <param name="entireProcessTree">是否同时终止进程树。</param>
     private static void TryKillProcess(Process? process, bool entireProcessTree)
     {
         if (process == null)
@@ -281,7 +345,7 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         }
         catch
         {
-            // ignore
+            // 忽略清理过程中的异常。
         }
         finally
         {
@@ -289,6 +353,10 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         }
     }
 
+    /// <summary>
+    /// 按 PID 尝试终止进程树（用于兜底清理）。
+    /// </summary>
+    /// <param name="pid">进程号。</param>
     private static void TryKillProcess(int pid)
     {
         try
@@ -302,10 +370,14 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         }
         catch
         {
-            // ignore
+            // 忽略清理过程中的异常。
         }
     }
 
+    /// <summary>
+    /// 构造 Prepare 脚本：生成 <c>.next/BUILD_ID</c> 以满足 required paths 的就绪判定。
+    /// </summary>
+    /// <returns>PowerShell 脚本文本。</returns>
     private static string BuildPrepareSiteScript()
     {
         return """
@@ -315,6 +387,10 @@ Set-Content -Path (Join-Path $buildDirectory 'BUILD_ID') -Value 'test-build' -En
 """;
     }
 
+    /// <summary>
+    /// 构造托管站点脚本：启动 HttpListener 并额外拉起一个子进程，便于验证“宿主退出后子进程也被回收”。
+    /// </summary>
+    /// <returns>PowerShell 脚本文本。</returns>
     private static string BuildManagedSiteScriptWithChild()
     {
         return """

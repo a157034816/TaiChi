@@ -6,8 +6,14 @@ using Xunit;
 
 namespace TaiChi.License.Tests.Services;
 
+/// <summary>
+/// <see cref="LicenseGenerator"/> 的单元测试：验证生成许可证后可被 <see cref="LicenseValidator"/> 成功校验。
+/// </summary>
 public class LicenseGeneratorTests
 {
+    /// <summary>
+    /// 验证生成与校验闭环：Create 生成的 LicenseKey 在满足约束时应校验通过且无错误。
+    /// </summary>
     [Fact]
     public void Create_Then_Validate_ShouldBeValid()
     {

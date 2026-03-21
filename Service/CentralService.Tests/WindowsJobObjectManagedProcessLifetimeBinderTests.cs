@@ -2,8 +2,17 @@ using System.Diagnostics;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// Windows JobObject 生命周期绑定器测试：验证在释放绑定器时会终止已附加的外部进程。
+/// </summary>
+/// <remarks>
+/// 该能力仅在 Windows 上可用，因此非 Windows 环境直接跳过。
+/// </remarks>
 public sealed class WindowsJobObjectManagedProcessLifetimeBinderTests
 {
+    /// <summary>
+    /// 验证释放绑定器后，被附加的进程会在合理时间内退出。
+    /// </summary>
     [Fact]
     public async Task Dispose_ShouldTerminateAttachedProcess()
     {
@@ -24,6 +33,10 @@ public sealed class WindowsJobObjectManagedProcessLifetimeBinderTests
         Assert.True(process.HasExited);
     }
 
+    /// <summary>
+    /// 启动一个长时间运行的休眠进程（用于验证 JobObject 的进程回收能力）。
+    /// </summary>
+    /// <returns>已启动的进程。</returns>
     private static Process StartSleepProcess()
     {
         var startInfo = new ProcessStartInfo
@@ -50,6 +63,11 @@ public sealed class WindowsJobObjectManagedProcessLifetimeBinderTests
         return process;
     }
 
+    /// <summary>
+    /// 等待进程在超时窗口内退出。
+    /// </summary>
+    /// <param name="process">待等待的进程。</param>
+    /// <param name="timeout">超时时间。</param>
     private static async Task WaitForProcessExitAsync(Process process, TimeSpan timeout)
     {
         using var timeoutCts = new CancellationTokenSource(timeout);

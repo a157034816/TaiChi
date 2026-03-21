@@ -10,8 +10,18 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// CentralService 进程内集成测试：通过 <see cref="CentralServiceWebApplicationFactory"/> 启动 ASP.NET Core 管道，
+/// 验证关键 API（注册/心跳/注销、鉴权与 RBAC、配置发布回滚、审计、服务访问熔断等）的整体行为。
+/// </summary>
+/// <remarks>
+/// 这些测试使用真实的 <see cref="HttpClient"/> 与序列化流程，但不依赖外部端口监听，适合在 CI 中稳定运行。
+/// </remarks>
 public sealed class CentralServiceIntegrationTests
 {
+    /// <summary>
+    /// 创建集成测试 <see cref="HttpClient"/> 的默认选项：禁用自动重定向并启用 Cookie（覆盖登录态场景）。
+    /// </summary>
     private static WebApplicationFactoryClientOptions ClientOptions()
     {
         return new WebApplicationFactoryClientOptions
@@ -21,6 +31,12 @@ public sealed class CentralServiceIntegrationTests
         };
     }
 
+    /// <summary>
+    /// 使用用户名密码调用登录接口，并断言登录成功（返回 Success=true）。
+    /// </summary>
+    /// <param name="client">测试用 HttpClient。</param>
+    /// <param name="username">用户名。</param>
+    /// <param name="password">密码。</param>
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var resp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
@@ -31,6 +47,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.True(body!.Success);
     }
 
+    /// <summary>
+    /// 验证 Service 合同：注册成功后可查询到实例；心跳可更新；注销后心跳应返回 404。
+    /// </summary>
     [Fact]
     public async Task ServiceContract_RegisterHeartbeatDeregister_Works()
     {
@@ -88,6 +107,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Equal(HttpStatusCode.NotFound, heartbeatAfterDeregisterResp.StatusCode);
     }
 
+    /// <summary>
+    /// 验证鉴权与 RBAC：未登录访问受保护接口应返回 401；具备只读权限的账号应被禁止写操作（403）。
+    /// </summary>
     [Fact]
     public async Task Auth_And_Rbac_Permissions_Are_Enforced()
     {
@@ -142,6 +164,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Equal(HttpStatusCode.Forbidden, monitoringResp.StatusCode);
     }
 
+    /// <summary>
+    /// 验证初始化引导状态：当配置关闭 Bootstrap 时，状态接口应返回 Disabled 并给出可定位的提示信息。
+    /// </summary>
     [Fact]
     public async Task Bootstrap_Status_Should_Report_Disabled_When_Config_Turns_It_Off()
     {
@@ -162,6 +187,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Contains("CentralServiceAuth:Bootstrap:Enabled", response.Data.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// 验证配置流程：创建草稿、发布为当前版本，再创建新草稿并发布后，支持回滚到历史版本。
+    /// </summary>
     [Fact]
     public async Task Config_Publish_And_Rollback_Works()
     {
@@ -238,6 +266,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Equal(draft1Id, currentAfterRollbackResp.Data.CurrentVersionId);
     }
 
+    /// <summary>
+    /// 验证审计接口：能够返回分页数据结构，并包含必要字段（页码、页大小、Items）。
+    /// </summary>
     [Fact]
     public async Task Audit_List_Works()
     {
@@ -263,6 +294,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.NotNull(body.Data.Items);
     }
 
+    /// <summary>
+    /// 验证服务注册后熔断配置落盘：JSON 按服务名分组写入实例列表，同时生成包含 defaults 的 TOML。
+    /// </summary>
     [Fact]
     public async Task ServiceRegister_ShouldPersistCircuitConfig_AsJsonGroupedByServiceName()
     {
@@ -318,6 +352,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Contains("staleDays = 30", tomlText, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// 验证服务访问熔断以“客户端维度”独立追踪，并支持管理员清除打开的客户端列表以恢复访问。
+    /// </summary>
     [Fact]
     public async Task ServiceAccess_ShouldTrackCircuitPerClient_AndAdminCanClear()
     {
@@ -432,6 +469,9 @@ public sealed class CentralServiceIntegrationTests
         Assert.Empty(clearedInstance.OpenClients);
     }
 
+    /// <summary>
+    /// 验证管理员可更新单个实例的熔断参数，并能在详情接口中查询到更新后的配置。
+    /// </summary>
     [Fact]
     public async Task ServiceAccess_AdminCanUpdateCircuitConfig()
     {

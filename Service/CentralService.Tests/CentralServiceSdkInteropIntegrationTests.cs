@@ -12,8 +12,18 @@ using ServiceSdk = CentralService.Service;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// CentralService 与 SDK 的互操作集成测试：
+/// 在进程内宿主上同时验证 Service SDK（注册/心跳/注销）与 Client SDK（Access/熔断/上报）行为一致性。
+/// </summary>
+/// <remarks>
+/// 测试通过 <see cref="CentralServiceWebApplicationFactory"/> 提供的 Server Handler 在进程内发起请求，避免端口依赖。
+/// </remarks>
 public sealed class CentralServiceSdkInteropIntegrationTests
 {
+    /// <summary>
+    /// 创建集成测试 <see cref="HttpClient"/> 的默认选项：禁用自动重定向并启用 Cookie（覆盖登录态场景）。
+    /// </summary>
     private static WebApplicationFactoryClientOptions ClientOptions()
     {
         return new WebApplicationFactoryClientOptions
@@ -23,12 +33,23 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         };
     }
 
+    /// <summary>
+    /// 调用登录接口，建立管理员 Cookie 会话（用于后续访问管理端 API）。
+    /// </summary>
+    /// <param name="client">测试用 HttpClient。</param>
+    /// <param name="username">用户名。</param>
+    /// <param name="password">密码。</param>
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var resp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
         resp.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// 创建 Client SDK，并注入测试宿主的 <see cref="HttpMessageHandler"/> 与客户端身份信息。
+    /// </summary>
+    /// <param name="factory">测试宿主工厂。</param>
+    /// <param name="clientName">客户端名称（用于“按客户端熔断”维度）。</param>
     private static CentralServiceDiscoveryClient CreateSdk(CentralServiceWebApplicationFactory factory, string clientName)
     {
         var options = new CentralServiceSdkOptions("http://localhost")
@@ -47,6 +68,10 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         return new CentralServiceDiscoveryClient(options);
     }
 
+    /// <summary>
+    /// 创建 Service SDK，并注入测试宿主的 <see cref="HttpMessageHandler"/>。
+    /// </summary>
+    /// <param name="factory">测试宿主工厂。</param>
     private static ServiceSdk.CentralServiceServiceClient CreateServiceSdk(CentralServiceWebApplicationFactory factory)
     {
         var options = new ServiceSdk.CentralServiceSdkOptions("http://localhost")
@@ -58,6 +83,12 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         return new ServiceSdk.CentralServiceServiceClient(options);
     }
 
+    /// <summary>
+    /// 调用服务列表接口并返回指定服务名的实例列表。
+    /// </summary>
+    /// <param name="client">测试用 HttpClient。</param>
+    /// <param name="serviceName">服务名称。</param>
+    /// <returns>实例数组；若为空表示当前未注册实例。</returns>
     private static async Task<CentralService.Service.Models.ServiceInfo[]> ListServiceInstancesAsync(
         HttpClient client,
         string serviceName)
@@ -70,6 +101,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         return resp.Data?.Services ?? Array.Empty<CentralService.Service.Models.ServiceInfo>();
     }
 
+    /// <summary>
+    /// 验证 Client SDK Access：回调返回成功时应返回业务值，并完成访问上报流程（隐式）。
+    /// </summary>
     [Fact]
     public async Task SdkAccess_Succeeds_AndReports()
     {
@@ -97,6 +131,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.Equal("ok", value);
     }
 
+    /// <summary>
+    /// 验证 Service SDK：心跳应更新 LastHeartbeatTime，注销后列表中应移除对应实例。
+    /// </summary>
     [Fact]
     public async Task ServiceSdk_Heartbeat_UpdatesLastHeartbeatTime_AndDeregisterRemovesInstance()
     {
@@ -143,6 +180,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.Empty(emptyList);
     }
 
+    /// <summary>
+    /// 验证 Client SDK Access：当某实例连续失败触发熔断后，应自动切换到下一实例并成功返回。
+    /// </summary>
     [Fact]
     public async Task SdkAccess_OpensCircuit_ThenTriesNextInstance()
     {
@@ -210,6 +250,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.Equal("ok-b", value);
     }
 
+    /// <summary>
+    /// 验证熔断按客户端维度隔离：一个客户端熔断打开不应影响另一个客户端的访问尝试。
+    /// </summary>
     [Fact]
     public async Task SdkAccess_CircuitIsPerClient_OneClientOpenDoesNotBlockAnother()
     {
@@ -258,6 +301,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.Equal("ok", value);
     }
 
+    /// <summary>
+    /// 验证当所有候选实例的熔断均处于打开状态时，Access 应抛出 <see cref="CentralServiceAccessException"/>。
+    /// </summary>
     [Fact]
     public async Task SdkAccess_WhenAllCircuitsOpen_ThrowsCentralServiceAccessException()
     {
@@ -304,6 +350,9 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.False(string.IsNullOrWhiteSpace(ex.Message));
     }
 
+    /// <summary>
+    /// 验证管理员清除熔断状态后，所有客户端应可重新尝试访问并成功返回。
+    /// </summary>
     [Fact]
     public async Task AdminClear_RemovesOpenClients_AndAllowsRetryForAllClients()
     {

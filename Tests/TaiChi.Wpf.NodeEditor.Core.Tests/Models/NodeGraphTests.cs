@@ -3,8 +3,14 @@ using TaiChi.Wpf.NodeEditor.Core.Models;
 
 namespace TaiChi.Wpf.NodeEditor.Core.Tests.Models;
 
+/// <summary>
+/// <see cref="NodeGraph"/> 的单元测试：验证分类/执行引擎键、节点增删与连接、分组迁移、反序列化重建与合法性校验。
+/// </summary>
 public class NodeGraphTests
 {
+    /// <summary>
+    /// 流程节点：包含流程输入/输出 pin，用于构造 ControlFlow 图。
+    /// </summary>
     private sealed class FlowNode : Node
     {
         public Pin FlowIn { get; }
@@ -19,6 +25,9 @@ public class NodeGraphTests
         }
     }
 
+    /// <summary>
+    /// 数据节点：包含 int 输入/输出 pin，用于构造 DataFlow 图。
+    /// </summary>
     private sealed class DataNode : Node
     {
         public Pin Din { get; }
@@ -31,6 +40,9 @@ public class NodeGraphTests
         }
     }
 
+    /// <summary>
+    /// 验证分类与执行引擎键：Category 切换后，ExecutionEngineKey 应同步更新。
+    /// </summary>
     [Fact]
     public void Category_And_ExecutionKey_Work()
     {
@@ -42,6 +54,9 @@ public class NodeGraphTests
         Assert.Equal("DataFlow", g.GetExecutionEngineKey());
     }
 
+    /// <summary>
+    /// 验证节点增删与连接：添加节点后可连接，移除节点后应从集合中移除。
+    /// </summary>
     [Fact]
     public void Add_Remove_Node_And_Connect_Work()
     {
@@ -61,6 +76,9 @@ public class NodeGraphTests
         Assert.DoesNotContain(a, g.Nodes);
     }
 
+    /// <summary>
+    /// 验证移动节点到分组：应同时设置节点的 Group 引用与 GroupId，并把节点加入分组集合。
+    /// </summary>
     [Fact]
     public void MoveNodeToGroup_Sets_Both_Sides()
     {
@@ -77,6 +95,9 @@ public class NodeGraphTests
         Assert.Contains(a, grp.Nodes);
     }
 
+    /// <summary>
+    /// 验证反序列化重建：仅保留 Id 的连接与分组关系在 OnDeserialized 后应恢复为可用的运行时引用。
+    /// </summary>
     [Fact]
     public void OnDeserialized_Rebuilds_Pins_Groups_And_Connections()
     {
@@ -110,6 +131,9 @@ public class NodeGraphTests
         Assert.Same(gr, n2.Group);
     }
 
+    /// <summary>
+    /// 验证合法性校验：流程 pin 与数据 pin 之间的错误连接应导致 Validate 返回 false。
+    /// </summary>
     [Fact]
     public void Validate_Returns_False_For_Flow_To_Data_Mismatch()
     {
@@ -127,8 +151,14 @@ public class NodeGraphTests
     }
 }
 
+/// <summary>
+/// <see cref="NodeGraphCategory"/> 枚举定义测试：确保包含 ControlFlow/DataFlow 两个核心分类。
+/// </summary>
 public class NodeGraphCategoryTests
 {
+    /// <summary>
+    /// 验证枚举包含两种分类值。
+    /// </summary>
     [Fact]
     public void Enum_Defines_ControlFlow_And_DataFlow()
     {

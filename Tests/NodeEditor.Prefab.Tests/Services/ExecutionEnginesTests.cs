@@ -4,8 +4,14 @@ using TaiChi.Wpf.NodeEditor.Core.Models;
 
 namespace NodeEditor.Prefab.Tests.Services;
 
+/// <summary>
+/// 执行引擎单元测试：验证 ControlFlowEngine/DataFlowEngine 的基本执行语义。
+/// </summary>
 public class ExecutionEnginesTests
 {
+    /// <summary>
+    /// 流程节点：包含流程输入/输出 pin，执行时仅计数。
+    /// </summary>
     private sealed class FlowNode : Node
     {
         public int Called { get; private set; }
@@ -26,6 +32,9 @@ public class ExecutionEnginesTests
         }
     }
 
+    /// <summary>
+    /// 数据源节点：输出固定的 int 值。
+    /// </summary>
     private sealed class SourceNode : Node
     {
         public Pin Dout { get; }
@@ -40,6 +49,9 @@ public class ExecutionEnginesTests
         }
     }
 
+    /// <summary>
+    /// 数据处理节点：把输入值 +1 后输出。
+    /// </summary>
     private sealed class PlusOneNode : Node
     {
         public Pin Din { get; }
@@ -58,6 +70,9 @@ public class ExecutionEnginesTests
         }
     }
 
+    /// <summary>
+    /// 验证 ControlFlowEngine：按流程连接顺序执行节点，确保下游节点也会被触发。
+    /// </summary>
     [Fact]
     public async Task ControlFlowEngine_Executes_Sequentially()
     {
@@ -74,6 +89,9 @@ public class ExecutionEnginesTests
         Assert.True(b.Called >= 1);
     }
 
+    /// <summary>
+    /// 验证 DataFlowEngine：能按数据依赖计算，并在终端节点输出中包含预期的计算结果。
+    /// </summary>
     [Fact]
     public async Task DataFlowEngine_Computes_Data_Dependencies()
     {

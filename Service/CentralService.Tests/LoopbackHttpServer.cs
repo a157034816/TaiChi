@@ -15,6 +15,12 @@ internal sealed class LoopbackHttpServer : IDisposable
     private readonly Task _acceptLoopTask;
     private int _requestCount;
 
+    /// <summary>
+    /// 创建回环服务器并立即开始监听。
+    /// </summary>
+    /// <param name="handler">
+    /// 请求处理器：入参为解析后的请求对象与递增的请求序号，返回要发送的响应。
+    /// </param>
     public LoopbackHttpServer(Func<LoopbackHttpRequest, int, LoopbackHttpResponse> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -25,12 +31,25 @@ internal sealed class LoopbackHttpServer : IDisposable
         _acceptLoopTask = Task.Run(AcceptLoopAsync);
     }
 
+    /// <summary>
+    /// 实际监听端口（系统分配）。
+    /// </summary>
     public int Port { get; }
 
+    /// <summary>
+    /// 服务器 BaseUrl（固定使用 127.0.0.1）。
+    /// </summary>
     public string BaseUrl => $"http://127.0.0.1:{Port}";
 
+    /// <summary>
+    /// 已处理的请求数量（用于断言重试/故障转移次数）。
+    /// </summary>
     public int RequestCount => Volatile.Read(ref _requestCount);
 
+    /// <summary>
+    /// 获取一个当前未被占用的本地端口。
+    /// </summary>
+    /// <returns>可用端口号。</returns>
     public static int GetUnusedPort()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -38,6 +57,9 @@ internal sealed class LoopbackHttpServer : IDisposable
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
+    /// <summary>
+    /// 停止监听并释放资源。
+    /// </summary>
     public void Dispose()
     {
         _cts.Cancel();
@@ -187,8 +209,17 @@ internal sealed class LoopbackHttpServer : IDisposable
     }
 }
 
+/// <summary>
+/// 回环服务器解析得到的请求模型（仅包含测试所需的最小字段）。
+/// </summary>
 internal sealed class LoopbackHttpRequest
 {
+    /// <summary>
+    /// 创建请求模型。
+    /// </summary>
+    /// <param name="method">HTTP 方法。</param>
+    /// <param name="pathAndQuery">路径与查询字符串。</param>
+    /// <param name="body">请求体（UTF-8 文本）。</param>
     public LoopbackHttpRequest(string method, string pathAndQuery, string body)
     {
         Method = method ?? string.Empty;
@@ -196,13 +227,25 @@ internal sealed class LoopbackHttpRequest
         Body = body ?? string.Empty;
     }
 
+    /// <summary>
+    /// HTTP 方法。
+    /// </summary>
     public string Method { get; }
 
+    /// <summary>
+    /// 路径与查询字符串（例如 <c>/api/Service/list?name=foo</c>）。
+    /// </summary>
     public string PathAndQuery { get; }
 
+    /// <summary>
+    /// 请求体（UTF-8 文本）。
+    /// </summary>
     public string Body { get; }
 }
 
+/// <summary>
+/// 回环服务器响应模型（仅包含测试所需的最小字段）。
+/// </summary>
 internal sealed class LoopbackHttpResponse
 {
     private LoopbackHttpResponse(HttpStatusCode statusCode, string contentType, string body, bool closeConnectionWithoutResponse)
@@ -214,31 +257,67 @@ internal sealed class LoopbackHttpResponse
         DelayBeforeCloseMilliseconds = 0;
     }
 
+    /// <summary>
+    /// HTTP 状态码。
+    /// </summary>
     public HttpStatusCode StatusCode { get; }
 
+    /// <summary>
+    /// Content-Type 响应头值。
+    /// </summary>
     public string ContentType { get; }
 
+    /// <summary>
+    /// 响应体（UTF-8 文本）。
+    /// </summary>
     public string Body { get; }
 
+    /// <summary>
+    /// 是否直接关闭连接而不返回任何响应（用于模拟传输层异常）。
+    /// </summary>
     public bool CloseConnectionWithoutResponse { get; }
 
+    /// <summary>
+    /// 关闭连接前的延迟（毫秒）。用于模拟“长时间无响应后断开”。
+    /// </summary>
     public int DelayBeforeCloseMilliseconds { get; private set; }
 
+    /// <summary>
+    /// 构造 JSON 响应。
+    /// </summary>
+    /// <param name="statusCode">状态码。</param>
+    /// <param name="body">响应体。</param>
+    /// <returns>响应模型。</returns>
     public static LoopbackHttpResponse Json(HttpStatusCode statusCode, string body)
     {
         return new LoopbackHttpResponse(statusCode, "application/json; charset=utf-8", body, false);
     }
 
+    /// <summary>
+    /// 构造纯文本响应。
+    /// </summary>
+    /// <param name="statusCode">状态码。</param>
+    /// <param name="body">响应体。</param>
+    /// <returns>响应模型。</returns>
     public static LoopbackHttpResponse PlainText(HttpStatusCode statusCode, string body)
     {
         return new LoopbackHttpResponse(statusCode, "text/plain; charset=utf-8", body, false);
     }
 
+    /// <summary>
+    /// 直接关闭连接（不返回响应），用于模拟连接被对端断开。
+    /// </summary>
+    /// <returns>响应模型。</returns>
     public static LoopbackHttpResponse CloseConnection()
     {
         return new LoopbackHttpResponse(HttpStatusCode.ServiceUnavailable, "text/plain", string.Empty, true);
     }
 
+    /// <summary>
+    /// 延迟一段时间后关闭连接（不返回响应），用于模拟请求超时/卡死后断开。
+    /// </summary>
+    /// <param name="delayBeforeCloseMilliseconds">延迟毫秒数（至少 1ms）。</param>
+    /// <returns>响应模型。</returns>
     public static LoopbackHttpResponse HangConnection(int delayBeforeCloseMilliseconds)
     {
         return new LoopbackHttpResponse(HttpStatusCode.ServiceUnavailable, "text/plain", string.Empty, true)
@@ -247,6 +326,10 @@ internal sealed class LoopbackHttpResponse
         };
     }
 
+    /// <summary>
+    /// 把响应模型编码为 HTTP/1.1 字节流（UTF-8 body，ASCII header）。
+    /// </summary>
+    /// <returns>可直接写入 Socket 的字节数组。</returns>
     public byte[] ToPayload()
     {
         var bodyBytes = Encoding.UTF8.GetBytes(Body);

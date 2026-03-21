@@ -9,8 +9,20 @@ using Xunit;
 
 namespace TaiChi.License.Tests.Integration;
 
+/// <summary>
+/// 许可证模块的端到端集成测试。
+/// </summary>
+/// <remarks>
+/// 该测试覆盖“生成密钥对 -> 生成许可证 -> 落盘 -> 读取 -> 校验”的完整链路，并验证常见故障（文件被篡改）下的失败表现。
+/// </remarks>
 public class LicenseIntegrationTests
 {
+    /// <summary>
+    /// 端到端验证：生成并保存许可证后，能够成功加载并校验通过，同时校验耗时满足基本性能阈值。
+    /// </summary>
+    /// <remarks>
+    /// 使用临时目录作为存储介质，避免污染本地固定路径；测试结束会尝试清理目录。
+    /// </remarks>
     [Fact]
     public void EndToEnd_Generate_Store_Load_Validate_Success_And_Performance()
     {
@@ -58,10 +70,13 @@ public class LicenseIntegrationTests
         }
         finally
         {
-            try { Directory.Delete(baseDir, true); } catch { /* ignore */ }
+            try { Directory.Delete(baseDir, true); } catch { /* 忽略清理过程中的异常 */ }
         }
     }
 
+    /// <summary>
+    /// 端到端验证：当许可证存储文件被篡改导致无法解析时，加载与校验应失败，并给出“格式无效”等错误信息。
+    /// </summary>
     [Fact]
     public void EndToEnd_Tamper_File_Should_Fail_To_Load()
     {
@@ -95,7 +110,7 @@ public class LicenseIntegrationTests
         }
         finally
         {
-            try { Directory.Delete(baseDir, true); } catch { /* ignore */ }
+            try { Directory.Delete(baseDir, true); } catch { /* 忽略清理过程中的异常 */ }
         }
     }
 }

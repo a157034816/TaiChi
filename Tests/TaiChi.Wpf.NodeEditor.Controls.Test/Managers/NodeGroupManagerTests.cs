@@ -5,15 +5,30 @@ using TaiChi.Wpf.NodeEditor.Controls.Managers;
 
 namespace TaiChi.Wpf.NodeEditor.Controls.Tests;
 
+/// <summary>
+/// <see cref="NodeGroupManager"/> 的单元测试：验证分组边界计算、节点加入、移动级联与边界约束/扩展逻辑。
+/// </summary>
 public class NodeGroupManagerTests
 {
+    /// <summary>
+    /// 测试用节点类型（无需额外行为）。
+    /// </summary>
     private sealed class TestNode : Node { }
 
+    /// <summary>
+    /// 构造一个带坐标与名称的测试节点。
+    /// </summary>
+    /// <param name="x">X 坐标。</param>
+    /// <param name="y">Y 坐标。</param>
+    /// <returns>节点实例。</returns>
     private static Node MakeNode(double x, double y)
     {
         return new TestNode { Position = new NodeEditorPoint(x, y), Name = $"N({x},{y})" };
     }
 
+    /// <summary>
+    /// 验证从节点集合创建分组时的边界计算：应包含节点尺寸并叠加 padding。
+    /// </summary>
     [Fact]
     public void CreateGroupFromNodes_ComputesBounds_WithPadding()
     {
@@ -43,6 +58,9 @@ public class NodeGroupManagerTests
         Assert.Contains(n2, g.Nodes);
     }
 
+    /// <summary>
+    /// 验证把节点加入分组：应设置节点的 Group 引用，并在需要时扩展分组边界。
+    /// </summary>
     [Fact]
     public void AddNodeToGroup_SetsGroup_And_OptionallyExpandsBounds()
     {
@@ -57,6 +75,9 @@ public class NodeGroupManagerTests
         Assert.True(g.Bounds.Width >= 228 || g.Bounds.X <= 0); // 宽度被扩展（宽+padding）
     }
 
+    /// <summary>
+    /// 验证移动分组时的级联：可选择级联移动节点与子分组。
+    /// </summary>
     [Fact]
     public void MoveGroup_Cascade_Nodes_And_Children()
     {
@@ -81,6 +102,9 @@ public class NodeGroupManagerTests
         Assert.Equal(42, n2.Position.Y);
     }
 
+    /// <summary>
+    /// 验证节点约束/扩展：不扩展时应钳制在分组内；允许扩展时分组边界应随节点移动增长。
+    /// </summary>
     [Fact]
     public void ConstrainOrExpandNodePosition_Clamp_Or_Expand()
     {

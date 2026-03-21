@@ -4,10 +4,19 @@ using TaiChi.Wpf.NodeEditor.Core.Models;
 
 namespace TaiChi.Wpf.NodeEditor.Core.Tests.Models;
 
+/// <summary>
+/// <see cref="NodeGroup"/> 的单元测试：验证属性变更通知、节点/子分组增删与递归查询能力。
+/// </summary>
 public class NodeGroupTests
 {
+    /// <summary>
+    /// 测试用节点类型。
+    /// </summary>
     private sealed class TestNode : Node { }
 
+    /// <summary>
+    /// 验证 Name 属性变更会触发 <see cref="INotifyPropertyChanged.PropertyChanged"/>。
+    /// </summary>
     [Fact]
     public void Name_PropertyChanged_Raised()
     {
@@ -21,6 +30,9 @@ public class NodeGroupTests
         Assert.Equal("Group A", group.Name);
     }
 
+    /// <summary>
+    /// 验证 Bounds 属性变更会触发 <see cref="INotifyPropertyChanged.PropertyChanged"/>。
+    /// </summary>
     [Fact]
     public void Bounds_PropertyChanged_Raised()
     {
@@ -37,6 +49,9 @@ public class NodeGroupTests
         Assert.Equal(200, group.Bounds.Height);
     }
 
+    /// <summary>
+    /// 验证节点增删：AddNode/RemoveNode 应正确维护集合内容。
+    /// </summary>
     [Fact]
     public void AddRemove_Node_Works()
     {
@@ -51,6 +66,9 @@ public class NodeGroupTests
         Assert.DoesNotContain(node, group.Nodes);
     }
 
+    /// <summary>
+    /// 验证子分组增删：AddChild/RemoveChild 应正确维护 Parent 关系。
+    /// </summary>
     [Fact]
     public void AddRemove_ChildGroup_SetsParent()
     {
@@ -67,6 +85,9 @@ public class NodeGroupTests
         Assert.Null(child.Parent);
     }
 
+    /// <summary>
+    /// 验证递归获取节点：应包含子分组中的节点。
+    /// </summary>
     [Fact]
     public void GetAllNodesRecursive_Returns_Nodes_From_Children()
     {
@@ -85,6 +106,9 @@ public class NodeGroupTests
         Assert.Contains(n2, list);
     }
 
+    /// <summary>
+    /// 验证递归包含判断：父分组应能检测到子分组的节点；子分组不应误判父分组节点。
+    /// </summary>
     [Fact]
     public void ContainsNodeRecursive_Works()
     {

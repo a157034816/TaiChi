@@ -3,8 +3,14 @@ using Upgrade.Service;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// <see cref="UpgradeServiceCentralServiceSettings"/> 的单元测试：验证配置读取优先级与端点排序规则。
+/// </summary>
 public sealed class UpgradeServiceCentralServiceSettingsTests
 {
+    /// <summary>
+    /// 验证：当同时配置 legacy 单地址与端点列表时，应优先使用端点列表，并按 Priority 升序排序。
+    /// </summary>
     [Fact]
     public void Settings_PreferEndpointList_AndSortByPriority()
     {

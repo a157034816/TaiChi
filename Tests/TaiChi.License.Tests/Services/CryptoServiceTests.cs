@@ -5,8 +5,14 @@ using Xunit;
 
 namespace TaiChi.License.Tests.Services;
 
+/// <summary>
+/// <see cref="CryptoService"/> 的单元测试：覆盖 RSA 密钥生成/签名验签，以及 AES 加解密的边界条件。
+/// </summary>
 public class CryptoServiceTests
 {
+    /// <summary>
+    /// 验证生成 RSA 密钥对：公钥/私钥字节数组应非空且可被 .NET RSA 正确导入。
+    /// </summary>
     [Fact]
     public void GenerateRsaKeyPair_ShouldReturnValidKeys()
     {
@@ -23,6 +29,9 @@ public class CryptoServiceTests
         rsaPrv.ImportPkcs8PrivateKey(prv, out _);
     }
 
+    /// <summary>
+    /// 验证签名与验签：同一数据签名后应能通过公钥验签。
+    /// </summary>
     [Fact]
     public void Sign_Then_Verify_ShouldSucceed()
     {
@@ -32,6 +41,9 @@ public class CryptoServiceTests
         Assert.True(CryptoService.VerifyData(data, sig, pub));
     }
 
+    /// <summary>
+    /// 验证篡改签名：签名被修改后验签应失败。
+    /// </summary>
     [Fact]
     public void Verify_ShouldFail_WhenSignatureTampered()
     {
@@ -43,6 +55,9 @@ public class CryptoServiceTests
         Assert.False(CryptoService.VerifyData(data, sig, pub));
     }
 
+    /// <summary>
+    /// 验证 AES 往返：明文加密后再解密应还原原始字节数组。
+    /// </summary>
     [Fact]
     public void Aes_EncryptDecrypt_Roundtrip()
     {
@@ -54,6 +69,9 @@ public class CryptoServiceTests
         Assert.Equal(plaintext, restored);
     }
 
+    /// <summary>
+    /// 验证 AES 密钥长度：当密钥长度非法时应抛出 <see cref="ArgumentException"/>。
+    /// </summary>
     [Fact]
     public void Aes_ShouldThrow_OnInvalidKeyLength()
     {
@@ -63,6 +81,9 @@ public class CryptoServiceTests
         Assert.Throws<ArgumentException>(() => CryptoService.DecryptAes(new byte[32], badKey));
     }
 
+    /// <summary>
+    /// 验证 AES 解密输入长度：当输入过短（缺少 IV 等必要信息）时应抛出 <see cref="ArgumentException"/>。
+    /// </summary>
     [Fact]
     public void Aes_Decrypt_ShouldThrow_OnTooShortInput()
     {
@@ -70,6 +91,11 @@ public class CryptoServiceTests
         Assert.Throws<ArgumentException>(() => CryptoService.DecryptAes(new byte[8], key));
     }
 
+    /// <summary>
+    /// 生成指定长度的随机字节数组（用于测试数据）。
+    /// </summary>
+    /// <param name="count">字节数。</param>
+    /// <returns>随机字节数组。</returns>
     private static byte[] RandomBytes(int count)
     {
         var buf = new byte[count];

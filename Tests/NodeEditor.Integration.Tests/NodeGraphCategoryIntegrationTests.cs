@@ -6,8 +6,14 @@ using TaiChi.Wpf.NodeEditor.Core.Registry;
 
 namespace NodeEditor.Integration.Tests;
 
+/// <summary>
+/// 节点编辑器端到端集成测试：覆盖 ControlFlow/DataFlow 两类图的创建、序列化、反序列化与执行流程。
+/// </summary>
 public class NodeGraphCategoryIntegrationTests
 {
+    /// <summary>
+    /// 注册测试用节点类型（用于反序列化时按节点名创建实例）。
+    /// </summary>
     private static void RegisterTestNodes()
     {
         NodeRegistry.Clear();
@@ -16,6 +22,9 @@ public class NodeGraphCategoryIntegrationTests
         NodeRegistry.RegisterNode(() => new PlusOneNode(), nameof(PlusOneNode));
     }
 
+    /// <summary>
+    /// 流程节点：包含流程输入/输出 pin，执行时仅计数（用于验证流程链路被触发）。
+    /// </summary>
     private sealed class FlowNode : Node
     {
         public int Called { get; private set; }
@@ -33,6 +42,9 @@ public class NodeGraphCategoryIntegrationTests
         protected override void OnExecute() => Called++;
     }
 
+    /// <summary>
+    /// 数据源节点：输出固定的 int 值（用于 DataFlow 链路测试）。
+    /// </summary>
     private sealed class SourceNode : Node
     {
         public Pin Dout { get; }
@@ -44,6 +56,9 @@ public class NodeGraphCategoryIntegrationTests
         protected override void OnExecute() => Dout.Value = 1;
     }
 
+    /// <summary>
+    /// 数据处理节点：把输入值 +1 后输出（用于 DataFlow 依赖计算测试）。
+    /// </summary>
     private sealed class PlusOneNode : Node
     {
         public Pin Din { get; }
@@ -62,6 +77,9 @@ public class NodeGraphCategoryIntegrationTests
         }
     }
 
+    /// <summary>
+    /// 验证 ControlFlow 图：创建并保存/加载后仍保持分类，并可被执行引擎正常执行。
+    /// </summary>
     [Fact]
     public async Task ControlFlow_New_Save_Load_Execute_EndToEnd()
     {
@@ -91,6 +109,9 @@ public class NodeGraphCategoryIntegrationTests
         Assert.True(g2.Validate());
     }
 
+    /// <summary>
+    /// 验证 DataFlow 图：创建并保存/加载后仍保持分类，执行后能得到终端节点输出集合。
+    /// </summary>
     [Fact]
     public async Task DataFlow_New_Save_Load_Execute_EndToEnd()
     {

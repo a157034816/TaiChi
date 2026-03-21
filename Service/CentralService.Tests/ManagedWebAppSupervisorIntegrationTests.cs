@@ -9,8 +9,21 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace CentralService.Tests;
 
+/// <summary>
+/// 托管 WebApp 监督器（ManagedWebAppSupervisor）集成测试：
+/// 验证按配置启动外部站点，并在监控接口中呈现健康状态。
+/// </summary>
+/// <remarks>
+/// 该测试依赖 Windows 平台与 PowerShell，因此在非 Windows 环境会直接跳过。
+/// </remarks>
 public sealed class ManagedWebAppSupervisorIntegrationTests
 {
+    /// <summary>
+    /// 验证按配置启动托管站点后：
+    /// 1. 后台任务可在 summary 中查询到且为 Healthy；
+    /// 2. health 接口中包含对应检查项；
+    /// 3. Prepare 脚本能够生成 required path（用于就绪判定）。
+    /// </summary>
     [Fact]
     public async Task ManagedWebAppSupervisor_StartsConfiguredSite_AndReportsHealthy()
     {
@@ -75,17 +88,31 @@ public sealed class ManagedWebAppSupervisorIntegrationTests
             }
             catch
             {
-                // ignore
+                // 忽略清理过程中的异常（例如文件被占用）。
             }
         }
     }
 
+    /// <summary>
+    /// 调用登录接口，建立管理员 Cookie 会话（用于访问管理端监控 API）。
+    /// </summary>
+    /// <param name="client">测试用 HttpClient。</param>
+    /// <param name="username">用户名。</param>
+    /// <param name="password">密码。</param>
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// 构造托管站点配置（ManagedWebApps:Definitions）所需的设置键值对。
+    /// </summary>
+    /// <param name="prepareScriptPath">Prepare 脚本路径（用于生成 required paths）。</param>
+    /// <param name="startScriptPath">启动脚本路径。</param>
+    /// <param name="workingDirectory">站点工作目录。</param>
+    /// <param name="port">站点监听端口。</param>
+    /// <returns>可直接注入到 IConfiguration 的设置字典。</returns>
     private static Dictionary<string, string?> BuildManagedSiteSettings(
         string prepareScriptPath,
         string startScriptPath,
@@ -120,6 +147,12 @@ public sealed class ManagedWebAppSupervisorIntegrationTests
         return settings;
     }
 
+    /// <summary>
+    /// 在限定时间内轮询异步获取器，直到返回非 null 或超时。
+    /// </summary>
+    /// <typeparam name="T">引用类型返回值。</typeparam>
+    /// <param name="fetcher">异步获取器。</param>
+    /// <returns>获取到的对象；超时返回 null。</returns>
     private static async Task<T?> WaitUntilAsync<T>(Func<Task<T?>> fetcher)
         where T : class
     {
@@ -152,6 +185,10 @@ public sealed class ManagedWebAppSupervisorIntegrationTests
         return null;
     }
 
+    /// <summary>
+    /// 构造托管站点脚本：启动一个 HttpListener 并持续响应 "ok"。
+    /// </summary>
+    /// <returns>PowerShell 脚本文本。</returns>
     private static string BuildManagedSiteScript()
     {
         return """
@@ -179,6 +216,10 @@ finally {
 """;
     }
 
+    /// <summary>
+    /// 构造 Prepare 脚本：生成 <c>.next/BUILD_ID</c> 以满足 required paths 的就绪判定。
+    /// </summary>
+    /// <returns>PowerShell 脚本文本。</returns>
     private static string BuildPrepareSiteScript()
     {
         return """
@@ -188,6 +229,12 @@ Set-Content -Path (Join-Path $buildDirectory 'BUILD_ID') -Value 'test-build' -En
 """;
     }
 
+    /// <summary>
+    /// 按约定的参数格式，把脚本执行信息写入配置字典。
+    /// </summary>
+    /// <param name="settings">配置字典。</param>
+    /// <param name="prefix">键前缀（例如 "ManagedWebApps:Definitions:1:Prepare"）。</param>
+    /// <param name="scriptPath">脚本路径。</param>
     private static void ConfigurePowerShellScript(
         IDictionary<string, string?> settings,
         string prefix,
