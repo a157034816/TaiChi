@@ -1,145 +1,275 @@
-import { ApprovalDecision, ReviewTask, WorkflowRequest } from "./contracts.mjs";
+import { GeneratorSeed, LayerSignal, PreviewFrame } from "./contracts.mjs";
 
-const workflowRequestType = "workflow/request";
-const reviewTaskType = "workflow/review-task";
-const approvalDecisionType = "workflow/approval-decision";
+const generatorSeedType = "playground/seed";
+const layerSignalType = "playground/layer";
+const previewFrameType = "playground/frame";
 
 const categoryKeys = {
-  control: "categories.control",
-  integration: "categories.integration",
-  workflow: "categories.workflow",
+  output: "categories.output",
+  source: "categories.source",
+  transform: "categories.transform",
 };
 
 const nodeKeys = {
-  approval: {
-    description: "nodes.approval.description",
-    label: "nodes.approval.label",
+  colorMix: {
+    description: "nodes.colorMix.description",
+    label: "nodes.colorMix.label",
   },
-  merge: {
-    description: "nodes.merge.description",
-    label: "nodes.merge.label",
+  layerFanout: {
+    description: "nodes.layerFanout.description",
+    label: "nodes.layerFanout.label",
   },
-  notify: {
-    description: "nodes.notify.description",
-    label: "nodes.notify.label",
+  previewOutput: {
+    description: "nodes.previewOutput.description",
+    label: "nodes.previewOutput.label",
   },
-  parallelSplit: {
-    description: "nodes.parallelSplit.description",
-    label: "nodes.parallelSplit.label",
+  seedSource: {
+    description: "nodes.seedSource.description",
+    label: "nodes.seedSource.label",
   },
-  start: {
-    description: "nodes.start.description",
-    label: "nodes.start.label",
+  stylizeBranch: {
+    description: "nodes.stylizeBranch.description",
+    label: "nodes.stylizeBranch.label",
   },
 };
 
 const fieldKeys = {
-  channel: "fields.channel.label",
-  includeSummary: "fields.includeSummary.label",
-  note: "fields.note.label",
-  owner: "fields.owner.label",
-  slaHours: "fields.slaHours.label",
-  strategy: "fields.strategy.label",
-  waitForAll: "fields.waitForAll.label",
+  anchorDate: "fields.anchorDate.label",
+  baseTint: "fields.baseTint.label",
+  blendMode: "fields.blendMode.label",
+  distributionMode: "fields.distributionMode.label",
+  frequency: "fields.frequency.label",
+  notes: "fields.notes.label",
+  opacity: "fields.opacity.label",
+  previewShape: "fields.previewShape.label",
+  sampleCount: "fields.sampleCount.label",
+  seedName: "fields.seedName.label",
+  showGrid: "fields.showGrid.label",
+  variance: "fields.variance.label",
+};
+
+const fieldPlaceholderKeys = {
+  notes: "fields.notes.placeholder",
+  seedName: "fields.seedName.placeholder",
 };
 
 const portKeys = {
-  approved: "ports.approved",
-  failure: "ports.failure",
-  finance: "ports.finance",
-  legal: "ports.legal",
-  next: "ports.next",
-  rejected: "ports.rejected",
-  request: "ports.request",
-  security: "ports.security",
-  success: "ports.success",
-  trigger: "ports.trigger",
+  cool: "ports.cool",
+  frame: "ports.frame",
+  main: "ports.main",
+  noise: "ports.noise",
+  seed: "ports.seed",
+  variant: "ports.variant",
+  warm: "ports.warm",
+};
+
+const optionLabelKeys = {
+  blendMode: {
+    difference: "options.blendMode.difference",
+    multiply: "options.blendMode.multiply",
+    screen: "options.blendMode.screen",
+  },
+  distributionMode: {
+    burst: "options.distributionMode.burst",
+    ribbon: "options.distributionMode.ribbon",
+    spiral: "options.distributionMode.spiral",
+  },
+  previewShape: {
+    landscape: "options.previewShape.landscape",
+    poster: "options.previewShape.poster",
+    square: "options.previewShape.square",
+  },
+};
+
+const nodeAppearances = {
+  colorMix: {
+    bgColor: "#fce7f3",
+    borderColor: "#db2777",
+    textColor: "#831843",
+  },
+  layerFanout: {
+    bgColor: "#e0f2fe",
+    borderColor: "#0284c7",
+    textColor: "#0c4a6e",
+  },
+  previewOutput: {
+    bgColor: "#dcfce7",
+    borderColor: "#16a34a",
+    textColor: "#14532d",
+  },
+  seedSource: {
+    bgColor: "#fff7ed",
+    borderColor: "#f97316",
+    textColor: "#7c2d12",
+  },
+  stylizeBranch: {
+    bgColor: "#ede9fe",
+    borderColor: "#7c3aed",
+    textColor: "#4c1d95",
+  },
+};
+
+const fieldOptionCatalog = {
+  distributionMode: [
+    { value: "burst", labelKey: optionLabelKeys.distributionMode.burst },
+    { value: "spiral", labelKey: optionLabelKeys.distributionMode.spiral },
+    { value: "ribbon", labelKey: optionLabelKeys.distributionMode.ribbon },
+  ],
+  blendMode: [
+    { value: "screen", labelKey: optionLabelKeys.blendMode.screen },
+    { value: "multiply", labelKey: optionLabelKeys.blendMode.multiply },
+    { value: "difference", labelKey: optionLabelKeys.blendMode.difference },
+  ],
+  previewShape: [
+    { value: "poster", labelKey: optionLabelKeys.previewShape.poster },
+    { value: "landscape", labelKey: optionLabelKeys.previewShape.landscape },
+    { value: "square", labelKey: optionLabelKeys.previewShape.square },
+  ],
 };
 
 export const demoI18n = {
   defaultLocale: "en",
   locales: {
     en: {
-      [categoryKeys.control]: "Control",
-      [categoryKeys.integration]: "Integration",
-      [categoryKeys.workflow]: "Workflow",
-      [fieldKeys.channel]: "Channel",
-      [fieldKeys.includeSummary]: "Include summary",
-      [fieldKeys.note]: "Opening note",
-      [fieldKeys.owner]: "Owner",
-      [fieldKeys.slaHours]: "SLA hours",
-      [fieldKeys.strategy]: "Dispatch strategy",
-      [fieldKeys.waitForAll]: "Wait for all branches",
-      [nodeKeys.approval.description]: "Manual approval step with explicit approved and rejected exits.",
-      [nodeKeys.approval.label]: "Approval",
-      [nodeKeys.merge.description]: "Collect multiple upstream branches before continuing.",
-      [nodeKeys.merge.label]: "Merge",
-      [nodeKeys.notify.description]: "Send success or failure notifications after approval completes.",
-      [nodeKeys.notify.label]: "Notify",
-      [nodeKeys.parallelSplit.description]: "Fan out one trigger into multiple review branches.",
-      [nodeKeys.parallelSplit.label]: "Parallel Split",
-      [nodeKeys.start.description]: "Entry point for a new workflow.",
-      [nodeKeys.start.label]: "Start",
-      [portKeys.approved]: "Approved",
-      [portKeys.failure]: "Failure",
-      [portKeys.finance]: "Finance",
-      [portKeys.legal]: "Legal",
-      [portKeys.next]: "Next",
-      [portKeys.rejected]: "Rejected",
-      [portKeys.request]: "Request",
-      [portKeys.security]: "Security",
-      [portKeys.success]: "Success",
-      [portKeys.trigger]: "Trigger",
+      [categoryKeys.output]: "Output",
+      [categoryKeys.source]: "Source",
+      [categoryKeys.transform]: "Transform",
+      [fieldKeys.anchorDate]: "Anchor date",
+      [fieldKeys.baseTint]: "Base tint",
+      [fieldKeys.blendMode]: "Blend mode",
+      [fieldKeys.distributionMode]: "Distribution mode",
+      [fieldKeys.frequency]: "Frequency",
+      [fieldKeys.notes]: "Notes",
+      [fieldKeys.opacity]: "Opacity",
+      [fieldKeys.previewShape]: "Preview shape",
+      [fieldKeys.sampleCount]: "Sample count",
+      [fieldKeys.seedName]: "Seed name",
+      [fieldKeys.showGrid]: "Show grid",
+      [fieldKeys.variance]: "Variance",
+      [fieldPlaceholderKeys.notes]: "Describe the mood or composition idea",
+      [fieldPlaceholderKeys.seedName]: "Name this generator seed",
+      [nodeKeys.colorMix.description]:
+        "Blend warm, cool, and noise layers into a frame-ready composition.",
+      [nodeKeys.colorMix.label]: "Color Mix",
+      [nodeKeys.layerFanout.description]:
+        "Expand one seed into multiple tonal channels for downstream composition.",
+      [nodeKeys.layerFanout.label]: "Layer Fanout",
+      [nodeKeys.previewOutput.description]:
+        "Collect the main and variant frames for final preview output.",
+      [nodeKeys.previewOutput.label]: "Preview Output",
+      [nodeKeys.seedSource.description]:
+        "Create the base seed metadata that drives the rest of the playground.",
+      [nodeKeys.seedSource.label]: "Seed Source",
+      [nodeKeys.stylizeBranch.description]:
+        "Branch the frame into primary and alternate stylized variants.",
+      [nodeKeys.stylizeBranch.label]: "Stylize Branch",
+      [optionLabelKeys.blendMode.difference]: "Difference blend",
+      [optionLabelKeys.blendMode.multiply]: "Multiply overlay",
+      [optionLabelKeys.blendMode.screen]: "Screen wash",
+      [optionLabelKeys.distributionMode.burst]: "Burst scatter",
+      [optionLabelKeys.distributionMode.ribbon]: "Ribbon sweep",
+      [optionLabelKeys.distributionMode.spiral]: "Spiral drift",
+      [optionLabelKeys.previewShape.landscape]: "Landscape canvas",
+      [optionLabelKeys.previewShape.poster]: "Poster portrait",
+      [optionLabelKeys.previewShape.square]: "Square tile",
+      [portKeys.cool]: "Cool",
+      [portKeys.frame]: "Frame",
+      [portKeys.main]: "Main",
+      [portKeys.noise]: "Noise",
+      [portKeys.seed]: "Seed",
+      [portKeys.variant]: "Variant",
+      [portKeys.warm]: "Warm",
     },
     "zh-CN": {
-      [categoryKeys.control]: "控制",
-      [categoryKeys.integration]: "集成",
-      [categoryKeys.workflow]: "流程",
-      [fieldKeys.channel]: "通道",
-      [fieldKeys.includeSummary]: "包含摘要",
-      [fieldKeys.note]: "开场说明",
-      [fieldKeys.owner]: "负责人",
-      [fieldKeys.slaHours]: "SLA 小时",
-      [fieldKeys.strategy]: "分发策略",
-      [fieldKeys.waitForAll]: "等待全部分支",
-      [nodeKeys.approval.description]: "带有明确通过与驳回出口的人工审批步骤。",
-      [nodeKeys.approval.label]: "审批",
-      [nodeKeys.merge.description]: "在继续前汇集多个上游分支。",
-      [nodeKeys.merge.label]: "汇合",
-      [nodeKeys.notify.description]: "审批结束后发送成功或失败通知。",
-      [nodeKeys.notify.label]: "通知",
-      [nodeKeys.parallelSplit.description]: "把一个触发拆分成多个并行评审分支。",
-      [nodeKeys.parallelSplit.label]: "并行分发",
-      [nodeKeys.start.description]: "新工作流的入口节点。",
-      [nodeKeys.start.label]: "开始",
-      [portKeys.approved]: "通过",
-      [portKeys.failure]: "失败",
-      [portKeys.finance]: "财务",
-      [portKeys.legal]: "法务",
-      [portKeys.next]: "下一步",
-      [portKeys.rejected]: "驳回",
-      [portKeys.request]: "请求",
-      [portKeys.security]: "安全",
-      [portKeys.success]: "成功",
-      [portKeys.trigger]: "触发",
+      [categoryKeys.output]: "输出",
+      [categoryKeys.source]: "源节点",
+      [categoryKeys.transform]: "变换",
+      [fieldKeys.anchorDate]: "锚点日期",
+      [fieldKeys.baseTint]: "基础色调",
+      [fieldKeys.blendMode]: "混合模式",
+      [fieldKeys.distributionMode]: "分布模式",
+      [fieldKeys.frequency]: "频率",
+      [fieldKeys.notes]: "备注",
+      [fieldKeys.opacity]: "透明度",
+      [fieldKeys.previewShape]: "预览比例",
+      [fieldKeys.sampleCount]: "采样数量",
+      [fieldKeys.seedName]: "种子名称",
+      [fieldKeys.showGrid]: "显示网格",
+      [fieldKeys.variance]: "随机波动",
+      [fieldPlaceholderKeys.notes]: "记录这次视觉实验的氛围、质感或布局想法",
+      [fieldPlaceholderKeys.seedName]: "给这组生成参数起个名字",
+      [nodeKeys.colorMix.description]: "把暖色、冷色与噪声图层混合成可继续处理的画面。",
+      [nodeKeys.colorMix.label]: "色彩混合",
+      [nodeKeys.layerFanout.description]: "把单个种子拆分成多条色调通道，供后续合成使用。",
+      [nodeKeys.layerFanout.label]: "图层分发",
+      [nodeKeys.previewOutput.description]: "收集主输出和变体输出，作为最终预览节点。",
+      [nodeKeys.previewOutput.label]: "预览输出",
+      [nodeKeys.seedSource.description]: "创建驱动整个视觉 playground 的基础种子信息。",
+      [nodeKeys.seedSource.label]: "种子源",
+      [nodeKeys.stylizeBranch.description]: "把画面分支成主风格与变体风格两路输出。",
+      [nodeKeys.stylizeBranch.label]: "风格分支",
+      [optionLabelKeys.blendMode.difference]: "差值混合",
+      [optionLabelKeys.blendMode.multiply]: "正片叠底",
+      [optionLabelKeys.blendMode.screen]: "滤色叠加",
+      [optionLabelKeys.distributionMode.burst]: "爆发散射",
+      [optionLabelKeys.distributionMode.ribbon]: "丝带扫掠",
+      [optionLabelKeys.distributionMode.spiral]: "螺旋漂移",
+      [optionLabelKeys.previewShape.landscape]: "横向画布",
+      [optionLabelKeys.previewShape.poster]: "海报竖幅",
+      [optionLabelKeys.previewShape.square]: "方形画布",
+      [portKeys.cool]: "冷色",
+      [portKeys.frame]: "画面",
+      [portKeys.main]: "主输出",
+      [portKeys.noise]: "噪声",
+      [portKeys.seed]: "种子",
+      [portKeys.variant]: "变体",
+      [portKeys.warm]: "暖色",
     },
   },
 };
 
-function translate(locale, key) {
-  return demoI18n.locales[locale]?.[key] ?? key;
+function resolveLocale(locale) {
+  return demoI18n.locales[locale] ? locale : demoI18n.defaultLocale;
 }
 
+function translate(locale, key) {
+  const activeLocale = resolveLocale(locale);
+  return demoI18n.locales[activeLocale]?.[key] ?? demoI18n.locales[demoI18n.defaultLocale]?.[key] ?? key;
+}
+
+/**
+ * 统一构造端口定义，保持 Demo library 与 existing graph 使用相同结构。
+ */
 function createPort(id, labelKey, dataType) {
   return dataType ? { id, labelKey, dataType } : { id, labelKey };
 }
 
-function createField(key, labelKey, kind, defaultValue) {
-  return defaultValue === undefined
-    ? { key, labelKey, kind }
-    : { key, labelKey, kind, defaultValue };
+/**
+ * 按 NodeGraph schema 生成字段定义。
+ * select 字段通过 optionsEndpoint 指向 Demo 自己的远端选项接口。
+ */
+function createField({ key, labelKey, kind, defaultValue, optionsEndpoint, placeholderKey }) {
+  const field = { key, labelKey, kind };
+
+  if (defaultValue !== undefined) {
+    field.defaultValue = defaultValue;
+  }
+
+  if (optionsEndpoint) {
+    field.optionsEndpoint = optionsEndpoint;
+  }
+
+  if (placeholderKey) {
+    field.placeholderKey = placeholderKey;
+  }
+
+  return field;
 }
 
+/**
+ * 生成 existing graph 中保存的节点快照。
+ * label 与 description 会预先展开为默认语言，方便直接展示。
+ */
 function createStoredNode({
   id,
   nodeType,
@@ -171,129 +301,214 @@ function createStoredNode({
     style: {
       background: appearance?.bgColor,
       borderColor: appearance?.borderColor,
-      color: appearance?.textColor,
-      borderWidth: 1,
       borderRadius: 20,
+      borderWidth: 1,
+      color: appearance?.textColor,
     },
   };
 }
 
+function createFieldOptionsEndpoint(baseUrl, fieldKey) {
+  return new URL(`/api/node-field-options/${encodeURIComponent(fieldKey)}`, `${baseUrl}/`).toString();
+}
+
+function createNodeLibrary(baseUrl) {
+  return [
+    {
+      type: "seed_source",
+      labelKey: nodeKeys.seedSource.label,
+      descriptionKey: nodeKeys.seedSource.description,
+      categoryKey: categoryKeys.source,
+      inputs: [],
+      outputs: [createPort("seed", portKeys.seed, generatorSeedType)],
+      fields: [
+        createField({
+          key: "seedName",
+          labelKey: fieldKeys.seedName,
+          kind: "text",
+          defaultValue: "Aurora Seed",
+          placeholderKey: fieldPlaceholderKeys.seedName,
+        }),
+        createField({
+          key: "notes",
+          labelKey: fieldKeys.notes,
+          kind: "textarea",
+          defaultValue: "Start from layered gradients and leave room for a sharp highlight.",
+          placeholderKey: fieldPlaceholderKeys.notes,
+        }),
+        createField({
+          key: "anchorDate",
+          labelKey: fieldKeys.anchorDate,
+          kind: "date",
+          defaultValue: "2026-03-21",
+        }),
+      ],
+      appearance: nodeAppearances.seedSource,
+    },
+    {
+      type: "layer_fanout",
+      labelKey: nodeKeys.layerFanout.label,
+      descriptionKey: nodeKeys.layerFanout.description,
+      categoryKey: categoryKeys.transform,
+      inputs: [createPort("seed", portKeys.seed, generatorSeedType)],
+      outputs: [
+        createPort("warm", portKeys.warm, layerSignalType),
+        createPort("cool", portKeys.cool, layerSignalType),
+        createPort("noise", portKeys.noise, layerSignalType),
+      ],
+      fields: [
+        createField({
+          key: "distributionMode",
+          labelKey: fieldKeys.distributionMode,
+          kind: "select",
+          defaultValue: "spiral",
+          optionsEndpoint: createFieldOptionsEndpoint(baseUrl, "distributionMode"),
+        }),
+        createField({
+          key: "sampleCount",
+          labelKey: fieldKeys.sampleCount,
+          kind: "int",
+          defaultValue: 24,
+        }),
+        createField({
+          key: "variance",
+          labelKey: fieldKeys.variance,
+          kind: "float",
+          defaultValue: 0.35,
+        }),
+      ],
+      appearance: nodeAppearances.layerFanout,
+    },
+    {
+      type: "color_mix",
+      labelKey: nodeKeys.colorMix.label,
+      descriptionKey: nodeKeys.colorMix.description,
+      categoryKey: categoryKeys.transform,
+      inputs: [
+        createPort("warm", portKeys.warm, layerSignalType),
+        createPort("cool", portKeys.cool, layerSignalType),
+        createPort("noise", portKeys.noise, layerSignalType),
+      ],
+      outputs: [createPort("frame", portKeys.frame, previewFrameType)],
+      fields: [
+        createField({
+          key: "baseTint",
+          labelKey: fieldKeys.baseTint,
+          kind: "color",
+          defaultValue: "#ff9d1c",
+        }),
+        createField({
+          key: "blendMode",
+          labelKey: fieldKeys.blendMode,
+          kind: "select",
+          defaultValue: "screen",
+          optionsEndpoint: createFieldOptionsEndpoint(baseUrl, "blendMode"),
+        }),
+        createField({
+          key: "opacity",
+          labelKey: fieldKeys.opacity,
+          kind: "decimal",
+          defaultValue: "0.82",
+        }),
+      ],
+      appearance: nodeAppearances.colorMix,
+    },
+    {
+      type: "stylize_branch",
+      labelKey: nodeKeys.stylizeBranch.label,
+      descriptionKey: nodeKeys.stylizeBranch.description,
+      categoryKey: categoryKeys.transform,
+      inputs: [createPort("frame", portKeys.frame, previewFrameType)],
+      outputs: [
+        createPort("main", portKeys.main, previewFrameType),
+        createPort("variant", portKeys.variant, previewFrameType),
+      ],
+      fields: [
+        createField({
+          key: "frequency",
+          labelKey: fieldKeys.frequency,
+          kind: "double",
+          defaultValue: 1.75,
+        }),
+      ],
+      appearance: nodeAppearances.stylizeBranch,
+    },
+    {
+      type: "preview_output",
+      labelKey: nodeKeys.previewOutput.label,
+      descriptionKey: nodeKeys.previewOutput.description,
+      categoryKey: categoryKeys.output,
+      inputs: [
+        createPort("main", portKeys.main, previewFrameType),
+        createPort("variant", portKeys.variant, previewFrameType),
+      ],
+      outputs: [],
+      fields: [
+        createField({
+          key: "showGrid",
+          labelKey: fieldKeys.showGrid,
+          kind: "boolean",
+          defaultValue: true,
+        }),
+        createField({
+          key: "previewShape",
+          labelKey: fieldKeys.previewShape,
+          kind: "select",
+          defaultValue: "poster",
+          optionsEndpoint: createFieldOptionsEndpoint(baseUrl, "previewShape"),
+        }),
+      ],
+      appearance: nodeAppearances.previewOutput,
+    },
+  ];
+}
+
 export const demoTypeMappings = [
   {
-    canonicalId: workflowRequestType,
-    type: WorkflowRequest.name,
-    color: "#0ea5e9",
-  },
-  {
-    canonicalId: reviewTaskType,
-    type: ReviewTask.name,
-    color: "#22c55e",
-  },
-  {
-    canonicalId: approvalDecisionType,
-    type: ApprovalDecision.name,
+    canonicalId: generatorSeedType,
+    type: GeneratorSeed.name,
     color: "#f97316",
+  },
+  {
+    canonicalId: layerSignalType,
+    type: LayerSignal.name,
+    color: "#0284c7",
+  },
+  {
+    canonicalId: previewFrameType,
+    type: PreviewFrame.name,
+    color: "#16a34a",
   },
 ];
 
-export const demoNodeLibrary = [
-  {
-    type: "start",
-    labelKey: nodeKeys.start.label,
-    descriptionKey: nodeKeys.start.description,
-    categoryKey: categoryKeys.control,
-    inputs: [],
-    outputs: [createPort("next", portKeys.next, workflowRequestType)],
-    fields: [
-      createField("note", fieldKeys.note, "text", "Kick off the workflow"),
-    ],
-    appearance: {
-      bgColor: "#ecfdf5",
-      borderColor: "#10b981",
-      textColor: "#14532d",
-    },
-  },
-  {
-    type: "parallel_split",
-    labelKey: nodeKeys.parallelSplit.label,
-    descriptionKey: nodeKeys.parallelSplit.description,
-    categoryKey: categoryKeys.control,
-    inputs: [createPort("trigger", portKeys.trigger, workflowRequestType)],
-    outputs: [
-      createPort("finance", portKeys.finance, reviewTaskType),
-      createPort("legal", portKeys.legal, reviewTaskType),
-      createPort("security", portKeys.security, reviewTaskType),
-    ],
-    fields: [
-      createField("strategy", fieldKeys.strategy, "text", "broadcast"),
-    ],
-    appearance: {
-      bgColor: "#eff6ff",
-      borderColor: "#0ea5e9",
-      textColor: "#0c4a6e",
-    },
-  },
-  {
-    type: "merge",
-    labelKey: nodeKeys.merge.label,
-    descriptionKey: nodeKeys.merge.description,
-    categoryKey: categoryKeys.control,
-    inputs: [
-      createPort("finance", portKeys.finance, reviewTaskType),
-      createPort("legal", portKeys.legal, reviewTaskType),
-      createPort("security", portKeys.security, reviewTaskType),
-    ],
-    outputs: [createPort("next", portKeys.next, workflowRequestType)],
-    fields: [
-      createField("waitForAll", fieldKeys.waitForAll, "boolean", true),
-    ],
-    appearance: {
-      bgColor: "#fdf4ff",
-      borderColor: "#c026d3",
-      textColor: "#701a75",
-    },
-  },
-  {
-    type: "approval",
-    labelKey: nodeKeys.approval.label,
-    descriptionKey: nodeKeys.approval.description,
-    categoryKey: categoryKeys.workflow,
-    inputs: [createPort("request", portKeys.request, workflowRequestType)],
-    outputs: [
-      createPort("approved", portKeys.approved, approvalDecisionType),
-      createPort("rejected", portKeys.rejected, approvalDecisionType),
-    ],
-    fields: [
-      createField("owner", fieldKeys.owner, "text", "finance.manager"),
-      createField("slaHours", fieldKeys.slaHours, "number", 24),
-    ],
-    appearance: {
-      bgColor: "#fff7ed",
-      borderColor: "#f97316",
-      textColor: "#7c2d12",
-    },
-  },
-  {
-    type: "notify",
-    labelKey: nodeKeys.notify.label,
-    descriptionKey: nodeKeys.notify.description,
-    categoryKey: categoryKeys.integration,
-    inputs: [
-      createPort("success", portKeys.success, approvalDecisionType),
-      createPort("failure", portKeys.failure, approvalDecisionType),
-    ],
-    outputs: [],
-    fields: [
-      createField("channel", fieldKeys.channel, "text", "email"),
-      createField("includeSummary", fieldKeys.includeSummary, "boolean", true),
-    ],
-    appearance: {
-      bgColor: "#eef2ff",
-      borderColor: "#6366f1",
-      textColor: "#312e81",
-    },
-  },
-];
+/**
+ * 根据当前配置生成节点库响应，确保 select 字段总是返回可访问的绝对 optionsEndpoint。
+ */
+export function createDemoLibraryBundle(config) {
+  return {
+    nodes: createNodeLibrary(config.demoClientBaseUrl),
+    i18n: demoI18n,
+    typeMappings: demoTypeMappings,
+  };
+}
+
+/**
+ * 返回 Demo 自己托管的 select 字段选项。
+ * NodeGraph 代理请求时会附带额外查询参数，这里只消费 locale 并忽略其余参数。
+ */
+export function createDemoFieldOptionsPayload(fieldKey, locale) {
+  const entries = fieldOptionCatalog[fieldKey];
+  if (!entries) {
+    return null;
+  }
+
+  return {
+    options: entries.map((entry) => ({
+      value: entry.value,
+      label: translate(locale, entry.labelKey),
+    })),
+  };
+}
 
 export function createGraphDocument(graphName, graphMode = "new") {
   if (graphMode === "existing") {
@@ -302,7 +517,7 @@ export function createGraphDocument(graphName, graphMode = "new") {
 
   return {
     name: graphName,
-    description: "Created from the NodeGraph demo client.",
+    description: "Created from the NodeGraph visual playground demo client.",
     nodes: [],
     edges: [],
     viewport: {
@@ -315,166 +530,149 @@ export function createGraphDocument(graphName, graphMode = "new") {
 
 function createExistingGraph(graphName) {
   return {
-    graphId: "demo-existing-graph",
+    graphId: "demo-existing-playground-graph",
     name: graphName,
-    description: "A pre-filled multi-port workflow used to demo existing graph editing.",
+    description: "A pre-filled visual playground used to demonstrate typed node editors.",
     nodes: [
       createStoredNode({
-        id: "node_start",
-        nodeType: "start",
+        id: "node_seed_source",
+        nodeType: "seed_source",
         position: { x: 80, y: 220 },
-        labelKey: nodeKeys.start.label,
-        descriptionKey: nodeKeys.start.description,
-        categoryKey: categoryKeys.control,
-        inputs: [],
-        outputs: [createPort("next", portKeys.next, workflowRequestType)],
+        labelKey: nodeKeys.seedSource.label,
+        descriptionKey: nodeKeys.seedSource.description,
+        categoryKey: categoryKeys.source,
+        outputs: [createPort("seed", portKeys.seed, generatorSeedType)],
         values: {
-          note: "Request entered from the demo client",
+          seedName: "Aurora Seed",
+          notes: "Lean toward neon fog, long highlights, and one asymmetric focal point.",
+          anchorDate: "2026-03-21",
         },
-        appearance: {
-          bgColor: "#ecfdf5",
-          borderColor: "#10b981",
-          textColor: "#14532d",
-        },
+        appearance: nodeAppearances.seedSource,
       }),
       createStoredNode({
-        id: "node_parallel_split",
-        nodeType: "parallel_split",
+        id: "node_layer_fanout",
+        nodeType: "layer_fanout",
         position: { x: 360, y: 220 },
-        labelKey: nodeKeys.parallelSplit.label,
-        descriptionKey: nodeKeys.parallelSplit.description,
-        categoryKey: categoryKeys.control,
-        inputs: [createPort("trigger", portKeys.trigger, workflowRequestType)],
+        labelKey: nodeKeys.layerFanout.label,
+        descriptionKey: nodeKeys.layerFanout.description,
+        categoryKey: categoryKeys.transform,
+        inputs: [createPort("seed", portKeys.seed, generatorSeedType)],
         outputs: [
-          createPort("finance", portKeys.finance, reviewTaskType),
-          createPort("legal", portKeys.legal, reviewTaskType),
-          createPort("security", portKeys.security, reviewTaskType),
+          createPort("warm", portKeys.warm, layerSignalType),
+          createPort("cool", portKeys.cool, layerSignalType),
+          createPort("noise", portKeys.noise, layerSignalType),
         ],
         values: {
-          strategy: "broadcast",
+          distributionMode: "spiral",
+          sampleCount: 24,
+          variance: 0.35,
         },
-        appearance: {
-          bgColor: "#eff6ff",
-          borderColor: "#0ea5e9",
-          textColor: "#0c4a6e",
-        },
+        appearance: nodeAppearances.layerFanout,
       }),
       createStoredNode({
-        id: "node_merge",
-        nodeType: "merge",
-        position: { x: 700, y: 220 },
-        labelKey: nodeKeys.merge.label,
-        descriptionKey: nodeKeys.merge.description,
-        categoryKey: categoryKeys.control,
+        id: "node_color_mix",
+        nodeType: "color_mix",
+        position: { x: 740, y: 220 },
+        labelKey: nodeKeys.colorMix.label,
+        descriptionKey: nodeKeys.colorMix.description,
+        categoryKey: categoryKeys.transform,
         inputs: [
-          createPort("finance", portKeys.finance, reviewTaskType),
-          createPort("legal", portKeys.legal, reviewTaskType),
-          createPort("security", portKeys.security, reviewTaskType),
+          createPort("warm", portKeys.warm, layerSignalType),
+          createPort("cool", portKeys.cool, layerSignalType),
+          createPort("noise", portKeys.noise, layerSignalType),
         ],
-        outputs: [createPort("next", portKeys.next, workflowRequestType)],
+        outputs: [createPort("frame", portKeys.frame, previewFrameType)],
         values: {
-          waitForAll: true,
+          baseTint: "#ff9d1c",
+          blendMode: "screen",
+          opacity: "0.82",
         },
-        appearance: {
-          bgColor: "#fdf4ff",
-          borderColor: "#c026d3",
-          textColor: "#701a75",
-        },
+        appearance: nodeAppearances.colorMix,
       }),
       createStoredNode({
-        id: "node_approval",
-        nodeType: "approval",
-        position: { x: 1040, y: 220 },
-        labelKey: nodeKeys.approval.label,
-        descriptionKey: nodeKeys.approval.description,
-        categoryKey: categoryKeys.workflow,
-        inputs: [createPort("request", portKeys.request, workflowRequestType)],
+        id: "node_stylize_branch",
+        nodeType: "stylize_branch",
+        position: { x: 1080, y: 220 },
+        labelKey: nodeKeys.stylizeBranch.label,
+        descriptionKey: nodeKeys.stylizeBranch.description,
+        categoryKey: categoryKeys.transform,
+        inputs: [createPort("frame", portKeys.frame, previewFrameType)],
         outputs: [
-          createPort("approved", portKeys.approved, approvalDecisionType),
-          createPort("rejected", portKeys.rejected, approvalDecisionType),
+          createPort("main", portKeys.main, previewFrameType),
+          createPort("variant", portKeys.variant, previewFrameType),
         ],
         values: {
-          owner: "finance.manager",
-          slaHours: 24,
+          frequency: 1.75,
         },
-        appearance: {
-          bgColor: "#fff7ed",
-          borderColor: "#f97316",
-          textColor: "#7c2d12",
-        },
+        appearance: nodeAppearances.stylizeBranch,
       }),
       createStoredNode({
-        id: "node_notify",
-        nodeType: "notify",
-        position: { x: 1400, y: 220 },
-        labelKey: nodeKeys.notify.label,
-        descriptionKey: nodeKeys.notify.description,
-        categoryKey: categoryKeys.integration,
+        id: "node_preview_output",
+        nodeType: "preview_output",
+        position: { x: 1420, y: 220 },
+        labelKey: nodeKeys.previewOutput.label,
+        descriptionKey: nodeKeys.previewOutput.description,
+        categoryKey: categoryKeys.output,
         inputs: [
-          createPort("success", portKeys.success, approvalDecisionType),
-          createPort("failure", portKeys.failure, approvalDecisionType),
+          createPort("main", portKeys.main, previewFrameType),
+          createPort("variant", portKeys.variant, previewFrameType),
         ],
-        outputs: [],
         values: {
-          channel: "email",
-          includeSummary: true,
+          showGrid: true,
+          previewShape: "poster",
         },
-        appearance: {
-          bgColor: "#eef2ff",
-          borderColor: "#6366f1",
-          textColor: "#312e81",
-        },
+        appearance: nodeAppearances.previewOutput,
       }),
     ],
     edges: [
       {
-        id: "edge_start_split",
-        source: "node_start",
-        sourceHandle: "next",
-        target: "node_parallel_split",
-        targetHandle: "trigger",
+        id: "edge_seed_source_layer_fanout",
+        source: "node_seed_source",
+        sourceHandle: "seed",
+        target: "node_layer_fanout",
+        targetHandle: "seed",
       },
       {
-        id: "edge_split_merge_finance",
-        source: "node_parallel_split",
-        sourceHandle: "finance",
-        target: "node_merge",
-        targetHandle: "finance",
+        id: "edge_layer_fanout_color_mix_warm",
+        source: "node_layer_fanout",
+        sourceHandle: "warm",
+        target: "node_color_mix",
+        targetHandle: "warm",
       },
       {
-        id: "edge_split_merge_legal",
-        source: "node_parallel_split",
-        sourceHandle: "legal",
-        target: "node_merge",
-        targetHandle: "legal",
+        id: "edge_layer_fanout_color_mix_cool",
+        source: "node_layer_fanout",
+        sourceHandle: "cool",
+        target: "node_color_mix",
+        targetHandle: "cool",
       },
       {
-        id: "edge_split_merge_security",
-        source: "node_parallel_split",
-        sourceHandle: "security",
-        target: "node_merge",
-        targetHandle: "security",
+        id: "edge_layer_fanout_color_mix_noise",
+        source: "node_layer_fanout",
+        sourceHandle: "noise",
+        target: "node_color_mix",
+        targetHandle: "noise",
       },
       {
-        id: "edge_merge_approval",
-        source: "node_merge",
-        sourceHandle: "next",
-        target: "node_approval",
-        targetHandle: "request",
+        id: "edge_color_mix_stylize_branch",
+        source: "node_color_mix",
+        sourceHandle: "frame",
+        target: "node_stylize_branch",
+        targetHandle: "frame",
       },
       {
-        id: "edge_approval_notify_success",
-        source: "node_approval",
-        sourceHandle: "approved",
-        target: "node_notify",
-        targetHandle: "success",
+        id: "edge_stylize_branch_preview_output_main",
+        source: "node_stylize_branch",
+        sourceHandle: "main",
+        target: "node_preview_output",
+        targetHandle: "main",
       },
       {
-        id: "edge_approval_notify_failure",
-        source: "node_approval",
-        sourceHandle: "rejected",
-        target: "node_notify",
-        targetHandle: "failure",
+        id: "edge_stylize_branch_preview_output_variant",
+        source: "node_stylize_branch",
+        sourceHandle: "variant",
+        target: "node_preview_output",
+        targetHandle: "variant",
       },
     ],
     viewport: {

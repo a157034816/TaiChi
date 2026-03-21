@@ -1,10 +1,11 @@
 # NodeGraph Demo Client
 
-`Examples/NodeGraph.DemoClient.JavaScript` 是一个“业务侧 client”演示项目，用来完整模拟 NodeGraph 的接入方。
+`Examples/NodeGraph.DemoClient.JavaScript` 是一个“视觉编程 playground client”演示项目，用来完整模拟 NodeGraph 的接入方。
 
-它同时扮演 3 个角色：
+它同时扮演 4 个角色：
 
 - 提供节点库接口：`/api/node-library`
+- 提供远端字段选项接口：`/api/node-field-options/:fieldKey`
 - 接收编辑完成回调：`/api/completed`
 - 通过 `SDK/NodeGraph/javascript` 创建编辑会话：`/api/create-session`
 
@@ -14,13 +15,55 @@
 
 1. demo client 调用 NodeGraph 创建会话
 2. NodeGraph 首次见到当前 `domain` 时，从 demo client 拉取节点库
-3. 用户打开 NodeGraph 编辑器进行编辑
-4. 用户提交完成后，NodeGraph 回调 demo client
-5. demo client 页面实时显示最新回调结果
+3. NodeGraph 在需要时继续代理请求 demo client 的远端下拉选项
+4. 用户打开 NodeGraph 编辑器进行编辑
+5. 用户提交完成后，NodeGraph 回调 demo client
+6. demo client 页面实时显示最新回调结果
 
-当前示例节点库已经内置 Blueprint 风格的多输入/多输出节点，包括分流、汇聚、审批通过/拒绝双出口，以及成功/失败双入口通知节点。
+当前示例节点库已经改造成更接近视觉编程的 playground，内置 5 个多输入/多输出节点：
 
-示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient.JavaScript/src/contracts.mjs` 中定义。
+- `seed_source`
+- `layer_fanout`
+- `color_mix`
+- `stylize_branch`
+- `preview_output`
+
+示例字段会刻意覆盖新的编辑器类型：
+
+- `text`: `seedName`
+- `textarea`: `notes`
+- `boolean`: `showGrid`
+- `select`: `distributionMode` / `blendMode` / `previewShape`
+- `date`: `anchorDate`
+- `color`: `baseTint`
+- `int`: `sampleCount`
+- `float`: `variance`
+- `double`: `frequency`
+- `decimal`: `opacity`
+
+其中 `select` 字段不是静态假数据，而是走 Demo 自己暴露的远端接口：
+
+- `GET /api/node-field-options/distributionMode`
+- `GET /api/node-field-options/blendMode`
+- `GET /api/node-field-options/previewShape`
+
+这些接口会返回：
+
+```json
+{
+  "options": [
+    { "value": "screen", "label": "Screen wash" }
+  ]
+}
+```
+
+并兼容 NodeGraph 自动附带的查询参数，例如 `domain`、`nodeType`、`fieldKey`、`locale`。
+
+示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient.JavaScript/src/contracts.mjs` 中定义：
+
+- `GeneratorSeed`
+- `LayerSignal`
+- `PreviewFrame`
 
 ## 启动前提
 
@@ -71,7 +114,7 @@ cd Examples/NodeGraph.DemoClient.JavaScript
 npm run demo:interactive
 ```
 
-这个命令现在默认走 Python 版联调脚本。它会做 4 件事：
+这个命令默认会创建一张 visual playground 图，并完成以下 4 件事：
 
 1. 启动 `Service/NodeGraph`，默认端口 `3300`
 2. 启动 demo client，默认端口 `3101`
@@ -92,7 +135,7 @@ npm run demo:interactive
 你也可以覆盖默认图模式、图名称和端口：
 
 ```bash
-.tools/start-nodegraph-demo.ps1 --graph-mode new --graph-name "Blank Demo Flow" --nodegraph-port 3400 --demo-port 3201
+.tools/start-nodegraph-demo.ps1 --graph-mode new --graph-name "Blank Playground Scene" --nodegraph-port 3400 --demo-port 3201
 ```
 
 ## 可选环境变量
@@ -103,15 +146,15 @@ npm run demo:interactive
 - `DEMO_CLIENT_PORT`：demo client 监听端口，默认 `3100`
 - `DEMO_CLIENT_HOST`：监听主机，默认 `127.0.0.1`
 - `DEMO_CLIENT_BASE_URL`：demo client 对外可访问地址，默认 `http://localhost:3100`
-- `DEMO_CLIENT_DOMAIN`：示例 domain，默认 `demo-workflow`
+- `DEMO_CLIENT_DOMAIN`：示例 domain，默认 `demo-visual-playground`
 
 ## 演示步骤
 
 1. 打开 `http://localhost:3100`
-2. 选择“新建节点图”或“编辑已有示例图”
+2. 选择“新建视觉编程图”或“编辑已有 playground”
 3. 点击 `Create editor session`
 4. 从页面里最新 session 区域拿到 `editorUrl`，或点击 `Open editor page`
-5. 在 NodeGraph 编辑页完成编辑并点击 `Complete editing`
+5. 在 NodeGraph 编辑页里拖动节点、修改不同字段编辑器并点击 `Complete editing`
 6. 回到 demo client 页面查看“最新完成回调”
 
 ## 验证

@@ -2,9 +2,10 @@ function serializeForHtml(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-export function renderHomePage({ config, state }) {
+export function renderHomePage({ config, library, state }) {
   const bootstrap = serializeForHtml({
     config,
+    library,
     latestCompletion: state.latestCompletion,
     lastSession: state.lastSession,
   });
@@ -252,14 +253,14 @@ export function renderHomePage({ config, state }) {
       <section class="hero">
         <div class="badges">
           <span class="badge">NodeGraph Demo Client</span>
-          <span class="badge">Business-side Example</span>
+          <span class="badge">Visual Playground</span>
           <span class="badge">JavaScript SDK</span>
         </div>
         <div class="stack">
-          <h1>直接演示业务侧如何给 NodeGraph 提供节点库、接收完成回调，并创建编辑会话。</h1>
+          <h1>直接演示视觉编程 playground 如何给 NodeGraph 提供节点库、远端字段选项，并创建编辑会话。</h1>
           <p>
-            这个页面就是一个最小可运行的 demo client。你可以在这里发起新图编辑或编辑已有示例图，
-            然后打开 NodeGraph 返回的编辑页。完成提交后，页面会自动显示最新回调结果。
+            这个页面就是一个最小可运行的创意编程 demo client。你可以在这里发起空白画布，
+            或直接打开带有 seed_source、layer_fanout、color_mix 等节点的现成 playground，并查看最新完成回调。
           </p>
         </div>
       </section>
@@ -274,13 +275,13 @@ export function renderHomePage({ config, state }) {
             <label>
               节点图模式
               <select id="graphMode">
-                <option value="new">新建节点图</option>
-                <option value="existing">编辑已有示例图</option>
+                <option value="new">新建视觉编程图</option>
+                <option value="existing">编辑已有 playground</option>
               </select>
             </label>
             <label>
               节点图名称
-              <input id="graphName" value="Demo Approval Flow" />
+              <input id="graphName" value="Visual Playground Composition" />
             </label>
             <div class="button-row">
               <button id="createSessionButton" type="button">Create editor session</button>
@@ -303,7 +304,7 @@ export function renderHomePage({ config, state }) {
           </div>
           <div class="hint">
             如果创建成功，你会看到 <code>editorUrl</code>。打开它后，在 NodeGraph 编辑器里点击 “Complete editing”，
-            demo client 就会收到完成回调。
+            demo client 就会收到最新的视觉编程结果回调。
           </div>
         </div>
 
@@ -350,7 +351,7 @@ export function renderHomePage({ config, state }) {
         <div class="panel stack">
           <div>
             <h2>3. 最新完成回调</h2>
-            <p>NodeGraph 调用 <code>/api/completed</code> 后，最新节点图结果会显示在这里。</p>
+            <p>NodeGraph 调用 <code>/api/completed</code> 后，最新 playground 节点图结果会显示在这里。</p>
           </div>
           <pre id="completionOutput">No completion payload received yet.</pre>
         </div>
@@ -358,7 +359,7 @@ export function renderHomePage({ config, state }) {
         <div class="panel stack">
           <div>
             <h2>4. 当前节点库</h2>
-            <p>NodeGraph 首次见到当前 domain 时，会从本服务的 <code>/api/node-library</code> 拉取这些节点。</p>
+            <p>NodeGraph 首次见到当前 domain 时，会从本服务的 <code>/api/node-library</code> 拉取这些视觉编程节点与远端字段定义。</p>
           </div>
           <pre id="libraryOutput"></pre>
         </div>
@@ -402,7 +403,7 @@ export function renderHomePage({ config, state }) {
           editorLink.href = latestEditorUrl;
           editorLink.classList.add("is-visible");
           sessionHint.textContent =
-            "已经拿到 editorUrl。现在请手动打开编辑页，拖动或修改节点后点击 “Complete editing”，然后回到这个页面查看最新回调。";
+            "已经拿到 editorUrl。现在请手动打开编辑页，拖动或修改视觉节点后点击 “Complete editing”，然后回到这个页面查看最新回调。";
           return;
         }
 
@@ -450,6 +451,7 @@ export function renderHomePage({ config, state }) {
       demoClientBaseUrl.textContent = bootstrap.config.demoClientBaseUrl;
       demoDomain.textContent = bootstrap.config.demoDomain;
       applySession(bootstrap.lastSession);
+      libraryOutput.textContent = pretty(bootstrap.library, "Loading node library...");
       completionOutput.textContent = pretty(bootstrap.latestCompletion, "No completion payload received yet.");
 
       document.getElementById("createSessionButton").addEventListener("click", createSession);

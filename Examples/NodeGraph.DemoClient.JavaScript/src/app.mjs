@@ -1,4 +1,9 @@
-import { demoI18n, demoNodeLibrary, demoTypeMappings, createGraphDocument } from "./demo-data.mjs";
+import {
+  createDemoFieldOptionsPayload,
+  createDemoLibraryBundle,
+  createGraphDocument,
+  demoI18n,
+} from "./demo-data.mjs";
 import { renderHomePage } from "./html.mjs";
 import { createDemoState } from "./state.mjs";
 import { getDemoConfig } from "./config.mjs";
@@ -43,6 +48,7 @@ async function readJsonBody(request) {
 
 export function createApp({ config = getDemoConfig(), state = createDemoState(), nodeGraphClient } = {}) {
   const client = nodeGraphClient ?? createNodeGraphClient(config);
+  const libraryBundle = createDemoLibraryBundle(config);
 
   return async function app(request, response) {
     const url = new URL(request.url ?? "/", config.demoClientBaseUrl);
@@ -59,16 +65,28 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
     }
 
     if (request.method === "GET" && url.pathname === "/") {
-      sendHtml(response, renderHomePage({ config, state }));
+      sendHtml(response, renderHomePage({ config, library: libraryBundle, state }));
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/node-library") {
-      sendJson(response, 200, {
-        nodes: demoNodeLibrary,
-        i18n: demoI18n,
-        typeMappings: demoTypeMappings,
-      });
+      sendJson(response, 200, libraryBundle);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith("/api/node-field-options/")) {
+      const fieldKey = decodeURIComponent(url.pathname.slice("/api/node-field-options/".length));
+      const locale = url.searchParams.get("locale") ?? demoI18n.defaultLocale;
+      const payload = createDemoFieldOptionsPayload(fieldKey, locale);
+
+      if (!payload) {
+        sendJson(response, 404, {
+          error: "Demo field options not found.",
+        });
+        return;
+      }
+
+      sendJson(response, 200, payload);
       return;
     }
 
@@ -114,8 +132,8 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
           typeof body.graphName === "string" && body.graphName.trim()
             ? body.graphName.trim()
             : graphMode === "existing"
-              ? "Demo Existing Approval Flow"
-              : "Demo Approval Flow";
+              ? "Demo Existing Visual Playground"
+              : "Visual Playground Composition";
 
         const payload = await client.createSession({
           domain: config.demoDomain,

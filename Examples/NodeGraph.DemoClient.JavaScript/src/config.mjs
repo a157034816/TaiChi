@@ -18,7 +18,8 @@ export function getDemoConfig(overrides = {}) {
       overrides.nodeGraphBaseUrl ??
       process.env.NODEGRAPH_BASE_URL ??
       "http://localhost:3000",
-    demoDomain: overrides.demoDomain ?? process.env.DEMO_CLIENT_DOMAIN ?? "demo-workflow",
+    demoDomain:
+      overrides.demoDomain ?? process.env.DEMO_CLIENT_DOMAIN ?? "demo-visual-playground",
     clientName: overrides.clientName ?? "NodeGraph Demo Client",
   };
 }
