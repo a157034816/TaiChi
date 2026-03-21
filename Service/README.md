@@ -24,6 +24,22 @@ cd TaiChi/Service/CentralService
 dotnet run --launch-profile http
 ```
 
+### 使用 TaiChi/.tools 通用启动器
+
+如果你希望通过菜单式启动器构建并启动项目，可以在 `TaiChi` 根目录执行：
+
+```bat
+.\.tools\构建启动项目.bat
+```
+
+然后在菜单中选择 `CentralService`。
+
+补充：
+
+- 如需指定 MSBuild 路径，可设置环境变量 `TAICHI_MSBUILD_EXE`（或兼容使用 `ERP_MSBUILD_EXE`）。
+- 如需指定 Python 路径，可设置环境变量 `TAICHI_PYTHON_EXE`。
+- 如果本机暂未安装/准备 Node.js，建议用“自定义启动参数”追加 `--ManagedWebApps:Definitions:0:Enabled=false`，先禁用托管站点。
+
 ### CentralService 托管 admin site（默认启用）
 
 `TaiChi/Service/CentralService/appsettings.json` 默认启用了 `ManagedWebApps`，中心服务启动后会自动拉起并守护 `central-service-admin-site`：

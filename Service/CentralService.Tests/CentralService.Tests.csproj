@@ -26,7 +26,6 @@
     <ProjectReference Include="..\\CentralService\\CentralService.csproj" />
     <ProjectReference Include="..\\..\\SDK\\CentralService\\dotnet\\src\\CentralService.Client\\CentralService.Client.csproj" />
     <ProjectReference Include="..\\..\\SDK\\CentralService\\dotnet\\src\\CentralService.Service\\CentralService.Service.csproj" />
-    <ProjectReference Include="..\\..\\..\\Upgrade.Service\\Upgrade.Service.csproj" />
   </ItemGroup>
 
   <ItemGroup>
