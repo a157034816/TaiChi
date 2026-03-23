@@ -1,14 +1,15 @@
 # NodeGraph Demo Client（.NET）
 
-`Examples/NodeGraph.DemoClient.DotNet` 是一个基于 `NodeGraphSdk` 的最小 Hello World 宿主。
+`Examples/NodeGraph.DemoClient.DotNet` 是一个基于 `NodeGraphSdk` 的 Demo Showcase 宿主示例。
 
 ## 提供的接口
 
 - `GET /`：JSON 概览
 - `GET /api/health`：健康检查
 - `GET /api/runtime/library`：输出当前运行时节点库
+- `GET /api/runtime/field-options`：远端字段选项（当前仅 `demo_source.punctuation` 返回 4 个标点选项）
 - `POST /api/runtime/register`：注册运行时
-- `POST /api/runtime/execute`：执行 Hello World 图
+- `POST /api/runtime/execute`：执行 Demo Showcase 图
 - `POST /api/runtime/debug/sample`：返回断点调试样例
 - `POST /api/create-session`：创建 NodeGraph 编辑会话
 - `POST /api/completed`：接收编辑完成回调
@@ -26,10 +27,33 @@ dotnet run --project Examples/NodeGraph.DemoClient.DotNet/NodeGraph.DemoClient.D
 
 ## 示例能力
 
-该 Demo 内置一个真实可运行的 Hello World 节点库：
+该 Demo 内置版本为 `demo-showcase@1` 的可执行节点库（13 个节点），并自带一张可运行的 Showcase 图（`Demo Showcase Pipeline`）。
+
+节点类型列表：
 
 - `greeting_source`
 - `console_output`
+- `demo_source`
+- `greeting_builder`
+- `math_add`
+- `if_text`
+- `text_interpolate`
+- `const_text`
+- `const_number`
+- `const_boolean`
+- `const_date`
+- `const_color`
+- `const_decimal`
+
+默认图执行结果为：
+
+```json
+{
+  "console": [
+    "Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45"
+  ]
+}
+```
 
 同时演示：
 
@@ -39,6 +63,7 @@ dotnet run --project Examples/NodeGraph.DemoClient.DotNet/NodeGraph.DemoClient.D
 - 宿主内执行
 - 断点调试
 - 性能统计
+- 远端字段选项（下拉框动态选项）
 
 ## 可选环境变量
 

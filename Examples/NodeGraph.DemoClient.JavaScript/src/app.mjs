@@ -125,6 +125,30 @@ export function createApp({
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/runtime/field-options") {
+      const nodeType = url.searchParams.get("nodeType");
+      const fieldKey = url.searchParams.get("fieldKey");
+      const locale = url.searchParams.get("locale") ?? "en";
+
+      if (nodeType === "demo_source" && fieldKey === "punctuation") {
+        const isZh = locale.toLowerCase().startsWith("zh");
+        sendJson(response, 200, {
+          options: [
+            { value: "!", label: isZh ? "感叹号 (!)" : "Exclamation (!)" },
+            { value: "?", label: isZh ? "问号 (?)" : "Question (?)" },
+            { value: ".", label: isZh ? "句号 (.)" : "Dot (.)" },
+            { value: "...", label: isZh ? "省略号 (...)" : "Ellipsis (...)" },
+          ],
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        options: [],
+      });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/results/latest") {
       sendJson(response, 200, {
         runtime: createRuntimeInfo(runtime),

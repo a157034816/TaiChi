@@ -2,23 +2,132 @@ use std::collections::HashSet;
 use std::env;
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use nodegraph_sdk::{
-    CreateSessionRequest, CreateSessionResponse, NodeDefinition, NodeGraphClient, NodeGraphDocument,
-    NodeGraphEdge, NodeGraphExecutionOptions, NodeGraphNode, NodeGraphRuntime,
-    NodeGraphRuntimeOptions, NodeGraphViewport, NodeLibraryFieldDefinition, NodePortDefinition,
-    Position, RuntimeRegistrationResponse, TypeMappingEntry,
+    CreateSessionRequest, CreateSessionResponse, NodeAppearance, NodeDefinition, NodeExecutionContext,
+    NodeGraphClient, NodeGraphDocument, NodeGraphEdge, NodeGraphExecutionOptions, NodeGraphNode,
+    NodeGraphRuntime, NodeGraphRuntimeOptions, NodeGraphViewport, NodeLibraryFieldDefinition,
+    NodePortDefinition, Position, RuntimeRegistrationResponse, TypeMappingEntry,
 };
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
+/// Demo Showcase 的节点库版本号（与其它语言 Demo 保持一致）。
+const DEMO_LIBRARY_VERSION: &str = "demo-showcase@1";
+/// Demo Showcase 的默认图名称（existing 模式）。
+const DEFAULT_EXISTING_GRAPH_NAME: &str = "Demo Showcase Pipeline";
+/// Demo Showcase 的默认图名称（new 模式）。
+const DEFAULT_NEW_GRAPH_NAME: &str = "Blank Demo Showcase Graph";
+/// 文本 canonical 类型。
+const HELLO_TEXT_TYPE: &str = "hello/text";
+/// 数字 canonical 类型。
+const DEMO_NUMBER_TYPE: &str = "demo/number";
+/// 布尔 canonical 类型。
+const DEMO_BOOLEAN_TYPE: &str = "demo/boolean";
+/// 日期 canonical 类型。
+const DEMO_DATE_TYPE: &str = "demo/date";
+/// 颜色 canonical 类型。
+const DEMO_COLOR_TYPE: &str = "demo/color";
+/// 小数 canonical 类型。
+const DEMO_DECIMAL_TYPE: &str = "demo/decimal";
+/// 文本插值节点的默认模板（与其它语言 Demo 保持一致）。
+const DEFAULT_TEMPLATE: &str =
+    "Greeting: {greeting}\nLucky: {lucky}\nDate: {today}\nTheme: {theme}\nAmount: {amount}";
+/// 用于“只发射一次”的节点状态键（避免因多输入触发导致重复 emit）。
+const EMITTED_STATE_KEY: &str = "__emitted";
+
 /// Demo 宿主共享状态。
 type SharedHost = Arc<Mutex<DemoHost>>;
+
+/// 创建端口定义。
+fn create_port(id: &str, label: &str, data_type: &str) -> NodePortDefinition {
+    NodePortDefinition {
+        id: id.to_string(),
+        label: label.to_string(),
+        data_type: Some(data_type.to_string()),
+    }
+}
+
+/// 创建节点外观配置。
+fn create_appearance(bg_color: &str, border_color: &str, text_color: &str) -> NodeAppearance {
+    NodeAppearance {
+        bg_color: Some(bg_color.to_string()),
+        border_color: Some(border_color.to_string()),
+        text_color: Some(text_color.to_string()),
+    }
+}
+
+/// 判断输入是否为空白字符串。
+fn is_blank_string(value: Option<&Value>) -> bool {
+    match value.and_then(Value::as_str) {
+        Some(text) => text.trim().is_empty(),
+        None => true,
+    }
+}
+
+/// 将值尽量转换成非空字符串。
+fn coerce_string(value: Option<&Value>, fallback: &str) -> String {
+    match value.and_then(Value::as_str).map(str::trim).filter(|text| !text.is_empty()) {
+        Some(text) => text.to_string(),
+        None => fallback.to_string(),
+    }
+}
+
+/// 将值尽量转换成“非空字符串”，但保留首尾空白（适用于前缀、模板等需要精确空白的场景）。
+fn coerce_non_blank_string(value: Option<&Value>, fallback: &str) -> String {
+    match value.and_then(Value::as_str) {
+        Some(text) if !text.trim().is_empty() => text.to_string(),
+        _ => fallback.to_string(),
+    }
+}
+
+/// 将值尽量转换成布尔值。
+fn coerce_boolean(value: Option<&Value>, fallback: bool) -> bool {
+    match value {
+        Some(Value::Bool(value)) => *value,
+        Some(Value::String(value)) => {
+            let normalized = value.trim().to_lowercase();
+            if normalized == "true" {
+                return true;
+            }
+            if normalized == "false" {
+                return false;
+            }
+            fallback
+        }
+        Some(Value::Number(value)) => value.as_f64().map(|value| value != 0.0).unwrap_or(fallback),
+        _ => fallback,
+    }
+}
+
+/// 将值尽量转换成数字（f64）。
+fn coerce_number(value: Option<&Value>, fallback: f64) -> f64 {
+    match value {
+        Some(Value::Number(value)) => value.as_f64().unwrap_or(fallback),
+        Some(Value::String(value)) => value.trim().parse::<f64>().unwrap_or(fallback),
+        Some(Value::Bool(value)) => (*value as u8) as f64,
+        _ => fallback,
+    }
+}
+
+/// 判断当前节点是否已在本次执行过程中发射过值。
+fn has_emitted_once(context: &NodeExecutionContext) -> bool {
+    context
+        .state
+        .get(EMITTED_STATE_KEY)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+/// 标记当前节点已在本次执行过程中发射过值。
+fn mark_emitted_once(context: &NodeExecutionContext) {
+    context.state.insert(EMITTED_STATE_KEY, json!(true));
+}
 
 /// Demo 宿主配置。
 #[derive(Debug, Clone)]
@@ -70,6 +179,16 @@ struct GraphRequest {
     force_refresh: Option<bool>,
 }
 
+/// 字段选项接口查询参数。
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct FieldOptionsQuery {
+    domain: Option<String>,
+    node_type: Option<String>,
+    field_key: Option<String>,
+    locale: Option<String>,
+}
+
 /// Rust Demo 宿主。
 struct DemoHost {
     config: DemoConfig,
@@ -116,13 +235,14 @@ impl DemoHost {
     /// 返回对外概览。
     fn overview(&self) -> Value {
         json!({
-            "message": "NodeGraph Rust Hello World demo host",
+            "message": "NodeGraph Rust Demo Showcase host",
             "runtime": self.runtime_info(),
             "library": self.runtime.get_library(),
             "sampleGraph": create_graph(None, None),
             "endpoints": [
                 "/api/health",
                 "/api/runtime/library",
+                "/api/runtime/field-options",
                 "/api/runtime/register",
                 "/api/runtime/execute",
                 "/api/runtime/debug/sample",
@@ -193,7 +313,7 @@ impl DemoHost {
                     ("graphMode".to_string(), resolved_mode.to_string()),
                     (
                         "source".to_string(),
-                        "NodeGraph.DemoClient.Rust.HelloWorld".to_string(),
+                        "NodeGraph.DemoClient.Rust.Showcase".to_string(),
                     ),
                 ])),
             })
@@ -214,7 +334,7 @@ impl DemoHost {
         Ok(response)
     }
 
-    /// 执行 Hello World 图。
+    /// 执行 Demo Showcase 图。
     fn execute(&mut self, graph_mode: Option<String>, graph_name: Option<String>) -> Value {
         let graph = create_graph(graph_name.as_deref(), graph_mode.as_deref());
         let snapshot = self.runtime.execute_graph(&graph, None);
@@ -296,6 +416,7 @@ async fn main() {
         .route("/", get(get_overview))
         .route("/api/health", get(get_health))
         .route("/api/runtime/library", get(get_library))
+        .route("/api/runtime/field-options", get(get_field_options))
         .route("/api/runtime/register", post(post_register_runtime))
         .route("/api/runtime/execute", post(post_execute))
         .route("/api/runtime/debug/sample", post(post_debug_sample))
@@ -337,6 +458,28 @@ async fn get_health(State(host): State<SharedHost>) -> Json<Value> {
 /// 节点库接口。
 async fn get_library(State(host): State<SharedHost>) -> Json<Value> {
     Json(host.lock().await.library_payload())
+}
+
+/// 远端字段选项接口。
+async fn get_field_options(query: Query<FieldOptionsQuery>) -> Json<Value> {
+    let _domain = query.domain.as_deref().unwrap_or_default();
+    let node_type = query.node_type.as_deref().unwrap_or_default();
+    let field_key = query.field_key.as_deref().unwrap_or_default();
+    let locale = query.locale.as_deref().unwrap_or("en");
+    let is_zh = locale.to_lowercase().starts_with("zh");
+
+    if node_type == "demo_source" && field_key == "punctuation" {
+        return Json(json!({
+            "options": [
+                { "value": "!", "label": if is_zh { "感叹号 (!)" } else { "Exclamation (!)" } },
+                { "value": "?", "label": if is_zh { "问号 (?)" } else { "Question (?)" } },
+                { "value": ".", "label": if is_zh { "句号 (.)" } else { "Dot (.)" } },
+                { "value": "...", "label": if is_zh { "省略号 (...)" } else { "Ellipsis (...)" } }
+            ]
+        }));
+    }
+
+    Json(json!({ "options": [] }))
 }
 
 /// 最近状态接口。
@@ -427,13 +570,13 @@ fn chrono_like_now() -> String {
     format!("{:?}", std::time::SystemTime::now())
 }
 
-/// 创建 Hello World 运行时。
+/// 创建 Demo Showcase 运行时。
 fn create_runtime(config: &DemoConfig) -> NodeGraphRuntime {
     let mut runtime = NodeGraphRuntime::new(NodeGraphRuntimeOptions {
         domain: config.demo_domain.clone(),
         client_name: Some(config.client_name.clone()),
         control_base_url: format!("{}/api/runtime", config.demo_client_base_url),
-        library_version: "hello-world@1".to_string(),
+        library_version: DEMO_LIBRARY_VERSION.to_string(),
         capabilities: None,
         runtime_id: None,
         cache_ttl: None,
@@ -442,28 +585,49 @@ fn create_runtime(config: &DemoConfig) -> NodeGraphRuntime {
     .expect("failed to create rust demo runtime");
 
     runtime.register_type_mapping(TypeMappingEntry {
-        canonical_id: "hello/text".to_string(),
-        node_type: String::from("String"),
+        canonical_id: HELLO_TEXT_TYPE.to_string(),
+        node_type: "DemoText".to_string(),
         color: Some("#2563eb".to_string()),
+    });
+
+    runtime.register_type_mapping(TypeMappingEntry {
+        canonical_id: DEMO_NUMBER_TYPE.to_string(),
+        node_type: "DemoNumber".to_string(),
+        color: Some("#f97316".to_string()),
+    });
+
+    runtime.register_type_mapping(TypeMappingEntry {
+        canonical_id: DEMO_BOOLEAN_TYPE.to_string(),
+        node_type: "DemoBoolean".to_string(),
+        color: Some("#22c55e".to_string()),
+    });
+
+    runtime.register_type_mapping(TypeMappingEntry {
+        canonical_id: DEMO_DATE_TYPE.to_string(),
+        node_type: "DemoDate".to_string(),
+        color: Some("#a855f7".to_string()),
+    });
+
+    runtime.register_type_mapping(TypeMappingEntry {
+        canonical_id: DEMO_COLOR_TYPE.to_string(),
+        node_type: "DemoColor".to_string(),
+        color: Some("#e11d48".to_string()),
+    });
+
+    runtime.register_type_mapping(TypeMappingEntry {
+        canonical_id: DEMO_DECIMAL_TYPE.to_string(),
+        node_type: "DemoDecimal".to_string(),
+        color: Some("#06b6d4".to_string()),
     });
 
     runtime.register_node(
         NodeDefinition::new("greeting_source", "Greeting Source", "Hello World", |context| {
-            let name = context
-                .values
-                .get("name")
-                .and_then(Value::as_str)
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or("World");
+            let name = coerce_string(context.values.get("name"), "World");
             context.emit("text", json!(format!("Hello, {name}!")));
             Ok(())
         })
         .with_description("Create the greeting text that will be sent to the output node.")
-        .with_outputs(vec![NodePortDefinition {
-            id: "text".to_string(),
-            label: "Text".to_string(),
-            data_type: Some("hello/text".to_string()),
-        }])
+        .with_outputs(vec![create_port("text", "Text", HELLO_TEXT_TYPE)])
         .with_fields(vec![NodeLibraryFieldDefinition {
             key: "name".to_string(),
             label: "Name".to_string(),
@@ -471,11 +635,12 @@ fn create_runtime(config: &DemoConfig) -> NodeGraphRuntime {
             kind: "text".to_string(),
             default_value: Some(json!("World")),
             options_endpoint: None,
-        }]),
+        }])
+        .with_appearance(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
     );
 
     runtime.register_node(
-        NodeDefinition::new("console_output", "Console Output", "Hello World", |context| {
+        NodeDefinition::new("console_output", "Console Output", "Debug", |context| {
             context.push_result(
                 "console",
                 context.read_input("text").unwrap_or_else(|| json!("Hello, World!")),
@@ -483,11 +648,446 @@ fn create_runtime(config: &DemoConfig) -> NodeGraphRuntime {
             Ok(())
         })
         .with_description("Collect the final greeting into the runtime result buffer.")
-        .with_inputs(vec![NodePortDefinition {
-            id: "text".to_string(),
+        .with_inputs(vec![create_port("text", "Text", HELLO_TEXT_TYPE)])
+        .with_appearance(create_appearance("#f0fdf4", "#16a34a", "#14532d")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("demo_source", "Demo Source", "Playground", move |context| {
+            let name = coerce_string(context.values.get("name"), "Codex");
+            let punctuation = coerce_string(context.values.get("punctuation"), "!");
+            let enabled = coerce_boolean(context.values.get("enabled"), true);
+            let base_number = coerce_number(context.values.get("baseNumber"), 7.0);
+            let delta = coerce_number(context.values.get("delta"), 5.0);
+            let today = coerce_string(context.values.get("today"), "2026-03-21");
+            let theme = coerce_string(context.values.get("theme"), "#2563eb");
+            let amount = coerce_string(context.values.get("amount"), "123.45");
+
+            context.emit("name", json!(name));
+            context.emit("punctuation", json!(punctuation));
+            context.emit("enabled", json!(enabled));
+            context.emit("baseNumber", json!(base_number));
+            context.emit("delta", json!(delta));
+            context.emit("today", json!(today));
+            context.emit("theme", json!(theme));
+            context.emit("amount", json!(amount));
+            Ok(())
+        })
+        .with_description(
+            "Emit a bundle of typed values so downstream nodes can demonstrate rich editor features.",
+        )
+        .with_outputs(vec![
+            create_port("name", "Name", HELLO_TEXT_TYPE),
+            create_port("punctuation", "Punctuation", HELLO_TEXT_TYPE),
+            create_port("enabled", "Enabled", DEMO_BOOLEAN_TYPE),
+            create_port("baseNumber", "Base", DEMO_NUMBER_TYPE),
+            create_port("delta", "Delta", DEMO_NUMBER_TYPE),
+            create_port("today", "Date", DEMO_DATE_TYPE),
+            create_port("theme", "Theme", DEMO_COLOR_TYPE),
+            create_port("amount", "Amount", DEMO_DECIMAL_TYPE),
+        ])
+        .with_fields(vec![
+            NodeLibraryFieldDefinition {
+                key: "name".to_string(),
+                label: "Name".to_string(),
+                placeholder: Some("The name used in the greeting pipeline.".to_string()),
+                kind: "text".to_string(),
+                default_value: Some(json!("Codex")),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "punctuation".to_string(),
+                label: "Punctuation".to_string(),
+                placeholder: None,
+                kind: "select".to_string(),
+                default_value: Some(json!("!")),
+                options_endpoint: Some(format!(
+                    "{}/api/runtime/field-options",
+                    config.demo_client_base_url
+                )),
+            },
+            NodeLibraryFieldDefinition {
+                key: "enabled".to_string(),
+                label: "Enabled".to_string(),
+                placeholder: None,
+                kind: "boolean".to_string(),
+                default_value: Some(json!(true)),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "baseNumber".to_string(),
+                label: "Base Number".to_string(),
+                placeholder: None,
+                kind: "int".to_string(),
+                default_value: Some(json!(7)),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "delta".to_string(),
+                label: "Delta".to_string(),
+                placeholder: None,
+                kind: "double".to_string(),
+                default_value: Some(json!(5)),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "today".to_string(),
+                label: "Date".to_string(),
+                placeholder: None,
+                kind: "date".to_string(),
+                default_value: Some(json!("2026-03-21")),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "theme".to_string(),
+                label: "Theme Color".to_string(),
+                placeholder: None,
+                kind: "color".to_string(),
+                default_value: Some(json!("#2563eb")),
+                options_endpoint: None,
+            },
+            NodeLibraryFieldDefinition {
+                key: "amount".to_string(),
+                label: "Amount (decimal string)".to_string(),
+                placeholder: None,
+                kind: "decimal".to_string(),
+                default_value: Some(json!("123.45")),
+                options_endpoint: None,
+            },
+        ])
+        .with_appearance(create_appearance("#0b1220", "#38bdf8", "#e0f2fe")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("greeting_builder", "Greeting Builder", "Text", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            let name = context.read_input("name");
+            let punctuation = context.read_input("punctuation");
+            if name.is_none() || punctuation.is_none() {
+                return Ok(());
+            }
+
+            let prefix = coerce_non_blank_string(context.values.get("prefix"), "Hello, ");
+            context.emit(
+                "text",
+                json!(format!(
+                    "{}{}{}",
+                    prefix,
+                    coerce_string(name.as_ref(), "World"),
+                    coerce_string(punctuation.as_ref(), "!")
+                )),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description(
+            "Build a greeting message from inputs and emit it only when both inputs are ready.",
+        )
+        .with_inputs(vec![
+            create_port("name", "Name", HELLO_TEXT_TYPE),
+            create_port("punctuation", "Punctuation", HELLO_TEXT_TYPE),
+        ])
+        .with_outputs(vec![create_port("text", "Greeting", HELLO_TEXT_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "prefix".to_string(),
+            label: "Prefix".to_string(),
+            placeholder: Some("Text inserted before the name.".to_string()),
+            kind: "text".to_string(),
+            default_value: Some(json!("Hello, ")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("math_add", "Add Numbers", "Math", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            let a = context.read_input("a");
+            let b = context.read_input("b");
+            if a.is_none() || b.is_none() {
+                return Ok(());
+            }
+
+            let sum = coerce_number(a.as_ref(), 0.0) + coerce_number(b.as_ref(), 0.0);
+            context.emit("sum", json!(sum));
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Add two numeric inputs and emit a sum once both values are available.")
+        .with_inputs(vec![
+            create_port("a", "A", DEMO_NUMBER_TYPE),
+            create_port("b", "B", DEMO_NUMBER_TYPE),
+        ])
+        .with_outputs(vec![create_port("sum", "Sum", DEMO_NUMBER_TYPE)])
+        .with_appearance(create_appearance("#fff7ed", "#f97316", "#7c2d12")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("if_text", "If (Text)", "Logic", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            let condition = context.read_input("condition");
+            let when_true = context.read_input("whenTrue");
+            if condition.is_none() || when_true.is_none() {
+                return Ok(());
+            }
+
+            if coerce_boolean(condition.as_ref(), false) {
+                context.emit("text", json!(coerce_string(when_true.as_ref(), "")));
+                mark_emitted_once(context);
+                return Ok(());
+            }
+
+            let when_false = context.read_input("whenFalse");
+            if when_false.is_some() && !is_blank_string(when_false.as_ref()) {
+                context.emit("text", json!(coerce_string(when_false.as_ref(), "")));
+            } else {
+                context.emit(
+                    "text",
+                    json!(coerce_string(context.values.get("fallback"), "(disabled)")),
+                );
+            }
+
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Select between two text branches based on a boolean condition.")
+        .with_inputs(vec![
+            create_port("condition", "Condition", DEMO_BOOLEAN_TYPE),
+            create_port("whenTrue", "When True", HELLO_TEXT_TYPE),
+            create_port("whenFalse", "When False", HELLO_TEXT_TYPE),
+        ])
+        .with_outputs(vec![create_port("text", "Text", HELLO_TEXT_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "fallback".to_string(),
+            label: "Fallback".to_string(),
+            placeholder: Some(
+                "Used when condition=false and the whenFalse port is not connected.".to_string(),
+            ),
+            kind: "text".to_string(),
+            default_value: Some(json!("(disabled)")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#f0fdf4", "#22c55e", "#14532d")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("text_interpolate", "Text Interpolate", "Text", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            let greeting = context.read_input("greeting");
+            let lucky = context.read_input("lucky");
+            let today = context.read_input("today");
+            let theme = context.read_input("theme");
+            let amount = context.read_input("amount");
+
+            if greeting.is_none()
+                || lucky.is_none()
+                || today.is_none()
+                || theme.is_none()
+                || amount.is_none()
+            {
+                return Ok(());
+            }
+
+            let template = coerce_string(context.values.get("template"), DEFAULT_TEMPLATE);
+            let rendered = template
+                .replace("{greeting}", &coerce_string(greeting.as_ref(), ""))
+                .replace(
+                    "{lucky}",
+                    &coerce_number(lucky.as_ref(), 0.0).to_string(),
+                )
+                .replace("{today}", &coerce_string(today.as_ref(), ""))
+                .replace("{theme}", &coerce_string(theme.as_ref(), ""))
+                .replace("{amount}", &coerce_string(amount.as_ref(), ""));
+
+            context.emit("text", json!(rendered));
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Render a multi-line template by interpolating typed inputs.")
+        .with_inputs(vec![
+            create_port("greeting", "Greeting", HELLO_TEXT_TYPE),
+            create_port("lucky", "Lucky Number", DEMO_NUMBER_TYPE),
+            create_port("today", "Date", DEMO_DATE_TYPE),
+            create_port("theme", "Theme Color", DEMO_COLOR_TYPE),
+            create_port("amount", "Amount", DEMO_DECIMAL_TYPE),
+        ])
+        .with_outputs(vec![create_port("text", "Text", HELLO_TEXT_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "template".to_string(),
+            label: "Template".to_string(),
+            placeholder: Some("Use tokens like {greeting} to interpolate values.".to_string()),
+            kind: "textarea".to_string(),
+            default_value: Some(json!(DEFAULT_TEMPLATE)),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_text", "Const (Text)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit("text", json!(coerce_string(context.values.get("text"), "")));
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Emit a constant text value.")
+        .with_outputs(vec![create_port("text", "Text", HELLO_TEXT_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "text".to_string(),
             label: "Text".to_string(),
-            data_type: Some("hello/text".to_string()),
-        }]),
+            placeholder: Some("Constant text emitted by this node.".to_string()),
+            kind: "textarea".to_string(),
+            default_value: Some(json!("Hello")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_number", "Const (Number)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit(
+                "number",
+                json!(coerce_number(context.values.get("value"), 0.0)),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Emit a constant numeric value.")
+        .with_outputs(vec![create_port("number", "Number", DEMO_NUMBER_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "value".to_string(),
+            label: "Value".to_string(),
+            placeholder: Some("Constant number emitted by this node.".to_string()),
+            kind: "double".to_string(),
+            default_value: Some(json!(0)),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#fff7ed", "#f97316", "#7c2d12")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_boolean", "Const (Boolean)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit(
+                "value",
+                json!(coerce_boolean(context.values.get("value"), true)),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Emit a constant boolean value.")
+        .with_outputs(vec![create_port("value", "Value", DEMO_BOOLEAN_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "value".to_string(),
+            label: "Value".to_string(),
+            placeholder: None,
+            kind: "boolean".to_string(),
+            default_value: Some(json!(true)),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#f0fdf4", "#22c55e", "#14532d")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_date", "Const (Date)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit(
+                "date",
+                json!(coerce_string(context.values.get("date"), "2026-03-21")),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Emit a constant date string (YYYY-MM-DD).")
+        .with_outputs(vec![create_port("date", "Date", DEMO_DATE_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "date".to_string(),
+            label: "Date".to_string(),
+            placeholder: None,
+            kind: "date".to_string(),
+            default_value: Some(json!("2026-03-21")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#faf5ff", "#a855f7", "#581c87")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_color", "Const (Color)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit(
+                "color",
+                json!(coerce_string(context.values.get("color"), "#2563eb")),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description("Emit a constant color string (#RRGGBB).")
+        .with_outputs(vec![create_port("color", "Color", DEMO_COLOR_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "color".to_string(),
+            label: "Color".to_string(),
+            placeholder: None,
+            kind: "color".to_string(),
+            default_value: Some(json!("#2563eb")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#fff1f2", "#e11d48", "#881337")),
+    );
+
+    runtime.register_node(
+        NodeDefinition::new("const_decimal", "Const (Decimal)", "Inputs", |context| {
+            if has_emitted_once(context) {
+                return Ok(());
+            }
+
+            context.emit(
+                "decimal",
+                json!(coerce_string(context.values.get("value"), "123.45")),
+            );
+            mark_emitted_once(context);
+            Ok(())
+        })
+        .with_description(
+            "Emit a decimal value as a string to demonstrate the decimal field editor.",
+        )
+        .with_outputs(vec![create_port("decimal", "Decimal", DEMO_DECIMAL_TYPE)])
+        .with_fields(vec![NodeLibraryFieldDefinition {
+            key: "value".to_string(),
+            label: "Value".to_string(),
+            placeholder: Some("A decimal string like 123.45".to_string()),
+            kind: "decimal".to_string(),
+            default_value: Some(json!("123.45")),
+            options_endpoint: None,
+        }])
+        .with_appearance(create_appearance("#ecfeff", "#06b6d4", "#164e63")),
     );
 
     runtime
@@ -500,16 +1100,16 @@ fn create_graph(graph_name: Option<&str>, graph_mode: Option<&str>) -> NodeGraph
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(if mode == "new" {
-            "Blank Hello World Graph"
+            DEFAULT_NEW_GRAPH_NAME
         } else {
-            "Hello World Pipeline"
+            DEFAULT_EXISTING_GRAPH_NAME
         });
 
     if mode == "new" {
         return NodeGraphDocument {
             graph_id: None,
             name: resolved_name.to_string(),
-            description: Some("Start from a blank Hello World graph.".to_string()),
+            description: Some("Start from a blank Demo Showcase graph.".to_string()),
             nodes: Vec::new(),
             edges: Vec::new(),
             viewport: NodeGraphViewport {
@@ -521,77 +1121,393 @@ fn create_graph(graph_name: Option<&str>, graph_mode: Option<&str>) -> NodeGraph
     }
 
     NodeGraphDocument {
-        graph_id: Some("hello-world-demo-graph".to_string()),
+        graph_id: Some("demo-showcase-graph".to_string()),
         name: resolved_name.to_string(),
-        description: Some("A runnable Hello World graph hosted by the Rust SDK demo.".to_string()),
+        description: Some("A runnable Demo Showcase graph hosted by the Rust SDK demo.".to_string()),
         nodes: vec![
             NodeGraphNode {
                 id: "node_source".to_string(),
                 node_type: "default".to_string(),
-                position: Position { x: 80.0, y: 160.0 },
+                position: Position { x: 80.0, y: 220.0 },
                 data: Map::from_iter([
-                    ("label".to_string(), json!("Greeting Source")),
-                    ("nodeType".to_string(), json!("greeting_source")),
+                    ("label".to_string(), json!("Demo Source")),
+                    (
+                        "description".to_string(),
+                        json!("Emit typed values to drive the showcase pipeline."),
+                    ),
+                    ("category".to_string(), json!("Playground")),
+                    ("nodeType".to_string(), json!("demo_source")),
+                    ("inputs".to_string(), json!([])),
                     (
                         "outputs".to_string(),
                         json!([
-                            {
-                                "id": "text",
-                                "label": "Text",
-                                "dataType": "hello/text"
-                            }
+                            create_port("name", "Name", HELLO_TEXT_TYPE),
+                            create_port("punctuation", "Punctuation", HELLO_TEXT_TYPE),
+                            create_port("enabled", "Enabled", DEMO_BOOLEAN_TYPE),
+                            create_port("baseNumber", "Base", DEMO_NUMBER_TYPE),
+                            create_port("delta", "Delta", DEMO_NUMBER_TYPE),
+                            create_port("today", "Date", DEMO_DATE_TYPE),
+                            create_port("theme", "Theme", DEMO_COLOR_TYPE),
+                            create_port("amount", "Amount", DEMO_DECIMAL_TYPE)
                         ]),
                     ),
                     (
                         "values".to_string(),
                         json!({
-                            "name": "Codex"
+                            "name": "Codex",
+                            "punctuation": "!",
+                            "enabled": true,
+                            "baseNumber": 7,
+                            "delta": 5,
+                            "today": "2026-03-21",
+                            "theme": "#2563eb",
+                            "amount": "123.45"
                         }),
+                    ),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#0b1220", "#38bdf8", "#e0f2fe")),
                     ),
                 ]),
                 width: None,
                 height: None,
-                style: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#0b1220")),
+                    ("borderColor".to_string(), json!("#38bdf8")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#e0f2fe")),
+                ])),
+            },
+            NodeGraphNode {
+                id: "node_greet".to_string(),
+                node_type: "default".to_string(),
+                position: Position { x: 420.0, y: 140.0 },
+                data: Map::from_iter([
+                    ("label".to_string(), json!("Greeting Builder")),
+                    ("description".to_string(), json!("Build the greeting message.")),
+                    ("category".to_string(), json!("Text")),
+                    ("nodeType".to_string(), json!("greeting_builder")),
+                    (
+                        "inputs".to_string(),
+                        json!([
+                            create_port("name", "Name", HELLO_TEXT_TYPE),
+                            create_port("punctuation", "Punctuation", HELLO_TEXT_TYPE)
+                        ]),
+                    ),
+                    (
+                        "outputs".to_string(),
+                        json!([create_port("text", "Greeting", HELLO_TEXT_TYPE)]),
+                    ),
+                    ("values".to_string(), json!({ "prefix": "Hello, " })),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
+                    ),
+                ]),
+                width: None,
+                height: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#eff6ff")),
+                    ("borderColor".to_string(), json!("#2563eb")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#1e3a8a")),
+                ])),
+            },
+            NodeGraphNode {
+                id: "node_add".to_string(),
+                node_type: "default".to_string(),
+                position: Position { x: 420.0, y: 360.0 },
+                data: Map::from_iter([
+                    ("label".to_string(), json!("Add Numbers")),
+                    (
+                        "description".to_string(),
+                        json!("Compute a derived lucky number."),
+                    ),
+                    ("category".to_string(), json!("Math")),
+                    ("nodeType".to_string(), json!("math_add")),
+                    (
+                        "inputs".to_string(),
+                        json!([
+                            create_port("a", "A", DEMO_NUMBER_TYPE),
+                            create_port("b", "B", DEMO_NUMBER_TYPE)
+                        ]),
+                    ),
+                    (
+                        "outputs".to_string(),
+                        json!([create_port("sum", "Sum", DEMO_NUMBER_TYPE)]),
+                    ),
+                    ("values".to_string(), json!({})),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#fff7ed", "#f97316", "#7c2d12")),
+                    ),
+                ]),
+                width: None,
+                height: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#fff7ed")),
+                    ("borderColor".to_string(), json!("#f97316")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#7c2d12")),
+                ])),
+            },
+            NodeGraphNode {
+                id: "node_gate".to_string(),
+                node_type: "default".to_string(),
+                position: Position { x: 720.0, y: 140.0 },
+                data: Map::from_iter([
+                    ("label".to_string(), json!("If (Text)")),
+                    (
+                        "description".to_string(),
+                        json!("Gate the greeting pipeline with a boolean condition."),
+                    ),
+                    ("category".to_string(), json!("Logic")),
+                    ("nodeType".to_string(), json!("if_text")),
+                    (
+                        "inputs".to_string(),
+                        json!([
+                            create_port("condition", "Condition", DEMO_BOOLEAN_TYPE),
+                            create_port("whenTrue", "When True", HELLO_TEXT_TYPE),
+                            create_port("whenFalse", "When False", HELLO_TEXT_TYPE)
+                        ]),
+                    ),
+                    (
+                        "outputs".to_string(),
+                        json!([create_port("text", "Text", HELLO_TEXT_TYPE)]),
+                    ),
+                    ("values".to_string(), json!({ "fallback": "(disabled)" })),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#f0fdf4", "#22c55e", "#14532d")),
+                    ),
+                ]),
+                width: None,
+                height: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#f0fdf4")),
+                    ("borderColor".to_string(), json!("#22c55e")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#14532d")),
+                ])),
+            },
+            NodeGraphNode {
+                id: "node_format".to_string(),
+                node_type: "default".to_string(),
+                position: Position { x: 980.0, y: 240.0 },
+                data: Map::from_iter([
+                    ("label".to_string(), json!("Text Interpolate")),
+                    (
+                        "description".to_string(),
+                        json!("Combine typed inputs into a multi-line summary."),
+                    ),
+                    ("category".to_string(), json!("Text")),
+                    ("nodeType".to_string(), json!("text_interpolate")),
+                    (
+                        "inputs".to_string(),
+                        json!([
+                            create_port("greeting", "Greeting", HELLO_TEXT_TYPE),
+                            create_port("lucky", "Lucky Number", DEMO_NUMBER_TYPE),
+                            create_port("today", "Date", DEMO_DATE_TYPE),
+                            create_port("theme", "Theme Color", DEMO_COLOR_TYPE),
+                            create_port("amount", "Amount", DEMO_DECIMAL_TYPE)
+                        ]),
+                    ),
+                    (
+                        "outputs".to_string(),
+                        json!([create_port("text", "Text", HELLO_TEXT_TYPE)]),
+                    ),
+                    ("values".to_string(), json!({ "template": DEFAULT_TEMPLATE })),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#eff6ff", "#2563eb", "#1e3a8a")),
+                    ),
+                ]),
+                width: None,
+                height: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#eff6ff")),
+                    ("borderColor".to_string(), json!("#2563eb")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#1e3a8a")),
+                ])),
             },
             NodeGraphNode {
                 id: "node_output".to_string(),
                 node_type: "default".to_string(),
-                position: Position { x: 380.0, y: 160.0 },
+                position: Position { x: 1320.0, y: 240.0 },
                 data: Map::from_iter([
                     ("label".to_string(), json!("Console Output")),
+                    (
+                        "description".to_string(),
+                        json!("Collect the final text into the runtime result buffer."),
+                    ),
+                    ("category".to_string(), json!("Debug")),
                     ("nodeType".to_string(), json!("console_output")),
                     (
                         "inputs".to_string(),
-                        json!([
-                            {
-                                "id": "text",
-                                "label": "Text",
-                                "dataType": "hello/text"
-                            }
-                        ]),
+                        json!([create_port("text", "Text", HELLO_TEXT_TYPE)]),
                     ),
+                    ("outputs".to_string(), json!([])),
                     ("values".to_string(), json!({})),
+                    (
+                        "appearance".to_string(),
+                        json!(create_appearance("#f0fdf4", "#16a34a", "#14532d")),
+                    ),
                 ]),
                 width: None,
                 height: None,
-                style: None,
+                style: Some(Map::from_iter([
+                    ("background".to_string(), json!("#f0fdf4")),
+                    ("borderColor".to_string(), json!("#16a34a")),
+                    ("borderRadius".to_string(), json!(18)),
+                    ("borderWidth".to_string(), json!(1)),
+                    ("color".to_string(), json!("#14532d")),
+                ])),
             },
         ],
-        edges: vec![NodeGraphEdge {
-            id: "edge_source_output".to_string(),
-            source: "node_source".to_string(),
-            target: "node_output".to_string(),
-            source_handle: Some("text".to_string()),
-            target_handle: Some("text".to_string()),
-            label: None,
-            edge_type: None,
-            animated: None,
-            invalid_reason: None,
-        }],
+        edges: vec![
+            NodeGraphEdge {
+                id: "edge_source_name".to_string(),
+                source: "node_source".to_string(),
+                target: "node_greet".to_string(),
+                source_handle: Some("name".to_string()),
+                target_handle: Some("name".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_punct".to_string(),
+                source: "node_source".to_string(),
+                target: "node_greet".to_string(),
+                source_handle: Some("punctuation".to_string()),
+                target_handle: Some("punctuation".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_greet_text".to_string(),
+                source: "node_greet".to_string(),
+                target: "node_gate".to_string(),
+                source_handle: Some("text".to_string()),
+                target_handle: Some("whenTrue".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_enabled".to_string(),
+                source: "node_source".to_string(),
+                target: "node_gate".to_string(),
+                source_handle: Some("enabled".to_string()),
+                target_handle: Some("condition".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_base".to_string(),
+                source: "node_source".to_string(),
+                target: "node_add".to_string(),
+                source_handle: Some("baseNumber".to_string()),
+                target_handle: Some("a".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_delta".to_string(),
+                source: "node_source".to_string(),
+                target: "node_add".to_string(),
+                source_handle: Some("delta".to_string()),
+                target_handle: Some("b".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_add_sum".to_string(),
+                source: "node_add".to_string(),
+                target: "node_format".to_string(),
+                source_handle: Some("sum".to_string()),
+                target_handle: Some("lucky".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_gate_text".to_string(),
+                source: "node_gate".to_string(),
+                target: "node_format".to_string(),
+                source_handle: Some("text".to_string()),
+                target_handle: Some("greeting".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_today".to_string(),
+                source: "node_source".to_string(),
+                target: "node_format".to_string(),
+                source_handle: Some("today".to_string()),
+                target_handle: Some("today".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_theme".to_string(),
+                source: "node_source".to_string(),
+                target: "node_format".to_string(),
+                source_handle: Some("theme".to_string()),
+                target_handle: Some("theme".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_source_amount".to_string(),
+                source: "node_source".to_string(),
+                target: "node_format".to_string(),
+                source_handle: Some("amount".to_string()),
+                target_handle: Some("amount".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+            NodeGraphEdge {
+                id: "edge_format_text".to_string(),
+                source: "node_format".to_string(),
+                target: "node_output".to_string(),
+                source_handle: Some("text".to_string()),
+                target_handle: Some("text".to_string()),
+                label: None,
+                edge_type: None,
+                animated: None,
+                invalid_reason: None,
+            },
+        ],
         viewport: NodeGraphViewport {
             x: 40.0,
-            y: 20.0,
-            zoom: 0.95,
+            y: 80.0,
+            zoom: 0.85,
         },
     }
 }

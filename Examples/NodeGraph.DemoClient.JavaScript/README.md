@@ -1,11 +1,13 @@
 # NodeGraph Demo Client（JavaScript）
 
-`Examples/NodeGraph.DemoClient.JavaScript` 是一个基于 JavaScript SDK 的 Hello World 宿主示例，用来完整演示：
+`Examples/NodeGraph.DemoClient.JavaScript` 是一个基于 JavaScript SDK 的 Demo Showcase 宿主示例，用来完整演示：
 
 - 运行时初始化与 `runtimeId` 生成
 - 节点库内嵌输出
 - 注册运行时缓存
 - 创建编辑会话
+- 多类型字段（`text/textarea/boolean/select/int/double/date/color/decimal`）
+- 远端字段选项（`/api/runtime/field-options`，用于下拉框动态选项）
 - 宿主侧执行节点图
 - 断点调试与性能统计
 - 接收编辑完成回调
@@ -16,8 +18,9 @@
 - `GET /api/health`：健康检查
 - `GET /api/runtime/library`：输出当前运行时节点库
 - `GET /api/node-library`：兼容别名，返回与 `/api/runtime/library` 相同的数据
+- `GET /api/runtime/field-options`：远端字段选项（当前仅 `demo_source.punctuation` 返回 4 个标点选项）
 - `POST /api/runtime/register`：触发运行时注册
-- `POST /api/runtime/execute`：执行一张 Hello World 图
+- `POST /api/runtime/execute`：执行一张 Demo Showcase 图
 - `POST /api/runtime/debug/sample`：返回一组断点调试快照
 - `POST /api/create-session`：先注册运行时，再向 NodeGraph 创建编辑会话
 - `POST /api/completed`：接收 NodeGraph 编辑完成回调
@@ -25,16 +28,24 @@
 
 ## 示例节点库
 
-当前 Demo 节点库是真实可运行的 Hello World：
+当前 Demo 节点库版本为 `demo-showcase@1`，包含 13 个可执行节点，用于展示节点编辑器的组合能力：
 
 - `greeting_source`：读取 `name` 字段并输出 `Hello, {name}!`
 - `console_output`：读取输入端口 `text`，把最终结果写入 `console` 输出通道
+- `demo_source`：发射一组带 canonical 类型的值（文本/数字/布尔/日期/颜色/小数）
+- `greeting_builder`：等待 `name/punctuation` 同时就绪后拼接问候语
+- `math_add`：将 `a/b` 相加得到 `sum`
+- `if_text`：根据布尔条件选择文本分支
+- `text_interpolate`：把多种类型输入渲染成多行模板文本
+- `const_text/const_number/const_boolean/const_date/const_color/const_decimal`：各类型常量输入节点
 
-默认已有图执行结果为：
+默认已有图（`Demo Showcase Pipeline`）执行结果为：
 
 ```json
 {
-  "console": ["Hello, Codex!"]
+  "console": [
+    "Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45"
+  ]
 }
 ```
 
@@ -79,7 +90,7 @@ npm start
 
 1. 启动 `Service/NodeGraph`
 2. 启动当前 JavaScript Demo
-3. 自动创建一个 Hello World 编辑会话
+3. 自动创建一个 Demo Showcase 编辑会话
 4. 在终端打印 `editorUrl`
 
 如果你希望从示例目录内直接启动交互联调，也可以运行：
@@ -101,7 +112,7 @@ npm run demo:interactive
 1. 打开 Demo 首页
 2. 点击 `Create editor session`
 3. 打开返回的 `editorUrl`
-4. 在 NodeGraph 页面里编辑 Hello World 图
+4. 在 NodeGraph 页面里编辑 Demo Showcase 图
 5. 如需刷新节点库，可在编辑页触发强制刷新
 6. 点击 `Complete editing`
 7. 回到 Demo 首页或访问 `GET /api/results/latest` 查看最新回调
@@ -114,7 +125,7 @@ npm run demo:interactive
 - `DEMO_CLIENT_PORT`：Demo 监听端口，默认 `3100`
 - `DEMO_CLIENT_HOST`：监听主机，默认 `127.0.0.1`
 - `DEMO_CLIENT_BASE_URL`：Demo 对外地址，默认 `http://localhost:3100`
-- `DEMO_CLIENT_DOMAIN`：运行时业务域，默认 `demo-hello-world`
+- `DEMO_CLIENT_DOMAIN`：运行时业务域，默认 `demo-visual-playground`
 - `DEMO_CLIENT_NAME`：客户端名称
 
 ## 验证

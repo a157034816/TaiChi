@@ -31,7 +31,7 @@ function createRuntime(config) {
   });
 }
 
-test("GET /api/runtime/library returns the embedded hello-world node library", async () => {
+test("GET /api/runtime/library returns the embedded showcase node library", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
@@ -43,15 +43,49 @@ test("GET /api/runtime/library returns the embedded hello-world node library", a
 
     assert.equal(response.status, 200);
     assert.equal(payload.runtime.runtimeId, "rt_demo_001");
-    assert.equal(payload.runtime.libraryVersion, "hello-world@1");
+    assert.equal(payload.runtime.libraryVersion, "demo-showcase@1");
     assert.deepEqual(
       payload.library.nodes.map((node) => node.type),
-      ["greeting_source", "console_output"],
+      [
+        "greeting_source",
+        "console_output",
+        "demo_source",
+        "greeting_builder",
+        "math_add",
+        "if_text",
+        "text_interpolate",
+        "const_text",
+        "const_number",
+        "const_boolean",
+        "const_date",
+        "const_color",
+        "const_decimal",
+      ],
     );
     assert.equal(payload.library.nodes[0].displayName, "Greeting Source");
     assert.equal(payload.library.nodes[1].displayName, "Console Output");
     assert.equal(payload.library.typeMappings[0].canonicalId, "hello/text");
-    assert.equal(payload.library.typeMappings[0].type, "String");
+    assert.equal(payload.library.typeMappings[0].type, "DemoText");
+    assert.equal(payload.library.typeMappings[1].canonicalId, "demo/number");
+    assert.equal(payload.library.typeMappings[1].type, "DemoNumber");
+  });
+});
+
+test("GET /api/runtime/field-options returns select options for the demo source punctuation field", async () => {
+  const config = getDemoConfig({
+    demoClientBaseUrl: "http://demo-client.test",
+  });
+  const runtime = createRuntime(config);
+
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/runtime/field-options?domain=demo&nodeType=demo_source&fieldKey=punctuation&locale=zh-CN`,
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.options.length, 4);
+    assert.deepEqual(payload.options.map((option) => option.value), ["!", "?", ".", "..."]);
   });
 });
 
@@ -120,14 +154,16 @@ test("POST /api/runtime/execute runs the Hello World graph and records profiler 
       },
       body: JSON.stringify({
         graphMode: "existing",
-        graphName: "Hello World Pipeline",
+        graphName: "Demo Showcase Pipeline",
       }),
     });
     const payload = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(payload.snapshot.status, "completed");
-    assert.deepEqual(payload.snapshot.results.console, ["Hello, Codex!"]);
+    assert.deepEqual(payload.snapshot.results.console, [
+      "Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45",
+    ]);
     assert.equal(payload.snapshot.profiler.node_source.callCount, 1);
     assert.equal(payload.snapshot.profiler.node_output.callCount, 1);
   });
@@ -147,7 +183,7 @@ test("POST /api/runtime/debug/sample returns a breakpoint walkthrough", async ()
       },
       body: JSON.stringify({
         graphMode: "existing",
-        graphName: "Hello World Pipeline",
+        graphName: "Demo Showcase Pipeline",
       }),
     });
     const payload = await response.json();
@@ -159,7 +195,9 @@ test("POST /api/runtime/debug/sample returns a breakpoint walkthrough", async ()
     assert.equal(payload.paused.pauseReason, "breakpoint");
     assert.equal(payload.paused.pendingNodeId, "node_output");
     assert.equal(payload.completed.status, "completed");
-    assert.deepEqual(payload.completed.results.console, ["Hello, Codex!"]);
+    assert.deepEqual(payload.completed.results.console, [
+      "Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45",
+    ]);
   });
 });
 
@@ -202,7 +240,7 @@ test("POST /api/create-session registers the runtime and then creates a session 
       },
       body: JSON.stringify({
         graphMode: "existing",
-        graphName: "Hello World Pipeline",
+        graphName: "Demo Showcase Pipeline",
       }),
     });
     const payload = await response.json();
@@ -210,20 +248,20 @@ test("POST /api/create-session registers the runtime and then creates a session 
     assert.equal(response.status, 200);
     assert.equal(payload.sessionId, "ngs_fake");
     assert.equal(registrationRequest.runtimeId, "rt_demo_001");
-    assert.equal(registrationRequest.library.nodes.length, 2);
+    assert.equal(registrationRequest.library.nodes.length, 13);
     assert.equal(sessionRequest.runtimeId, "rt_demo_001");
     assert.equal(sessionRequest.completionWebhook, "http://demo-client.test/api/completed");
-    assert.equal(sessionRequest.graph.nodes.length, 2);
+    assert.equal(sessionRequest.graph.nodes.length, 6);
     assert.deepEqual(
       sessionRequest.graph.nodes.map((node) => node.data.nodeType),
-      ["greeting_source", "console_output"],
+      ["demo_source", "greeting_builder", "math_add", "if_text", "text_interpolate", "console_output"],
     );
-    assert.equal(state.lastSession.registration.libraryVersion, "hello-world@1");
+    assert.equal(state.lastSession.registration.libraryVersion, "demo-showcase@1");
     assert.equal(state.lastSession.response.editorUrl, "http://localhost:3000/editor/ngs_fake");
   });
 });
 
-test("GET / renders the Hello World runtime copy", async () => {
+test("GET / renders the showcase runtime copy", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
@@ -234,7 +272,7 @@ test("GET / renders the Hello World runtime copy", async () => {
     const html = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, /Hello World Runtime/);
+    assert.match(html, /Showcase Runtime/);
     assert.match(html, /Create editor session/);
     assert.match(html, /Greeting Source/);
     assert.match(html, /rt_demo_001/);
