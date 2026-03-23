@@ -15,19 +15,16 @@ import {
   resolveNodeLibraryLabel,
 } from "@/lib/nodegraph/localization";
 
-const DEFAULT_INPUT_PORTS: NodePortDefinition[] = [{ id: "in", labelKey: "editor.defaults.port.input" }];
-const DEFAULT_OUTPUT_PORTS: NodePortDefinition[] = [{ id: "out", labelKey: "editor.defaults.port.output" }];
+function getDefaultInputPorts(i18n = createI18nRuntime({ locale: DEFAULT_LOCALE })): NodePortDefinition[] {
+  return [{ id: "in", label: i18n.text("editor.defaults.port.input") }];
+}
 
-function cloneLegacyTextValue(value: NodePortDefinition["label"]) {
-  if (!value || typeof value === "string") {
-    return value;
-  }
-
-  return { ...value };
+function getDefaultOutputPorts(i18n = createI18nRuntime({ locale: DEFAULT_LOCALE })): NodePortDefinition[] {
+  return [{ id: "out", label: i18n.text("editor.defaults.port.output") }];
 }
 
 /**
- * Creates a new empty graph document with locale-aware default copy.
+ * 创建空白图文档，并使用 NodeGraph 内建 UI 文案填充默认名称与描述。
  */
 export function createEmptyGraph(domain: string, domainI18n?: I18nBundle): NodeGraphDocument {
   const i18n = createI18nRuntime({
@@ -49,7 +46,7 @@ export function createEmptyGraph(domain: string, domainI18n?: I18nBundle): NodeG
 }
 
 /**
- * Builds default values for editable node fields.
+ * 为节点字段生成默认值快照，供新建节点与运行时迁移复用。
  */
 export function buildFieldDefaults(fields?: NodeLibraryField[]) {
   if (!fields?.length) {
@@ -77,28 +74,31 @@ function getFallbackValue(kind: NodeLibraryField["kind"]) {
 function clonePorts(ports: NodePortDefinition[]) {
   return ports.map((port) => ({
     ...port,
-    label: cloneLegacyTextValue(port.label),
   }));
 }
 
 /**
- * Ensures every node has a stable input and output shape.
+ * 生成端口快照，保证节点始终拥有稳定的输入输出结构。
  */
-export function buildPortSnapshot(item?: Pick<NodeLibraryItem, "inputs" | "outputs">) {
+export function buildPortSnapshot(
+  item?: Pick<NodeLibraryItem, "inputs" | "outputs">,
+  i18n = createI18nRuntime({ locale: DEFAULT_LOCALE }),
+) {
   return {
-    inputs: clonePorts(item?.inputs ?? DEFAULT_INPUT_PORTS),
-    outputs: clonePorts(item?.outputs ?? DEFAULT_OUTPUT_PORTS),
+    inputs: clonePorts(item?.inputs ?? getDefaultInputPorts(i18n)),
+    outputs: clonePorts(item?.outputs ?? getDefaultOutputPorts(i18n)),
   };
 }
 
 /**
- * Hydrates saved nodes with template ports when older payloads omitted them.
+ * 为缺失端口快照的节点补齐模板端口，兼容端口信息缺省的已保存图数据。
  */
 export function normalizeNodeDataPorts(
   data: NodeGraphNodeData,
   item?: Pick<NodeLibraryItem, "inputs" | "outputs">,
+  i18n = createI18nRuntime({ locale: DEFAULT_LOCALE }),
 ): NodeGraphNodeData {
-  const fallbackPorts = buildPortSnapshot(item);
+  const fallbackPorts = buildPortSnapshot(item, i18n);
 
   return {
     ...data,
@@ -108,7 +108,7 @@ export function normalizeNodeDataPorts(
 }
 
 /**
- * Produces the shell style consumed by the custom blueprint node renderer.
+ * 生成蓝图节点渲染器需要的基础样式。
  */
 export function buildNodeStyle(appearance?: NodeAppearance) {
   return {
@@ -124,8 +124,7 @@ export function buildNodeStyle(appearance?: NodeAppearance) {
 }
 
 /**
- * Converts a library template into an editor node, preserving translation keys
- * alongside compatibility snapshots.
+ * 根据节点库模板创建编辑器节点，并固化宿主提供的原始展示文本与端口快照。
  */
 export function createNodeFromLibrary(
   item: NodeLibraryItem,
@@ -134,13 +133,11 @@ export function createNodeFromLibrary(
     locale: DEFAULT_LOCALE,
   }),
 ): NodeGraphNode {
-  const portSnapshot = buildPortSnapshot(item);
+  const portSnapshot = buildPortSnapshot(item, i18n);
   const data: NodeGraphNodeData = {
     label: resolveNodeLibraryLabel(item, i18n),
-    labelKey: item.labelKey,
     description: resolveNodeLibraryDescription(item, i18n),
-    descriptionKey: item.descriptionKey,
-    categoryKey: item.categoryKey,
+    category: item.category,
     nodeType: item.type,
     inputs: portSnapshot.inputs,
     outputs: portSnapshot.outputs,

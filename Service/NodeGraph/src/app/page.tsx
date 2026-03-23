@@ -5,6 +5,70 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
+const registerRuntimeExample = `POST /api/sdk/runtimes/register
+{
+  "runtimeId": "rt_hello_world_001",
+  "domain": "hello-world",
+  "clientName": "TaiChi Hello World Host",
+  "controlBaseUrl": "https://client.example.com/nodegraph/runtime",
+  "libraryVersion": "hello-world@1",
+  "capabilities": {
+    "canExecute": true,
+    "canDebug": true,
+    "canProfile": true
+  },
+  "library": {
+    "nodes": [
+      {
+        "type": "greeting_source",
+        "displayName": "Greeting Source",
+        "description": "Create the greeting text.",
+        "category": "Hello World",
+        "outputs": [
+          { "id": "text", "label": "Text", "dataType": "hello/text" }
+        ],
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "placeholder": "Who should be greeted?",
+            "kind": "text",
+            "defaultValue": "World"
+          }
+        ]
+      }
+    ],
+    "typeMappings": [
+      { "canonicalId": "hello/text", "type": "String", "color": "#2563eb" }
+    ]
+  }
+}`;
+
+const createSessionExample = `POST /api/sdk/sessions
+{
+  "runtimeId": "rt_hello_world_001",
+  "completionWebhook": "https://client.example.com/nodegraph/completed",
+  "graph": {
+    "name": "Hello World Pipeline",
+    "nodes": [],
+    "edges": [],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  },
+  "metadata": {
+    "ticketId": "HW-1001"
+  }
+}`;
+
+const refreshExample = `POST /api/editor/sessions/{sessionId}/library/refresh
+{
+  "graph": {
+    "name": "Hello World Pipeline",
+    "nodes": [],
+    "edges": [],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  }
+}`;
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-10 lg:px-10">
@@ -14,22 +78,22 @@ export default function Home() {
           <div className="space-y-6">
             <div className="flex flex-wrap gap-3">
               <Badge variant="secondary">NodeGraph</Badge>
-              <Badge variant="outline">Next.js + React Flow + shadcn</Badge>
-              <Badge variant="outline">SDK-first workflow editor</Badge>
+              <Badge variant="outline">Runtime registry</Badge>
+              <Badge variant="outline">SDK-hosted execution</Badge>
             </div>
             <div className="space-y-4">
               <p className="display-font text-sm uppercase tracking-[0.32em] text-muted-foreground">
-                Domain-aware visual flow editing
+                Runtime-aware visual flow editing
               </p>
               <h1 className="display-font max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl lg:text-6xl">
-                Build a node-graph editing URL for every client request, then hand the result back
-                with one webhook.
+                Register the runtime once, open editor sessions by <code>runtimeId</code>, and
+                keep execution inside your SDK host.
               </h1>
               <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-                NodeGraph is designed for SDK consumers: you create an editing session, we resolve
-                the domain node library on first contact, return the correct editor URL for the
-                caller network, and post the final graph back to your business system when the user
-                finishes editing.
+                NodeGraph no longer pulls a node library from a remote endpoint during session
+                creation. Your host initializes a runtime in memory, submits the node-library
+                snapshot up front, optionally refreshes it later, and receives the finished graph
+                back through one completion webhook.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -44,14 +108,14 @@ export default function Home() {
           <Card className="border-white/60">
             <CardHeader>
               <CardTitle className="display-font text-2xl">Session flow</CardTitle>
-              <CardDescription>What happens when a client asks to edit a graph.</CardDescription>
+              <CardDescription>What happens when a host wants to edit a graph.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
-              <p>1. Client sends `domain`, node-library endpoint, completion webhook, and graph.</p>
-              <p>2. NodeGraph fetches and caches the domain node library on first encounter.</p>
-              <p>3. NodeGraph returns a public or private editor URL based on the caller IP.</p>
-              <p>4. User edits the graph in the browser and submits the final version.</p>
-              <p>5. NodeGraph calls the client webhook with the finished graph document.</p>
+              <p>1. Host creates a runtime, generates a unique `runtimeId`, and exports a library snapshot.</p>
+              <p>2. Host calls `POST /api/sdk/runtimes/register` with library, version, and capabilities.</p>
+              <p>3. Host creates an editor session with `runtimeId + completionWebhook + graph?`.</p>
+              <p>4. The editor may force-refresh the runtime library from `GET controlBaseUrl/library`.</p>
+              <p>5. NodeGraph posts the final graph back to the host webhook when editing completes.</p>
             </CardContent>
           </Card>
         </div>
@@ -60,32 +124,34 @@ export default function Home() {
       <section className="grid gap-6 py-10 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="display-font text-2xl">Per-domain caching</CardTitle>
-            <CardDescription>Each client owns its domain identity.</CardDescription>
+            <CardTitle className="display-font text-2xl">Runtime cache</CardTitle>
+            <CardDescription>Cache is keyed by `runtimeId` for 30 minutes.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-muted-foreground">
-            Node libraries are cached in memory by domain, so subsequent editing sessions can be
-            created quickly while keeping business-specific node catalogs isolated.
+            The SDK can skip redundant registrations locally, while NodeGraph keeps the registered
+            runtime available for repeated session creation until the cache expires or the editor
+            requests a forced refresh.
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="display-font text-2xl">Network-aware URL</CardTitle>
-            <CardDescription>One API call, the right base URL.</CardDescription>
+            <CardTitle className="display-font text-2xl">Raw library text</CardTitle>
+            <CardDescription>Node libraries are no longer translated by NodeGraph.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-muted-foreground">
-            NodeGraph inspects the request IP and chooses an internal or public base URL before it
-            returns the editor entry link to the SDK caller.
+            Display names, descriptions, categories, field labels, and placeholders are rendered
+            exactly as the host provides them. NodeGraph i18n now applies only to the editor UI
+            chrome.
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="display-font text-2xl">Webhook completion</CardTitle>
-            <CardDescription>Business systems stay in control of persistence.</CardDescription>
+            <CardTitle className="display-font text-2xl">Host-owned runtime</CardTitle>
+            <CardDescription>Execution, debugging, and profiling stay in your process.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-muted-foreground">
-            Final graph data is posted back to the client webhook. Your application decides how to
-            store it, validate it, or continue downstream business processing.
+            The SDK runtimes execute graphs, produce profiler snapshots, and support breakpoints.
+            NodeGraph focuses on editing, runtime cache management, and completion webhooks.
           </CardContent>
         </Card>
       </section>
@@ -94,93 +160,65 @@ export default function Home() {
         <Card>
           <CardHeader>
             <CardTitle className="display-font text-3xl">Quick contract</CardTitle>
-            <CardDescription>The minimum payload needed to request an editing session.</CardDescription>
+            <CardDescription>The minimum runtime-first workflow for NodeGraph.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <pre className="overflow-x-auto rounded-[1.5rem] bg-[#152230] p-5 text-sm leading-7 text-[#d6f6ef]">
-              {`POST /api/sdk/sessions
-{
-  "domain": "erp-workflow",
-  "clientName": "TaiChi ERP",
-  "nodeLibraryEndpoint": "https://client.example.com/nodegraph/library",
-  "completionWebhook": "https://client.example.com/nodegraph/completed",
-  "graph": {
-    "name": "审批流程",
-    "nodes": [],
-    "edges": [],
-    "viewport": { "x": 0, "y": 0, "zoom": 1 }
-  },
-  "metadata": {
-    "ticketId": "WF-1001"
-  }
-}`}
-            </pre>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">1. Register the runtime and node library</p>
+              <pre className="overflow-x-auto rounded-[1.5rem] bg-[#152230] p-5 text-sm leading-7 text-[#d6f6ef]">
+                {registerRuntimeExample}
+              </pre>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">2. Create a session using only `runtimeId`</p>
+              <pre className="overflow-x-auto rounded-[1.5rem] bg-[#152230] p-5 text-sm leading-7 text-[#d6f6ef]">
+                {createSessionExample}
+              </pre>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">3. Force-refresh the cached library when needed</p>
+              <pre className="overflow-x-auto rounded-[1.5rem] bg-[#152230] p-5 text-sm leading-7 text-[#d6f6ef]">
+                {refreshExample}
+              </pre>
+            </div>
             <Separator />
             <div className="space-y-2 text-sm leading-7 text-muted-foreground">
               <p>
-                The client node-library endpoint now returns a key-based envelope shaped like{" "}
-                <code>{`{ "nodes": [...], "i18n": {...}, "typeMappings"?: [...] }`}</code>.
+                NodeGraph caches runtimes by <code>runtimeId</code>; it does not fetch a{" "}
+                <code>nodeLibraryEndpoint</code> during <code>createSession</code> anymore.
               </p>
               <p>
-                Node definitions reference translations through <code>labelKey</code>,{" "}
-                <code>descriptionKey</code>, <code>categoryKey</code>, port{" "}
-                <code>labelKey</code>, and field <code>labelKey</code>/<code>placeholderKey</code>.
-                Provide the actual localized text inside the accompanying <code>i18n</code> bundle.
+                Re-registering the same runtime returns <code>cached: true</code> when the version,
+                domain, and <code>controlBaseUrl</code> match; SDK hosts normally skip this call
+                locally until the 30-minute TTL expires.
               </p>
               <p>
-                Each node definition may optionally declare <code>inputs</code> and{" "}
-                <code>outputs</code> for Blueprint-style multi-port nodes. If they are omitted,
-                NodeGraph falls back to one input and one output.
+                The refresh API reads <code>GET {"{controlBaseUrl}"}/library</code>, updates the
+                runtime cache, and immediately returns the latest node library plus a migrated graph
+                payload for the current editor session.
               </p>
               <p>
-                Port definitions can also include an optional <code>dataType</code> so the editor
-                can suggest compatible nodes when a user drops a connection onto empty canvas
-                space. Use a cross-language canonical id such as <code>workflow/request</code> or{" "}
-                <code>workflow/approval-decision</code> instead of a language-specific type name.
+                Node-library fields use raw strings such as <code>displayName</code>,{" "}
+                <code>description</code>, <code>category</code>, port <code>label</code>, and
+                field <code>label</code>/<code>placeholder</code>. Old key-based fields are
+                compatibility-only.
               </p>
               <p>
-                If your current SDK needs to map canonical ids back to runtime types, return an
-                optional <code>typeMappings</code> array alongside <code>nodes</code>, with flat
-                entries shaped like <code>{`{ canonicalId, type }`}</code>. The editor still
-                matches ports by canonical id only, while the mapping lets the current SDK attach
-                its own runtime type name without bloating <code>dataType</code>.
+                Port <code>dataType</code> values should use cross-language canonical ids such as{" "}
+                <code>hello/text</code>. Optional <code>typeMappings</code> map canonical ids back
+                to runtime-specific types and may also provide a display color.
               </p>
               <p>
-                Field templates support <code>text</code>, <code>textarea</code>,{" "}
-                <code>boolean</code>, <code>select</code>, <code>date</code>,{" "}
-                <code>color</code>, <code>int</code>, <code>float</code>, <code>double</code>,
-                and <code>decimal</code>. The old <code>number</code> kind has been removed.
+                <code>select</code> fields still use{" "}
+                <code>GET /api/editor/sessions/{"{sessionId}"}/field-options</code>, and persisted
+                edges may keep <code>sourceHandle</code>/<code>targetHandle</code> for multi-port
+                graphs.
               </p>
               <p>
-                <code>select</code> fields must provide an external <code>optionsEndpoint</code>.
-                The editor asks NodeGraph to proxy that endpoint and forwards <code>domain</code>,{" "}
-                <code>nodeType</code>, <code>fieldKey</code>, and <code>locale</code>. The remote
-                source should respond with <code>{`{ options: [{ value, label }] }`}</code>.
-              </p>
-              <p>
-                <code>date</code> values use <code>YYYY-MM-DD</code>, <code>color</code> values use{" "}
-                <code>#RRGGBB</code>, <code>decimal</code> values stay as strings to preserve
-                precision, and <code>int</code>/<code>float</code>/<code>double</code> are stored
-                as JSON numbers.
-              </p>
-              <p>
-                Each type mapping may also optionally include <code>color</code> in the form{" "}
-                <code>#RRGGBB</code>, so ports and links can be visually grouped by the canonical
-                type id inside the editor. When omitted, NodeGraph renders the type in a neutral
-                grey.
-              </p>
-              <p>
-                Persisted edges may include <code>sourceHandle</code> and <code>targetHandle</code>{" "}
-                so the editor can restore which specific port each link used.
-              </p>
-              <p>
-                Editor language and connection-line style are browser-local preferences. They
-                affect rendering only and are not written into the submitted graph document.
-              </p>
-              <p>
-                Set <code>NODEGRAPH_PUBLIC_BASE_URL</code> and{" "}
-                <code>NODEGRAPH_PRIVATE_BASE_URL</code> to control the editor URL returned to the
-                SDK caller.
+                Configure <code>NODEGRAPH_PUBLIC_BASE_URL</code>,{" "}
+                <code>NODEGRAPH_PRIVATE_BASE_URL</code>, and{" "}
+                <code>NODEGRAPH_RUNTIME_CACHE_TTL_MS</code> to control editor URLs and cache
+                lifetime.
               </p>
             </div>
           </CardContent>
@@ -202,16 +240,22 @@ export default function Home() {
             </div>
             <div>
               <p className="font-medium text-foreground">Timeouts</p>
-              <p>Node-library fetch and completion webhook both default to 5000ms.</p>
+              <p>Runtime library refresh and completion webhook both default to `5000ms`.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Runtime cache TTL</p>
+              <p>Defaults to `1800000ms` (`30` minutes).</p>
             </div>
             <Separator />
             <p>
-              Use the SDK packages under <code>SDK/NodeGraph</code> to build these requests from
-              JavaScript, .NET, or Rust.
+              Use the SDK packages under <code>SDK/NodeGraph</code> to register runtimes and build
+              sessions from JavaScript, .NET, or Rust.
             </p>
             <p>
-              SDK graph edge models also preserve <code>sourceHandle</code> and{" "}
-              <code>targetHandle</code> for multi-port graphs.
+              For end-to-end samples, check the Hello World hosts under{" "}
+              <code>Examples/NodeGraph.DemoClient.JavaScript</code>,{" "}
+              <code>Examples/NodeGraph.DemoClient.DotNet</code>, and{" "}
+              <code>Examples/NodeGraph.DemoClient.Rust</code>.
             </p>
           </CardContent>
         </Card>

@@ -94,10 +94,10 @@ describe("nodegraph type mappings", () => {
     const nodes: NodeLibraryItem[] = [
       {
         type: "approval",
-        labelKey: "nodes.approval.label",
-        descriptionKey: "nodes.approval.description",
-        categoryKey: "categories.workflow",
-        inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
+        displayName: "Approval",
+        description: "Manual approval step.",
+        category: "Workflow",
+        inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
       },
     ];
 
@@ -117,10 +117,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "approval",
-            labelKey: "nodes.approval.label",
-            descriptionKey: "nodes.approval.description",
-            categoryKey: "categories.workflow",
-            inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
+            displayName: "Approval",
+            description: "Manual approval step.",
+            category: "Workflow",
+            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
           },
         ],
         [],
@@ -134,10 +134,10 @@ describe("nodegraph type mappings", () => {
         [
           {
             type: "start",
-            labelKey: "nodes.start.label",
-            descriptionKey: "nodes.start.description",
-            categoryKey: "categories.control",
-            outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
+            displayName: "Start",
+            description: "Entry point for a new flow.",
+            category: "Control",
+            outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
           },
         ],
         undefined,

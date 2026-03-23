@@ -82,15 +82,15 @@ describe("nodegraph connections", () => {
     expect(
       getPortForHandle(
         {
-          inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
-          outputs: [{ id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType }],
+          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
         },
         "source",
         "approved",
       ),
     ).toEqual({
       id: "approved",
-      labelKey: "ports.approved",
+      label: "Approved",
       dataType: approvalDecisionType,
     });
   });
@@ -100,19 +100,19 @@ describe("nodegraph connections", () => {
       findCompatibleOppositePort(
         {
           inputs: [
-            { id: "request", labelKey: "ports.request", dataType: workflowRequestType },
-            { id: "fallback", labelKey: "ports.fallback", dataType: "OtherType" },
+            { id: "request", label: "Request", dataType: workflowRequestType },
+            { id: "fallback", label: "Fallback", dataType: "OtherType" },
           ],
           outputs: [],
         },
         {
           handleType: "source",
-          startPort: { id: "next", labelKey: "ports.next", dataType: workflowRequestType },
+          startPort: { id: "next", label: "Next", dataType: workflowRequestType },
         },
       ),
     ).toEqual({
       id: "request",
-      labelKey: "ports.request",
+      label: "Request",
       dataType: workflowRequestType,
     });
   });
@@ -122,19 +122,19 @@ describe("nodegraph connections", () => {
       findCompatibleOppositePort(
         {
           inputs: [
-            { id: "approved", labelKey: "ports.approved" },
-            { id: "rejected", labelKey: "ports.rejected" },
+            { id: "approved", label: "Approved" },
+            { id: "rejected", label: "Rejected" },
           ],
           outputs: [],
         },
         {
           handleType: "source",
-          startPort: { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
+          startPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
         },
       ),
     ).toEqual({
       id: "approved",
-      labelKey: "ports.approved",
+      label: "Approved",
     });
   });
 
@@ -144,25 +144,25 @@ describe("nodegraph connections", () => {
         [
           {
             type: "notify",
-            labelKey: "nodes.notify.label",
-            descriptionKey: "nodes.notify.description",
-            categoryKey: "categories.integration",
-            inputs: [{ id: "success", labelKey: "ports.success", dataType: approvalDecisionType }],
+            displayName: "Notify",
+            description: "Send the success signal to an external system.",
+            category: "Integration",
+            inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
             outputs: [],
           },
           {
             type: "merge",
-            labelKey: "nodes.merge.label",
-            descriptionKey: "nodes.merge.description",
-            categoryKey: "categories.control",
-            inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
-            outputs: [{ id: "next", labelKey: "ports.next", dataType: workflowRequestType }],
+            displayName: "Merge",
+            description: "Merge the request back into the main path.",
+            category: "Control",
+            inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+            outputs: [{ id: "next", label: "Next", dataType: workflowRequestType }],
           },
         ],
         {
           handleType: "source",
         },
-        { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
+        { id: "approved", label: "Approved", dataType: approvalDecisionType },
       ).map((item) => item.type),
     ).toEqual(["notify"]);
   });
@@ -173,10 +173,10 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_approval",
         existingHandleId: "approved",
         existingHandleType: "source",
-        existingPort: { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
+        existingPort: { id: "approved", label: "Approved", dataType: approvalDecisionType },
         insertedNodeId: "node_notify",
         insertedNodeData: {
-          inputs: [{ id: "success", labelKey: "ports.success", dataType: approvalDecisionType }],
+          inputs: [{ id: "success", label: "Success", dataType: approvalDecisionType }],
           outputs: [],
         },
       }),
@@ -194,11 +194,11 @@ describe("nodegraph connections", () => {
         existingNodeId: "node_notify",
         existingHandleId: "success",
         existingHandleType: "target",
-        existingPort: { id: "success", labelKey: "ports.success", dataType: approvalDecisionType },
+        existingPort: { id: "success", label: "Success", dataType: approvalDecisionType },
         insertedNodeId: "node_approval",
         insertedNodeData: {
-          inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
-          outputs: [{ id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType }],
+          inputs: [{ id: "request", label: "Request", dataType: workflowRequestType }],
+          outputs: [{ id: "approved", label: "Approved", dataType: approvalDecisionType }],
         },
       }),
     ).toEqual({

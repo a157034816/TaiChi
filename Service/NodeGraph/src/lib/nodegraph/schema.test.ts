@@ -1,115 +1,114 @@
 import { describe, expect, it } from "vitest";
 
-import { nodeGraphDocumentSchema, nodeLibraryEnvelopeSchema } from "@/lib/nodegraph/schema";
+import {
+  createSessionRequestSchema,
+  nodeGraphDocumentSchema,
+  nodeLibraryEnvelopeSchema,
+  runtimeRegistrationRequestSchema,
+} from "@/lib/nodegraph/schema";
 
-const workflowRequestType = "workflow/request";
-const approvalDecisionType = "workflow/approval-decision";
-
-const nodeLibraryI18n = {
-  defaultLocale: "en",
-  locales: {
-    en: {
-      "categories.workflow": "Workflow",
-      "nodes.approval.description": "Review and route the request.",
-      "nodes.approval.label": "Approval",
-      "nodes.start.label": "Start",
-      "ports.approved": "Approved",
-      "ports.next": "Next",
-      "ports.rejected": "Rejected",
-      "ports.request": "Request",
-    },
-    "zh-CN": {
-      "categories.workflow": "流程",
-      "nodes.approval.description": "审核并路由请求。",
-      "nodes.approval.label": "审批",
-      "nodes.start.label": "开始",
-      "ports.approved": "通过",
-      "ports.next": "下一步",
-      "ports.rejected": "驳回",
-      "ports.request": "请求",
-    },
-  },
-} as const;
+const greetingTextType = "hello/text";
 
 describe("nodegraph schema", () => {
-  it("accepts node library items that reference translation keys", () => {
+  it("accepts raw-string node library items for SDK runtime registration", () => {
+    expect(
+      runtimeRegistrationRequestSchema.parse({
+        runtimeId: "rt_demo_001",
+        domain: "hello-world",
+        clientName: "Hello World Host",
+        controlBaseUrl: "https://client.example.com/nodegraph/runtime",
+        libraryVersion: "hello-world@1",
+        capabilities: {
+          canDebug: true,
+          canExecute: true,
+          canProfile: true,
+        },
+        library: {
+          nodes: [
+            {
+              type: "greeting_source",
+              displayName: "Greeting Source",
+              description: "Create the base greeting text.",
+              category: "Hello World",
+              outputs: [{ id: "text", label: "Text", dataType: greetingTextType }],
+              fields: [
+                {
+                  key: "name",
+                  label: "Name",
+                  kind: "text",
+                  defaultValue: "World",
+                  placeholder: "Enter the target name",
+                },
+              ],
+            },
+          ],
+          typeMappings: [
+            {
+              canonicalId: greetingTextType,
+              type: "GreetingText",
+              color: "#0ea5e9",
+            },
+          ],
+        },
+      }),
+    ).toBeTruthy();
+  });
+
+  it("accepts node library envelopes that no longer provide i18n bundles", () => {
     expect(
       nodeLibraryEnvelopeSchema.parse({
         nodes: [
           {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            descriptionKey: "nodes.approval.description",
-            categoryKey: "categories.workflow",
-            inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
-            outputs: [
-              { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
-              { id: "rejected", labelKey: "ports.rejected", dataType: approvalDecisionType },
-            ],
-          },
-        ],
-        i18n: nodeLibraryI18n,
-        typeMappings: [
-          {
-            canonicalId: workflowRequestType,
-            type: "WorkflowRequest",
-            color: "#0ea5e9",
-          },
-          {
-            canonicalId: approvalDecisionType,
-            type: "ApprovalDecision",
-            color: "#f97316",
+            type: "console_output",
+            displayName: "Console Output",
+            description: "Write the message to the host console.",
+            category: "Hello World",
+            inputs: [{ id: "text", label: "Text", dataType: greetingTextType }],
+            outputs: [],
           },
         ],
       }),
     ).toBeTruthy();
   });
 
-  it("accepts saved edge handle ids for key-based multi-port graphs", () => {
+  it("accepts saved edge handle ids for multi-port graphs", () => {
     expect(
       nodeGraphDocumentSchema.parse({
-        name: "Blueprint review flow",
+        name: "Hello flow",
         nodes: [
           {
-            id: "node_approval",
+            id: "node_greeting",
             type: "default",
             position: { x: 0, y: 0 },
             data: {
-              label: "Approval",
-              labelKey: "nodes.approval.label",
-              description: "Review and route the request.",
-              descriptionKey: "nodes.approval.description",
-              categoryKey: "categories.workflow",
-              nodeType: "approval",
-              inputs: [{ id: "request", labelKey: "ports.request", dataType: workflowRequestType }],
-              outputs: [
-                { id: "approved", labelKey: "ports.approved", dataType: approvalDecisionType },
-                { id: "rejected", labelKey: "ports.rejected", dataType: approvalDecisionType },
-              ],
+              label: "Greeting Source",
+              description: "Create the base greeting text.",
+              category: "Hello World",
+              nodeType: "greeting_source",
+              outputs: [{ id: "text", label: "Text", dataType: greetingTextType }],
             },
           },
           {
-            id: "node_notify",
+            id: "node_output",
             type: "default",
             position: { x: 280, y: 0 },
             data: {
-              label: "Notify",
-              nodeType: "notify",
-              inputs: [
-                { id: "success", labelKey: "ports.approved", dataType: approvalDecisionType },
-                { id: "failure", labelKey: "ports.rejected", dataType: approvalDecisionType },
-              ],
+              label: "Console Output",
+              description: "Write the message to the host console.",
+              category: "Hello World",
+              nodeType: "console_output",
+              inputs: [{ id: "text", label: "Text", dataType: greetingTextType }],
               outputs: [],
             },
           },
         ],
         edges: [
           {
-            id: "edge_approval_notify",
-            source: "node_approval",
-            sourceHandle: "approved",
-            target: "node_notify",
-            targetHandle: "success",
+            id: "edge_greeting_output",
+            source: "node_greeting",
+            sourceHandle: "text",
+            target: "node_output",
+            targetHandle: "text",
           },
         ],
         viewport: { x: 0, y: 0, zoom: 1 },
@@ -117,228 +116,141 @@ describe("nodegraph schema", () => {
     ).toBeTruthy();
   });
 
-  it("keeps legacy saved node port label objects valid", () => {
-    expect(
+  it("rejects saved graph ports that only provide translation keys", () => {
+    expect(() =>
       nodeGraphDocumentSchema.parse({
-        name: "Legacy graph",
+        name: "Hello flow",
         nodes: [
           {
-            id: "node_start",
+            id: "node_greeting",
             type: "default",
             position: { x: 0, y: 0 },
             data: {
-              label: "Start",
-              nodeType: "start",
-              category: {
-                "zh-CN": "控制",
-                en: "Control",
-              },
-              outputs: [
-                {
-                  id: "next",
-                  label: {
-                    "zh-CN": "下一步",
-                    en: "Next",
-                  },
-                },
-              ],
+              label: "Greeting Source",
+              category: "Hello World",
+              nodeType: "greeting_source",
+              outputs: [{ id: "text", labelKey: "ports.text", dataType: greetingTextType }],
             },
           },
         ],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },
       }),
+    ).toThrow(/label/i);
+  });
+
+  it("rejects saved graph nodes that persist localized category objects", () => {
+    expect(() =>
+      nodeGraphDocumentSchema.parse({
+        name: "Hello flow",
+        nodes: [
+          {
+            id: "node_greeting",
+            type: "default",
+            position: { x: 0, y: 0 },
+            data: {
+              label: "Greeting Source",
+              category: {
+                en: "Hello World",
+                "zh-CN": "你好世界",
+              },
+              nodeType: "greeting_source",
+              outputs: [{ id: "text", label: "Text", dataType: greetingTextType }],
+            },
+          },
+        ],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 },
+      }),
+    ).toThrow(/category/i);
+  });
+
+  it("accepts create-session payloads that reference a runtime id instead of a node-library endpoint", () => {
+    expect(
+      createSessionRequestSchema.parse({
+        runtimeId: "rt_demo_001",
+        completionWebhook: "https://client.example.com/nodegraph/completed",
+        metadata: {
+          ticketId: "HELLO-1",
+        },
+      }),
     ).toBeTruthy();
   });
 
-  it("rejects node libraries that omit the i18n bundle", () => {
+  it("rejects runtime registrations whose node library omits raw labels", () => {
     expect(() =>
-      nodeLibraryEnvelopeSchema.parse({
-        nodes: [
-          {
-            type: "start",
-            labelKey: "nodes.start.label",
-            categoryKey: "categories.workflow",
-          },
-        ],
-      }),
-    ).toThrow();
-  });
-
-  it("rejects legacy inline localized node library labels", () => {
-    expect(() =>
-      nodeLibraryEnvelopeSchema.parse({
-        nodes: [
-          {
-            type: "start",
-            label: {
-              "zh-CN": "开始",
-              en: "Start",
+      runtimeRegistrationRequestSchema.parse({
+        runtimeId: "rt_demo_001",
+        domain: "hello-world",
+        controlBaseUrl: "https://client.example.com/nodegraph/runtime",
+        libraryVersion: "hello-world@1",
+        library: {
+          nodes: [
+            {
+              type: "greeting_source",
+              category: "Hello World",
             },
-            descriptionKey: "nodes.approval.description",
-            categoryKey: "categories.workflow",
-          },
-        ],
-        i18n: nodeLibraryI18n,
+          ],
+        },
       }),
-    ).toThrow();
+    ).toThrow(/displayName/i);
   });
 
-  it("rejects invalid color formats in typeMappings", () => {
+  it("rejects legacy translation-key node library payloads", () => {
     expect(() =>
       nodeLibraryEnvelopeSchema.parse({
-        nodes: [],
-        i18n: nodeLibraryI18n,
-        typeMappings: [
+        nodes: [
           {
-            canonicalId: workflowRequestType,
-            type: "WorkflowRequest",
-            color: "red",
+            type: "greeting_source",
+            labelKey: "nodes.greetingSource.label",
+            categoryKey: "categories.helloWorld",
           },
         ],
       }),
     ).toThrow();
   });
 
-  it("accepts typed field definitions for editors beyond plain text", () => {
+  it("accepts typed field definitions with raw labels", () => {
     expect(
       nodeLibraryEnvelopeSchema.parse({
         nodes: [
           {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            descriptionKey: "nodes.approval.description",
-            categoryKey: "categories.workflow",
+            type: "format_message",
+            displayName: "Format Message",
+            description: "Format the hello text using a template.",
+            category: "Hello World",
             fields: [
               {
-                key: "assignee",
-                labelKey: "fields.assignee.label",
+                key: "template",
+                label: "Template",
                 kind: "text",
-                placeholderKey: "fields.assignee.placeholder",
+                defaultValue: "Hello, {name}!",
+                placeholder: "Use {name} as the placeholder.",
               },
               {
-                key: "notes",
-                labelKey: "fields.notes.label",
-                kind: "textarea",
-              },
-              {
-                key: "active",
-                labelKey: "fields.active.label",
-                kind: "boolean",
-                defaultValue: true,
-              },
-              {
-                key: "priority",
-                labelKey: "fields.priority.label",
-                kind: "select",
-                optionsEndpoint: "https://client.example.com/options/priorities",
-                defaultValue: "high",
-              },
-              {
-                key: "dueDate",
-                labelKey: "fields.dueDate.label",
-                kind: "date",
-                defaultValue: "2026-03-21",
-              },
-              {
-                key: "theme",
-                labelKey: "fields.theme.label",
-                kind: "color",
-                defaultValue: "#ff9d1c",
-              },
-              {
-                key: "retries",
-                labelKey: "fields.retries.label",
+                key: "repeat",
+                label: "Repeat Count",
                 kind: "int",
-                defaultValue: 3,
+                defaultValue: 1,
               },
               {
-                key: "score",
-                labelKey: "fields.score.label",
-                kind: "float",
-                defaultValue: 1.5,
+                key: "uppercase",
+                label: "Uppercase",
+                kind: "boolean",
+                defaultValue: false,
               },
               {
-                key: "ratio",
-                labelKey: "fields.ratio.label",
-                kind: "double",
-                defaultValue: 0.125,
-              },
-              {
-                key: "budget",
-                labelKey: "fields.budget.label",
-                kind: "decimal",
-                defaultValue: "99.90",
+                key: "previewStyle",
+                label: "Preview Style",
+                kind: "select",
+                optionsEndpoint: "https://client.example.com/nodegraph/runtime/options/previewStyle",
+                defaultValue: "console",
               },
             ],
           },
         ],
-        i18n: {
-          defaultLocale: "en",
-          locales: {
-            en: {
-              ...nodeLibraryI18n.locales.en,
-              "fields.active.label": "Active",
-              "fields.assignee.label": "Assignee",
-              "fields.assignee.placeholder": "Enter assignee",
-              "fields.budget.label": "Budget",
-              "fields.dueDate.label": "Due date",
-              "fields.notes.label": "Notes",
-              "fields.priority.label": "Priority",
-              "fields.ratio.label": "Ratio",
-              "fields.retries.label": "Retries",
-              "fields.score.label": "Score",
-              "fields.theme.label": "Theme",
-            },
-            "zh-CN": {
-              ...nodeLibraryI18n.locales["zh-CN"],
-              "fields.active.label": "启用",
-              "fields.assignee.label": "负责人",
-              "fields.assignee.placeholder": "请输入负责人",
-              "fields.budget.label": "预算",
-              "fields.dueDate.label": "截止日期",
-              "fields.notes.label": "备注",
-              "fields.priority.label": "优先级",
-              "fields.ratio.label": "比例",
-              "fields.retries.label": "重试次数",
-              "fields.score.label": "评分",
-              "fields.theme.label": "主题色",
-            },
-          },
-        },
       }),
     ).toBeTruthy();
-  });
-
-  it("rejects legacy number field kinds after the numeric split", () => {
-    expect(() =>
-      nodeLibraryEnvelopeSchema.parse({
-        nodes: [
-          {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            categoryKey: "categories.workflow",
-            fields: [
-              {
-                key: "retries",
-                labelKey: "fields.retries.label",
-                kind: "number",
-              },
-            ],
-          },
-        ],
-        i18n: {
-          defaultLocale: "en",
-          locales: {
-            en: {
-              "categories.workflow": "Workflow",
-              "fields.retries.label": "Retries",
-              "nodes.approval.label": "Approval",
-            },
-          },
-        },
-      }),
-    ).toThrow(/Invalid input/i);
   });
 
   it("rejects select fields without an options endpoint", () => {
@@ -346,93 +258,19 @@ describe("nodegraph schema", () => {
       nodeLibraryEnvelopeSchema.parse({
         nodes: [
           {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            categoryKey: "categories.workflow",
+            type: "format_message",
+            displayName: "Format Message",
+            category: "Hello World",
             fields: [
               {
-                key: "priority",
-                labelKey: "fields.priority.label",
+                key: "previewStyle",
+                label: "Preview Style",
                 kind: "select",
               },
             ],
           },
         ],
-        i18n: {
-          defaultLocale: "en",
-          locales: {
-            en: {
-              "categories.workflow": "Workflow",
-              "fields.priority.label": "Priority",
-              "nodes.approval.label": "Approval",
-            },
-          },
-        },
       }),
     ).toThrow(/optionsEndpoint/i);
-  });
-
-  it("rejects decimal defaults that are not stored as strings", () => {
-    expect(() =>
-      nodeLibraryEnvelopeSchema.parse({
-        nodes: [
-          {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            categoryKey: "categories.workflow",
-            fields: [
-              {
-                key: "budget",
-                labelKey: "fields.budget.label",
-                kind: "decimal",
-                defaultValue: 12.5,
-              },
-            ],
-          },
-        ],
-        i18n: {
-          defaultLocale: "en",
-          locales: {
-            en: {
-              "categories.workflow": "Workflow",
-              "fields.budget.label": "Budget",
-              "nodes.approval.label": "Approval",
-            },
-          },
-        },
-      }),
-    ).toThrow(/expected string/i);
-  });
-
-  it("rejects color defaults that are not hex strings", () => {
-    expect(() =>
-      nodeLibraryEnvelopeSchema.parse({
-        nodes: [
-          {
-            type: "approval",
-            labelKey: "nodes.approval.label",
-            categoryKey: "categories.workflow",
-            fields: [
-              {
-                key: "theme",
-                labelKey: "fields.theme.label",
-                kind: "color",
-                defaultValue: "orange",
-              },
-            ],
-          },
-        ],
-        i18n: {
-          defaultLocale: "en",
-          locales: {
-            en: {
-              "categories.workflow": "Workflow",
-              "fields.theme.label": "Theme",
-              "nodes.approval.label": "Approval",
-            },
-          },
-        },
-      }),
-    ).toThrow(/RRGGBB/i);
   });
 });

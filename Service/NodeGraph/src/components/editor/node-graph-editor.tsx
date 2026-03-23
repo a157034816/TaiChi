@@ -8,7 +8,7 @@ import {
   MiniMap,
   ReactFlow,
 } from "@xyflow/react";
-import { CheckCircle2, Crosshair, Network, Save, Waypoints } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Crosshair, Network, RefreshCcw, Save, Waypoints } from "lucide-react";
 
 import { CanvasContextMenu } from "@/components/editor/canvas-context-menu";
 import { EditorI18nProvider } from "@/components/editor/editor-i18n-context";
@@ -22,7 +22,7 @@ import {
   readEditorPreferences,
 } from "@/lib/nodegraph/editor-preferences";
 import { createI18nRuntime, getAvailableLocaleCodes, serializeNodeData } from "@/lib/nodegraph/localization";
-import type { EditorSessionPayload } from "@/lib/nodegraph/types";
+import type { EditorSessionPayload, NodeGraphDocument } from "@/lib/nodegraph/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,23 +32,23 @@ interface NodeGraphEditorProps {
 }
 
 /**
- * Hosts the full NodeGraph editor workbench and wires runtime i18n into the
- * canvas, library, inspector, and save flow.
+ * 承载完整节点编辑工作台，并负责处理节点库刷新后的即时回灌。
  */
 export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
+  const [editorPayload, setEditorPayload] = useState(payload);
   const [graphName, setGraphName] = useState(payload.session.graph.name);
   const [graphDescription, setGraphDescription] = useState(payload.session.graph.description ?? "");
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [refreshState, setRefreshState] = useState<"idle" | "refreshing" | "refreshed" | "error">("idle");
   const [preferences, setPreferences] = useState(DEFAULT_EDITOR_PREFERENCES);
-  const availableLocales = useMemo(() => getAvailableLocaleCodes(payload.i18n), [payload.i18n]);
+  const availableLocales = useMemo(() => getAvailableLocaleCodes(), []);
   const i18n = useMemo(
     () =>
       createI18nRuntime({
         locale: preferences.locale,
-        domainI18n: payload.i18n,
       }),
-    [payload.i18n, preferences.locale],
+    [preferences.locale],
   );
   const {
     addNode,
@@ -87,19 +87,28 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     selectionTypeLabel,
     setReactFlowInstance,
     updateSelectedNode,
-  } = useNodeGraphCanvas(payload, preferences.edgeStyle, i18n);
+  } = useNodeGraphCanvas(editorPayload, preferences.edgeStyle, i18n);
 
   const typeColors = useMemo(
     () =>
       new Map(
-        (payload.typeMappings ?? [])
+        (editorPayload.typeMappings ?? [])
           .filter((mapping) => Boolean(mapping.color))
           .map((mapping) => [mapping.canonicalId, String(mapping.color)] as const),
       ),
-    [payload.typeMappings],
+    [editorPayload.typeMappings],
   );
   const deleteKeyCode = useMemo(() => ["Delete", "Backspace"], []);
   const fitViewOptions = useMemo(() => ({ padding: 0.18 }), []);
+  const invalidNodeCount = useMemo(
+    () => nodes.filter((node) => (node.data.templateMarkers?.length ?? 0) > 0).length,
+    [nodes],
+  );
+  const invalidEdgeCount = useMemo(
+    () => edges.filter((edge) => Boolean(edge.invalidReason)).length,
+    [edges],
+  );
+  const invalidGraphCount = invalidNodeCount + invalidEdgeCount;
   const handleCanvasEdgeClick = useCallback(
     (_event: unknown, edge: { id: string }) => {
       handleEdgeClick(edge.id);
@@ -113,10 +122,16 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     [handleNodeClick],
   );
   const miniMapNodeColor = useCallback(
-    (node: { style?: { borderColor?: string } }) =>
-      String(node.style?.borderColor ?? "#ff9d1c"),
+    (node: { data?: { templateMarkers?: unknown[] }; style?: { borderColor?: string } }) =>
+      node.data?.templateMarkers?.length ? "#ef4444" : String(node.style?.borderColor ?? "#ff9d1c"),
     [],
   );
+
+  useEffect(() => {
+    setEditorPayload(payload);
+    setGraphName(payload.session.graph.name);
+    setGraphDescription(payload.session.graph.description ?? "");
+  }, [payload]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -148,32 +163,96 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     document.documentElement.lang = preferences.locale;
   }, [preferences]);
 
+  function buildCurrentGraphSnapshot(): NodeGraphDocument {
+    return {
+      ...editorPayload.session.graph,
+      name: graphName,
+      description: graphDescription,
+      nodes: nodes.map((node) => ({
+        ...node,
+        data: serializeNodeData(node.data, i18n),
+      })),
+      edges,
+    };
+  }
+
   async function saveGraph() {
     setSaveState("saving");
+    const nextGraph = buildCurrentGraphSnapshot();
 
     try {
-      const response = await fetch(`/api/editor/sessions/${payload.session.sessionId}/complete`, {
+      const response = await fetch(`/api/editor/sessions/${editorPayload.session.sessionId}/complete`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          graph: {
-            ...payload.session.graph,
-            name: graphName,
-            description: graphDescription,
-            nodes: nodes.map((node) => ({
-              ...node,
-              data: serializeNodeData(node.data, i18n),
-            })),
-            edges,
-          },
+          graph: nextGraph,
         }),
       });
 
-      setSaveState(response.ok ? "saved" : "error");
+      if (!response.ok) {
+        setSaveState("error");
+        return;
+      }
+
+      setEditorPayload((currentPayload) => ({
+        ...currentPayload,
+        session: {
+          ...currentPayload.session,
+          graph: nextGraph,
+          updatedAt: new Date().toISOString(),
+        },
+      }));
+      setSaveState("saved");
     } catch {
       setSaveState("error");
+    }
+  }
+
+  async function refreshLibrary() {
+    setRefreshState("refreshing");
+
+    try {
+      const response = await fetch(`/api/editor/sessions/${editorPayload.session.sessionId}/library/refresh`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          graph: buildCurrentGraphSnapshot(),
+        }),
+      });
+
+      if (!response.ok) {
+        setRefreshState("error");
+        return;
+      }
+
+      const refreshed = (await response.json()) as {
+        runtime: EditorSessionPayload["runtime"];
+        nodeLibrary: EditorSessionPayload["nodeLibrary"];
+        typeMappings?: EditorSessionPayload["typeMappings"];
+        migratedGraph?: NodeGraphDocument;
+      };
+      const nextGraph = refreshed.migratedGraph ?? buildCurrentGraphSnapshot();
+
+      setEditorPayload((currentPayload) => ({
+        ...currentPayload,
+        runtime: refreshed.runtime,
+        nodeLibrary: refreshed.nodeLibrary,
+        typeMappings: refreshed.typeMappings ?? currentPayload.typeMappings,
+        session: {
+          ...currentPayload.session,
+          graph: nextGraph,
+          updatedAt: new Date().toISOString(),
+        },
+      }));
+      setGraphName(nextGraph.name);
+      setGraphDescription(nextGraph.description ?? "");
+      setRefreshState("refreshed");
+    } catch {
+      setRefreshState("error");
     }
   }
 
@@ -184,7 +263,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
           <div className="grid min-h-screen gap-4 p-4 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
             <div className="xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
               <NodeLibraryPanel
-                items={payload.nodeLibrary}
+                items={editorPayload.nodeLibrary}
                 onAddNode={addNode}
                 onSearchTermChange={setSearchTerm}
                 searchTerm={searchTerm}
@@ -196,12 +275,19 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                 <CardContent className="flex flex-col gap-6 p-6 xl:flex-row xl:items-start xl:justify-between">
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
-                      <Badge className="editor-chip">{payload.session.domain}</Badge>
+                      <Badge className="editor-chip">{editorPayload.session.domain}</Badge>
                       <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                        {i18n.text(`editor.access.${payload.session.accessType}`)} {i18n.text("editor.header.accessUrlSuffix")}
+                        {i18n.text(`editor.access.${editorPayload.session.accessType}`)} {i18n.text("editor.header.accessUrlSuffix")}
                       </Badge>
                       <Badge className="border-white/10 bg-black/30 text-[#d4deef]" variant="outline">
-                        {i18n.text("editor.header.libraryNodes", { count: payload.nodeLibrary.length })}
+                        {i18n.text("editor.header.libraryNodes", { count: editorPayload.nodeLibrary.length })}
+                      </Badge>
+                      <Badge
+                        className="border-white/10 bg-black/30 text-[#d4deef]"
+                        data-testid="runtime-library-version"
+                        variant="outline"
+                      >
+                        {i18n.text("editor.runtime.libraryVersion", { version: editorPayload.runtime.libraryVersion })}
                       </Badge>
                     </div>
 
@@ -214,7 +300,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                         {graphDescription?.trim() || i18n.text("editor.header.fallbackDescription")}
                       </p>
                       <p className="text-xs uppercase tracking-[0.3em] text-[#92a3bc]">
-                        {i18n.text("editor.header.sessionLabel", { sessionId: payload.session.sessionId })}
+                        {i18n.text("editor.header.sessionLabel", { sessionId: editorPayload.session.sessionId })}
                       </p>
                     </div>
                   </div>
@@ -235,7 +321,31 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                       </div>
                     </div>
 
+                    {invalidGraphCount ? (
+                      <div
+                        className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+                        data-testid="invalid-graph-alert"
+                        role="alert"
+                      >
+                        <AlertTriangle className="size-4" />
+                        {i18n.text("editor.runtime.invalidGraphSummary", { count: invalidGraphCount })}
+                      </div>
+                    ) : null}
+
                     <div className="flex flex-wrap items-center justify-end gap-3">
+                      {refreshState === "refreshed" ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-4 py-2 text-sm text-sky-100">
+                          <CheckCircle2 className="size-4" />
+                          {i18n.text("editor.runtime.libraryRefreshed")}
+                        </span>
+                      ) : null}
+
+                      {refreshState === "error" ? (
+                        <span className="rounded-full border border-rose-400/20 bg-rose-500/12 px-4 py-2 text-sm text-rose-200">
+                          {i18n.text("editor.runtime.libraryRefreshFailed")}
+                        </span>
+                      ) : null}
+
                       {saveState === "saved" ? (
                         <span
                           className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
@@ -254,6 +364,19 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                           {i18n.text("editor.save.failed")}
                         </span>
                       ) : null}
+
+                      <Button
+                        className="h-12 rounded-2xl border border-white/10 bg-white/5 px-6 text-white hover:bg-white/10"
+                        data-testid="refresh-library-button"
+                        onClick={refreshLibrary}
+                        size="lg"
+                        variant="outline"
+                      >
+                        <RefreshCcw className="size-4" />
+                        {refreshState === "refreshing"
+                          ? i18n.text("editor.runtime.refreshingLibrary")
+                          : i18n.text("editor.runtime.refreshLibrary")}
+                      </Button>
 
                       <Button
                         className="h-12 rounded-2xl border border-amber-300/10 bg-[linear-gradient(135deg,#ff9d1c,#ffb44c)] px-6 text-[#1d1305] shadow-[0_18px_38px_rgba(255,157,28,0.2)] hover:bg-[linear-gradient(135deg,#ffad38,#ffc261)]"
@@ -428,7 +551,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                     },
                   }))
                 }
-                sessionId={payload.session.sessionId}
+                sessionId={editorPayload.session.sessionId}
                 template={selectedTemplate}
               />
             </div>

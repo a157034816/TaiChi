@@ -1,31 +1,25 @@
 import { z } from "zod";
 
-const translationKeySchema = z.string().min(1);
 const colorHexSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Expected a hex color like "#RRGGBB".');
 const dateValueSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a date like "2026-03-21".');
-const legacyLocalizedTextSchema = z
-  .record(z.string(), z.string())
-  .refine((value) => Object.keys(value).length > 0, "Expected at least one locale entry.");
-const legacyTextSnapshotSchema = z.union([z.string(), legacyLocalizedTextSchema]);
-const i18nBundleSchema = z.object({
-  defaultLocale: z.string().min(1).optional(),
-  locales: z.record(z.string(), z.record(z.string(), z.string())),
+
+const runtimeCapabilitiesSchema = z.object({
+  canExecute: z.boolean().optional(),
+  canDebug: z.boolean().optional(),
+  canProfile: z.boolean().optional(),
 });
 
 const libraryPortDefinitionSchema = z.object({
   id: z.string().min(1),
-  labelKey: translationKeySchema,
+  label: z.string().min(1),
   dataType: z.string().min(1).optional(),
 });
 
-const storedPortDefinitionSchema = z.union([
-  libraryPortDefinitionSchema,
-  z.object({
-    id: z.string().min(1),
-    label: legacyTextSnapshotSchema,
-    dataType: z.string().min(1).optional(),
-  }),
-]);
+const storedPortDefinitionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  dataType: z.string().min(1).optional(),
+});
 
 export const nodePortDefinitionSchema = storedPortDefinitionSchema;
 
@@ -37,8 +31,8 @@ export const typeMappingEntrySchema = z.object({
 
 const nodeLibraryFieldBaseSchema = z.object({
   key: z.string().min(1),
-  labelKey: translationKeySchema,
-  placeholderKey: translationKeySchema.optional(),
+  label: z.string().min(1),
+  placeholder: z.string().min(1).optional(),
 });
 
 const nodeLibraryStringFieldSchema = nodeLibraryFieldBaseSchema.extend({
@@ -87,11 +81,16 @@ export const nodeAppearanceSchema = z.object({
   textColor: z.string().optional(),
 });
 
+export const invalidTemplateMarkerSchema = z.object({
+  code: z.string().min(1),
+  reason: z.string().min(1),
+});
+
 export const nodeLibraryItemSchema = z.object({
   type: z.string().min(1),
-  labelKey: translationKeySchema,
-  descriptionKey: translationKeySchema.optional(),
-  categoryKey: translationKeySchema,
+  displayName: z.string().min(1),
+  description: z.string().min(1).optional(),
+  category: z.string().min(1),
   inputs: z.array(libraryPortDefinitionSchema).optional(),
   outputs: z.array(libraryPortDefinitionSchema).optional(),
   fields: z.array(nodeLibraryFieldSchema).optional(),
@@ -101,18 +100,16 @@ export const nodeLibraryItemSchema = z.object({
 
 export const nodeGraphNodeDataSchema = z.object({
   label: z.string().min(1),
-  labelKey: translationKeySchema.optional(),
   labelOverride: z.string().optional(),
   description: z.string().optional(),
-  descriptionKey: translationKeySchema.optional(),
   descriptionOverride: z.string().optional(),
-  categoryKey: translationKeySchema.optional(),
-  category: legacyTextSnapshotSchema.optional(),
+  category: z.string().min(1).optional(),
   nodeType: z.string().min(1),
   inputs: z.array(storedPortDefinitionSchema).optional(),
   outputs: z.array(storedPortDefinitionSchema).optional(),
   values: z.record(z.string(), z.unknown()).optional(),
   appearance: nodeAppearanceSchema.optional(),
+  templateMarkers: z.array(invalidTemplateMarkerSchema).optional(),
 });
 
 export const nodeGraphNodeSchema = z.object({
@@ -137,6 +134,7 @@ export const nodeGraphEdgeSchema = z.object({
   label: z.string().optional(),
   type: z.string().optional(),
   animated: z.boolean().optional(),
+  invalidReason: z.string().optional(),
 });
 
 export const nodeGraphDocumentSchema = z.object({
@@ -153,21 +151,43 @@ export const nodeGraphDocumentSchema = z.object({
 });
 
 export const createSessionRequestSchema = z.object({
-  domain: z.string().min(1),
-  clientName: z.string().optional(),
-  nodeLibraryEndpoint: z.string().url(),
+  runtimeId: z.string().min(1),
   completionWebhook: z.string().url(),
   graph: nodeGraphDocumentSchema.optional(),
   metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const runtimeRegistrationRequestSchema = z.object({
+  runtimeId: z.string().min(1),
+  domain: z.string().min(1),
+  clientName: z.string().optional(),
+  controlBaseUrl: z.string().url(),
+  libraryVersion: z.string().min(1),
+  capabilities: runtimeCapabilitiesSchema.optional(),
+  library: z.object({
+    nodes: z.array(nodeLibraryItemSchema),
+    typeMappings: z.array(typeMappingEntrySchema).optional(),
+  }),
+});
+
+export const runtimeLibraryResponseSchema = z.object({
+  libraryVersion: z.string().min(1).optional(),
+  library: z.object({
+    nodes: z.array(nodeLibraryItemSchema),
+    typeMappings: z.array(typeMappingEntrySchema).optional(),
+  }),
 });
 
 export const completeSessionRequestSchema = z.object({
   graph: nodeGraphDocumentSchema,
 });
 
+export const refreshRuntimeLibraryRequestSchema = z.object({
+  graph: nodeGraphDocumentSchema.optional(),
+});
+
 export const nodeLibraryEnvelopeSchema = z.object({
   nodes: z.array(nodeLibraryItemSchema),
-  i18n: i18nBundleSchema,
   typeMappings: z.array(typeMappingEntrySchema).optional(),
 });
 

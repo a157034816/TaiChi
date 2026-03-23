@@ -65,10 +65,10 @@ describe("nodegraph localization helpers", () => {
 
     expect(getAvailableLocaleCodes(domainI18nWithFrench)).toEqual(["zh-CN", "en", "fr-FR"]);
     expect(i18n.availableLocales).toEqual(["zh-CN", "en", "fr-FR"]);
-    expect(resolvePortLabel({ id: "next", labelKey: "ports.next" }, i18n)).toBe("Suivant");
+    expect(i18n.getLocaleLabel("fr-FR")).toBeTruthy();
   });
 
-  it("resolves node-library metadata from translation keys", () => {
+  it("returns raw node-library metadata without applying locale translation", () => {
     const i18n = createI18nRuntime({
       locale: "zh-CN",
       domainI18n,
@@ -76,30 +76,30 @@ describe("nodegraph localization helpers", () => {
 
     const port = {
       id: "next",
-      labelKey: "ports.next",
+      label: "Next",
     };
     const field = {
       key: "owner",
       kind: "text" as const,
-      labelKey: "fields.owner.label",
-      placeholderKey: "fields.owner.placeholder",
+      label: "Owner",
+      placeholder: "Enter owner",
     };
 
-    expect(resolvePortLabel(port, i18n)).toBe("下一步");
-    expect(resolveFieldLabel(field, i18n)).toBe("负责人");
-    expect(resolveFieldPlaceholder(field, i18n)).toBe("请输入负责人");
+    expect(resolvePortLabel(port, i18n)).toBe("Next");
+    expect(resolveFieldLabel(field, i18n)).toBe("Owner");
+    expect(resolveFieldPlaceholder(field, i18n)).toBe("Enter owner");
   });
 
-  it("falls back to the domain default locale when the active locale is missing", () => {
+  it("keeps raw labels stable even when the active locale is missing", () => {
     const i18n = createI18nRuntime({
       locale: "fr-FR",
       domainI18n,
     });
 
-    expect(resolvePortLabel({ id: "next", labelKey: "ports.next" }, i18n)).toBe("Next");
+    expect(resolvePortLabel({ id: "next", label: "Next" }, i18n)).toBe("Next");
   });
 
-  it("prefers node overrides and falls back to keys, snapshots, then literals", () => {
+  it("prefers node overrides and otherwise uses the stored raw strings", () => {
     const i18n = createI18nRuntime({
       locale: "en",
       domainI18n,
@@ -108,8 +108,7 @@ describe("nodegraph localization helpers", () => {
     expect(
       resolveNodeLabel(
         {
-          label: "开始",
-          labelKey: "nodes.start.label",
+          label: "Start",
         },
         i18n,
       ),
@@ -117,8 +116,7 @@ describe("nodegraph localization helpers", () => {
     expect(
       resolveNodeDescription(
         {
-          description: "旧说明",
-          descriptionKey: "nodes.start.description",
+          description: "Entry point for a new workflow.",
         },
         i18n,
       ),
@@ -127,7 +125,6 @@ describe("nodegraph localization helpers", () => {
       resolveNodeLabel(
         {
           label: "Start",
-          labelKey: "nodes.start.label",
           labelOverride: "Manual Start",
         },
         i18n,
@@ -137,7 +134,6 @@ describe("nodegraph localization helpers", () => {
       resolveNodeDescription(
         {
           description: "Legacy snapshot",
-          descriptionKey: "nodes.missing.description",
         },
         i18n,
       ),
@@ -145,7 +141,7 @@ describe("nodegraph localization helpers", () => {
     expect(
       resolveNodeCategory(
         {
-          categoryKey: "categories.control",
+          category: "Control",
         },
         i18n,
       ),

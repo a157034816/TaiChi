@@ -134,22 +134,25 @@ function getNodeTemplate(nodeLibrary: NodeLibraryItem[], nodeType: string) {
   return nodeLibrary.find((item) => item.type === nodeType);
 }
 
-function prepareCanvasNode(node: NodeGraphNode, nodeLibrary: NodeLibraryItem[]): NodeGraphNode {
+function prepareCanvasNode(node: NodeGraphNode, nodeLibrary: NodeLibraryItem[], i18n: I18nRuntime): NodeGraphNode {
   const template = getNodeTemplate(nodeLibrary, node.data.nodeType);
+  const isInvalid = (node.data.templateMarkers?.length ?? 0) > 0;
 
   return {
     ...node,
     type: "default",
-    data: normalizeNodeDataPorts(node.data, template),
+    data: normalizeNodeDataPorts(node.data, template, i18n),
     style: {
-      ...(node.style ?? {}),
       ...buildNodeStyle(node.data.appearance),
+      ...(node.style ?? {}),
+      borderColor: isInvalid ? "#ef4444" : (node.style?.borderColor ?? node.data.appearance?.borderColor ?? "#ff9d1c"),
     },
   };
 }
 
 function prepareStoredEdge(edge: NodeGraphEdge, nodes: NodeGraphNode[], typeColors: Map<string, string>): NodeGraphEdge {
   const typeStroke = resolveTypeColorForConnection(edge, nodes, typeColors);
+  const stroke = edge.invalidReason ? "#ef4444" : (typeStroke ?? EDGE_STROKE);
   const baseMarkerEnd = (
     edge.markerEnd && typeof edge.markerEnd === "object"
       ? edge.markerEnd
@@ -161,10 +164,10 @@ function prepareStoredEdge(edge: NodeGraphEdge, nodes: NodeGraphNode[], typeColo
     animated: edge.animated ?? false,
     markerEnd: {
       ...baseMarkerEnd,
-      color: typeStroke ?? EDGE_STROKE,
+      color: stroke,
     },
     style: {
-      stroke: typeStroke ?? EDGE_STROKE,
+      stroke,
       strokeWidth: 3,
       ...(edge.style ?? {}),
     },
@@ -319,8 +322,8 @@ export function useNodeGraphCanvas(
     [payload.typeMappings],
   );
   const initialNodes = useMemo(
-    () => payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary)),
-    [payload.nodeLibrary, payload.session.graph.nodes],
+    () => payload.session.graph.nodes.map((node) => prepareCanvasNode(node, payload.nodeLibrary, i18n)),
+    [i18n, payload.nodeLibrary, payload.session.graph.nodes],
   );
   const initialEdges = useMemo(
     () => payload.session.graph.edges.map((edge) => prepareStoredEdge(edge, initialNodes, typeColors)),
@@ -335,6 +338,14 @@ export function useNodeGraphCanvas(
   const [selectedItem, setSelectedItem] = useState<CanvasSelection>(null);
   const [selectionSnapshot, setSelectionSnapshot] = useState<CanvasSelectionSnapshot>(createEmptyCanvasSelectionSnapshot);
   const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setSelectedItem(null);
+    setSelectionSnapshot(createEmptyCanvasSelectionSnapshot());
+    setContextMenuState(null);
+  }, [initialEdges, initialNodes, setEdges, setNodes]);
 
   const selectedNode =
     selectedItem?.type === "node"

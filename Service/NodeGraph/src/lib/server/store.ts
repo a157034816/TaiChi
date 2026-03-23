@@ -1,7 +1,7 @@
-import type { DomainRegistryEntry, NodeGraphSession } from "@/lib/nodegraph/types";
+import type { NodeGraphSession, RuntimeRegistryEntry } from "@/lib/nodegraph/types";
 
 interface RuntimeStore {
-  domains: Map<string, DomainRegistryEntry>;
+  runtimes: Map<string, RuntimeRegistryEntry>;
   sessions: Map<string, NodeGraphSession>;
 }
 
@@ -12,7 +12,7 @@ declare global {
 export function getRuntimeStore(): RuntimeStore {
   if (!globalThis.__nodeGraphStore) {
     globalThis.__nodeGraphStore = {
-      domains: new Map(),
+      runtimes: new Map(),
       sessions: new Map(),
     };
   }

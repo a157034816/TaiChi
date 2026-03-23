@@ -12,5 +12,6 @@ export function getServerConfig() {
     privateBaseUrl: process.env.NODEGRAPH_PRIVATE_BASE_URL ?? DEFAULT_PRIVATE_BASE_URL,
     libraryTimeoutMs: readTimeout(process.env.NODEGRAPH_LIBRARY_TIMEOUT_MS, 5000),
     webhookTimeoutMs: readTimeout(process.env.NODEGRAPH_WEBHOOK_TIMEOUT_MS, 5000),
+    runtimeCacheTtlMs: readTimeout(process.env.NODEGRAPH_RUNTIME_CACHE_TTL_MS, 30 * 60 * 1000),
   };
 }

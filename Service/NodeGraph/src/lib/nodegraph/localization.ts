@@ -2,7 +2,6 @@ import enCatalog from "@/i18n/en.json";
 import zhCnCatalog from "@/i18n/zh-CN.json";
 import type {
   I18nBundle,
-  LegacyLocalizedText,
   LocaleCode,
   NodeGraphNodeData,
   NodeLibraryField,
@@ -67,14 +66,6 @@ function formatTemplate(template: string, params?: TextParams) {
   });
 }
 
-function isLegacyLocalizedText(value: unknown): value is LegacyLocalizedText {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => typeof entry === "string");
-}
-
 function cloneCatalog(catalog: TranslationCatalog | undefined): TranslationCatalog {
   return catalog ? { ...catalog } : {};
 }
@@ -129,29 +120,6 @@ function resolveFromCatalogs(
   }
 
   return undefined;
-}
-
-function resolveLegacyText(
-  value: string | LegacyLocalizedText | undefined,
-  locale: LocaleCode,
-  domainDefaultLocale: LocaleCode,
-) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (!isLegacyLocalizedText(value)) {
-    return undefined;
-  }
-
-  for (const localeCode of getLookupLocales(locale, domainDefaultLocale)) {
-    const match = value[localeCode];
-    if (match !== undefined) {
-      return match;
-    }
-  }
-
-  return Object.values(value)[0];
 }
 
 /**
@@ -229,123 +197,85 @@ export function getLocaleDisplayName(localeCode: LocaleCode, displayLocale: Loca
 }
 
 /**
- * Resolves a node-library item label from the merged catalog set.
+ * 解析节点库里的原始展示名称。
  */
-export function resolveNodeLibraryLabel(item: Pick<NodeLibraryItem, "labelKey">, i18n: I18nRuntime) {
-  return i18n.lookupText(item.labelKey) ?? item.labelKey;
+export function resolveNodeLibraryLabel(item: Pick<NodeLibraryItem, "displayName">, _i18n: I18nRuntime) {
+  return item.displayName;
 }
 
 /**
- * Resolves a node-library item description from the merged catalog set.
+ * 解析节点库里的原始描述文本。
  */
-export function resolveNodeLibraryDescription(
-  item: Pick<NodeLibraryItem, "descriptionKey">,
-  i18n: I18nRuntime,
-) {
-  if (!item.descriptionKey) {
-    return undefined;
-  }
-
-  return i18n.lookupText(item.descriptionKey) ?? item.descriptionKey;
+export function resolveNodeLibraryDescription(item: Pick<NodeLibraryItem, "description">, _i18n: I18nRuntime) {
+  return item.description;
 }
 
 /**
- * Resolves a node-library category from the merged catalog set.
+ * 解析节点库里的原始分类文本。
  */
-export function resolveNodeLibraryCategory(item: Pick<NodeLibraryItem, "categoryKey">, i18n: I18nRuntime) {
-  return i18n.lookupText(item.categoryKey) ?? item.categoryKey;
+export function resolveNodeLibraryCategory(item: Pick<NodeLibraryItem, "category">, _i18n: I18nRuntime) {
+  return item.category;
 }
 
 /**
  * Resolves the display label for a stored graph node.
  */
 export function resolveNodeLabel(
-  data: Pick<NodeGraphNodeData, "label" | "labelKey" | "labelOverride">,
-  i18n: I18nRuntime,
+  data: Pick<NodeGraphNodeData, "label" | "labelOverride">,
+  _i18n: I18nRuntime,
 ) {
   if (hasOwnKey(data, "labelOverride") && data.labelOverride !== undefined) {
     return data.labelOverride;
   }
-
-  if (data.labelKey) {
-    const translated = i18n.lookupText(data.labelKey);
-    if (translated !== undefined) {
-      return translated;
-    }
-  }
-
-  return data.label || data.labelKey || "";
+  return data.label;
 }
 
 /**
  * Resolves the display description for a stored graph node.
  */
 export function resolveNodeDescription(
-  data: Pick<NodeGraphNodeData, "description" | "descriptionKey" | "descriptionOverride">,
-  i18n: I18nRuntime,
+  data: Pick<NodeGraphNodeData, "description" | "descriptionOverride">,
+  _i18n: I18nRuntime,
 ) {
   if (hasOwnKey(data, "descriptionOverride") && data.descriptionOverride !== undefined) {
     return data.descriptionOverride;
   }
-
-  if (data.descriptionKey) {
-    const translated = i18n.lookupText(data.descriptionKey);
-    if (translated !== undefined) {
-      return translated;
-    }
-  }
-
-  return data.description ?? data.descriptionKey;
+  return data.description;
 }
 
 /**
  * Resolves a node or template category string.
  */
 export function resolveNodeCategory(
-  data: Pick<NodeGraphNodeData, "category" | "categoryKey">,
-  i18n: I18nRuntime,
+  data: Pick<NodeGraphNodeData, "category">,
+  _i18n: I18nRuntime,
 ) {
-  if (data.categoryKey) {
-    const translated = i18n.lookupText(data.categoryKey);
-    if (translated !== undefined) {
-      return translated;
-    }
-  }
-
-  return resolveLegacyText(data.category, i18n.locale, i18n.defaultLocale);
+  return data.category;
 }
 
 /**
- * Resolves a port label from either a translation key or a legacy snapshot.
+ * 解析端口原始标签。
  */
-export function resolvePortLabel(port: NodePortDefinition, i18n: I18nRuntime) {
-  if (port.labelKey) {
-    const translated = i18n.lookupText(port.labelKey);
-    if (translated !== undefined) {
-      return translated;
-    }
-  }
-
-  return resolveLegacyText(port.label, i18n.locale, i18n.defaultLocale) ?? port.id;
+export function resolvePortLabel(port: NodePortDefinition, _i18n: I18nRuntime) {
+  return port.label || port.id;
 }
 
 /**
- * Resolves field labels from the merged catalog set.
+ * 解析字段原始标签。
  */
-export function resolveFieldLabel(field: NodeLibraryField, i18n: I18nRuntime) {
-  return i18n.lookupText(field.labelKey) ?? field.labelKey;
+export function resolveFieldLabel(field: NodeLibraryField, _i18n: I18nRuntime) {
+  return field.label;
 }
 
 /**
- * Resolves field placeholders from the merged catalog set.
+ * 解析字段原始占位文本。
  */
-export function resolveFieldPlaceholder(field: NodeLibraryField, i18n: I18nRuntime) {
-  return field.placeholderKey ? (i18n.lookupText(field.placeholderKey) ?? field.placeholderKey) : undefined;
+export function resolveFieldPlaceholder(field: NodeLibraryField, _i18n: I18nRuntime) {
+  return field.placeholder;
 }
 
 /**
- * Serializes node data so outgoing graph payloads keep compatibility snapshots
- * in sync with the currently visible locale.
+ * 序列化节点数据，确保导出的图快照始终写入当前节点上保存的原始展示文本。
  */
 export function serializeNodeData(data: NodeGraphNodeData, i18n: I18nRuntime): NodeGraphNodeData {
   const nextDescription = resolveNodeDescription(data, i18n);
@@ -355,32 +285,4 @@ export function serializeNodeData(data: NodeGraphNodeData, i18n: I18nRuntime): N
     label: resolveNodeLabel(data, i18n),
     description: nextDescription,
   };
-}
-
-/**
- * Ensures every key referenced by a node-library payload exists in the domain
- * default locale, which keeps fallbacks deterministic during editing.
- */
-export function validateNodeLibraryTranslationKeys(nodes: NodeLibraryItem[], bundle: I18nBundle) {
-  const normalizedBundle = normalizeI18nBundle(bundle);
-  const defaultCatalog = normalizedBundle.locales[normalizedBundle.defaultLocale ?? DEFAULT_LOCALE] ?? {};
-
-  for (const item of nodes) {
-    const requiredKeys = [
-      item.labelKey,
-      item.descriptionKey,
-      item.categoryKey,
-      ...(item.inputs ?? []).map((port) => port.labelKey),
-      ...(item.outputs ?? []).map((port) => port.labelKey),
-      ...(item.fields ?? []).flatMap((field) => [field.labelKey, field.placeholderKey]),
-    ].filter((key): key is string => Boolean(key));
-
-    for (const key of requiredKeys) {
-      if (!hasOwnKey(defaultCatalog, key)) {
-        throw new Error(
-          `nodeLibrary i18n missing key "${key}" in defaultLocale "${normalizedBundle.defaultLocale}".`,
-        );
-      }
-    }
-  }
 }

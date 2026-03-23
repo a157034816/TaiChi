@@ -1,34 +1,27 @@
 import type { Edge, Node } from "@xyflow/react";
 
 /**
- * The editor can be opened from public or private network entrypoints.
+ * 编辑器入口既可能来自公网，也可能来自宿主所在内网。
  */
 export type AccessType = "public" | "private";
 
 /**
- * Locale codes now stay open-ended so the built-in `src/i18n/<locale>.json`
- * files can define the supported language set at runtime.
+ * 当前编辑器 UI 仍然使用开放的语言代码，方便沿用内建多语言能力。
  */
 export type LocaleCode = string;
 
 /**
- * Translation catalogs store flattened dot-notation keys.
+ * 内建编辑器文案仍然使用扁平翻译目录。
  */
 export type TranslationCatalog = Record<string, string>;
 
 /**
- * Domain-specific i18n payloads travel with the node library contract.
+ * 仅供 NodeGraph 自身 UI 文案运行时使用。
  */
 export interface I18nBundle {
   defaultLocale?: LocaleCode;
   locales: Record<LocaleCode, TranslationCatalog>;
 }
-
-/**
- * Older saved graphs may still carry inline locale maps for ports or category
- * metadata. We keep that compatibility path during the refactor.
- */
-export type LegacyLocalizedText = Record<string, string>;
 
 export type NodeFieldKind =
   | "text"
@@ -43,7 +36,7 @@ export type NodeFieldKind =
   | "decimal";
 
 /**
- * 字段远端选项在编辑器中统一使用已本地化的 label。
+ * Select 字段代理接口直接返回当前语言下可展示的文本。
  */
 export interface NodeFieldOption {
   value: string;
@@ -52,8 +45,8 @@ export interface NodeFieldOption {
 
 interface NodeLibraryFieldBase {
   key: string;
-  labelKey: string;
-  placeholderKey?: string;
+  label: string;
+  placeholder?: string;
 }
 
 type NodeLibraryStringFieldKind = "text" | "textarea" | "date" | "decimal";
@@ -86,7 +79,7 @@ interface NodeLibrarySelectField extends NodeLibraryFieldBase {
 }
 
 /**
- * Node field metadata now points at translation keys instead of inline values.
+ * 节点库字段全部使用宿主提供的原始字符串。
  */
 export type NodeLibraryField =
   | NodeLibraryStringField
@@ -96,7 +89,7 @@ export type NodeLibraryField =
   | NodeLibrarySelectField;
 
 /**
- * Visual styling for a node card inside the editor.
+ * 节点卡片在编辑器中的外观配置。
  */
 export interface NodeAppearance {
   bgColor?: string;
@@ -105,14 +98,11 @@ export interface NodeAppearance {
 }
 
 /**
- * Ports primarily use translation keys. Legacy saved graphs may still carry an
- * inline label snapshot or localized object, so the runtime accepts both.
+ * 端口定义使用可直接展示的原始字符串标签。
  */
 export interface NodePortDefinition {
   id: string;
-  labelKey?: string;
-  label?: string | LegacyLocalizedText;
-  /** Canonical type identifier shared across languages, e.g. workflow/request. */
+  label: string;
   dataType?: string;
 }
 
@@ -123,13 +113,13 @@ export interface TypeMappingEntry {
 }
 
 /**
- * Node-library templates describe reusable business nodes for a domain.
+ * 节点模板描述宿主可提供给编辑器的新建节点。
  */
 export interface NodeLibraryItem {
   type: string;
-  labelKey: string;
-  descriptionKey?: string;
-  categoryKey: string;
+  displayName: string;
+  description?: string;
+  category: string;
   inputs?: NodePortDefinition[];
   outputs?: NodePortDefinition[];
   fields?: NodeLibraryField[];
@@ -137,24 +127,27 @@ export interface NodeLibraryItem {
   appearance?: NodeAppearance;
 }
 
+export interface InvalidTemplateMarker {
+  code: string;
+  reason: string;
+}
+
 /**
- * Stored node data keeps compatibility snapshots in `label` and
- * `description`, while key-based fields drive locale-aware rendering.
+ * 画布中的节点始终保存一份可直接展示的文本快照。
+ * `templateMarkers` 用于记录刷新后发现的失效项，供 UI 标红提示。
  */
 export interface NodeGraphNodeData extends Record<string, unknown> {
   label: string;
-  labelKey?: string;
   labelOverride?: string;
   description?: string;
-  descriptionKey?: string;
   descriptionOverride?: string;
-  categoryKey?: string;
-  category?: string | LegacyLocalizedText;
+  category?: string;
   nodeType: string;
   inputs?: NodePortDefinition[];
   outputs?: NodePortDefinition[];
   values?: Record<string, unknown>;
   appearance?: NodeAppearance;
+  templateMarkers?: InvalidTemplateMarker[];
 }
 
 export type NodeGraphNode = Node<NodeGraphNodeData>;
@@ -162,6 +155,7 @@ export type NodeGraphNode = Node<NodeGraphNodeData>;
 export interface NodeGraphEdge extends Edge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
+  invalidReason?: string;
 }
 
 export interface NodeGraphViewport {
@@ -179,10 +173,50 @@ export interface NodeGraphDocument {
   viewport: NodeGraphViewport;
 }
 
-export interface CreateSessionRequest {
+export interface RuntimeCapabilities {
+  canExecute: boolean;
+  canDebug: boolean;
+  canProfile: boolean;
+}
+
+export interface NodeLibraryEnvelope {
+  nodes: NodeLibraryItem[];
+  typeMappings?: TypeMappingEntry[];
+}
+
+export interface RuntimeRegistrationRequest {
+  runtimeId: string;
   domain: string;
   clientName?: string;
-  nodeLibraryEndpoint: string;
+  controlBaseUrl: string;
+  libraryVersion: string;
+  capabilities?: Partial<RuntimeCapabilities>;
+  library: NodeLibraryEnvelope;
+}
+
+export interface RuntimeRegistrationResponse {
+  runtimeId: string;
+  cached: boolean;
+  expiresAt: string;
+  libraryVersion: string;
+}
+
+export interface RuntimeRegistryEntry {
+  runtimeId: string;
+  domain: string;
+  clientName?: string;
+  controlBaseUrl: string;
+  libraryVersion: string;
+  capabilities: RuntimeCapabilities;
+  nodeLibrary: NodeLibraryItem[];
+  typeMappings?: TypeMappingEntry[];
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+}
+
+export interface CreateSessionRequest {
+  runtimeId: string;
   completionWebhook: string;
   graph?: NodeGraphDocument;
   metadata?: Record<string, string>;
@@ -190,27 +224,16 @@ export interface CreateSessionRequest {
 
 export interface CreateSessionResponse {
   sessionId: string;
+  runtimeId: string;
   editorUrl: string;
   accessType: AccessType;
-  domainCached: boolean;
-}
-
-export interface DomainRegistryEntry {
-  domain: string;
-  clientName?: string;
-  nodeLibraryEndpoint: string;
-  completionWebhook: string;
-  nodeLibrary: NodeLibraryItem[];
-  i18n: I18nBundle;
-  typeMappings?: TypeMappingEntry[];
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type SessionStatus = "draft" | "completed";
 
 export interface NodeGraphSession {
   sessionId: string;
+  runtimeId: string;
   domain: string;
   clientName?: string;
   graph: NodeGraphDocument;
@@ -218,17 +241,25 @@ export interface NodeGraphSession {
   accessType: AccessType;
   editorUrl: string;
   status: SessionStatus;
-  nodeLibraryEndpoint: string;
   completionWebhook: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
 }
 
+export interface EditorSessionRuntimePayload {
+  runtimeId: string;
+  domain: string;
+  clientName?: string;
+  libraryVersion: string;
+  capabilities: RuntimeCapabilities;
+  expiresAt: string;
+}
+
 export interface EditorSessionPayload {
   session: NodeGraphSession;
+  runtime: EditorSessionRuntimePayload;
   nodeLibrary: NodeLibraryItem[];
-  i18n: I18nBundle;
   typeMappings?: TypeMappingEntry[];
 }
 
@@ -241,9 +272,17 @@ export interface NodeFieldOptionsResponse {
 
 export interface CompletionWebhookPayload {
   sessionId: string;
+  runtimeId: string;
   domain: string;
   graph: NodeGraphDocument;
   metadata: Record<string, string>;
   completedAt: string;
   status: "completed";
+}
+
+export interface RuntimeLibraryRefreshResult {
+  runtime: EditorSessionRuntimePayload;
+  nodeLibrary: NodeLibraryItem[];
+  typeMappings?: TypeMappingEntry[];
+  migratedGraph?: NodeGraphDocument;
 }

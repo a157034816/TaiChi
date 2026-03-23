@@ -8,8 +8,7 @@ import { NodeGraphEditor } from "@/components/editor/node-graph-editor";
 import type { EditorSessionPayload } from "@/lib/nodegraph/types";
 
 /**
- * React Flow relies on a few browser-only APIs that JSDOM does not expose.
- * The editor smoke test only needs minimal no-op implementations.
+ * React Flow 依赖部分浏览器专属 API，测试只需要最小空实现即可。
  */
 class ResizeObserverStub {
   observe() {}
@@ -22,10 +21,11 @@ class ResizeObserverStub {
 const editorPayload: EditorSessionPayload = {
   session: {
     sessionId: "ngs_test",
-    domain: "demo-workflow",
+    runtimeId: "rt_demo_001",
+    domain: "hello-world",
     clientName: "NodeGraph Demo Client",
     graph: {
-      name: "Demo Approval Flow",
+      name: "Hello World Flow",
       description: "Smoke-test graph",
       nodes: [],
       edges: [],
@@ -39,48 +39,36 @@ const editorPayload: EditorSessionPayload = {
     accessType: "private",
     editorUrl: "http://localhost:3001/editor/ngs_test",
     status: "draft",
-    nodeLibraryEndpoint: "http://localhost:3100/api/node-library",
     completionWebhook: "http://localhost:3100/api/completed",
     createdAt: "2026-03-19T00:00:00.000Z",
     updatedAt: "2026-03-19T00:00:00.000Z",
   },
+  runtime: {
+    runtimeId: "rt_demo_001",
+    domain: "hello-world",
+    clientName: "NodeGraph Demo Client",
+    libraryVersion: "hello-world@1",
+    capabilities: {
+      canDebug: true,
+      canExecute: true,
+      canProfile: true,
+    },
+    expiresAt: "2026-03-19T00:30:00.000Z",
+  },
   nodeLibrary: [
     {
-      type: "start",
-      labelKey: "nodes.start.label",
-      descriptionKey: "nodes.start.description",
-      categoryKey: "categories.control",
+      type: "greeting_source",
+      displayName: "Greeting Source",
+      description: "Create the base greeting text.",
+      category: "Hello World",
       outputs: [
         {
-          id: "next",
-          labelKey: "ports.next",
+          id: "text",
+          label: "Text",
         },
       ],
     },
   ],
-  i18n: {
-    defaultLocale: "en",
-    locales: {
-      en: {
-        "categories.control": "Control",
-        "nodes.start.description": "Entry point for a new workflow.",
-        "nodes.start.label": "Start",
-        "ports.next": "Next",
-      },
-      "zh-CN": {
-        "categories.control": "控制",
-        "nodes.start.description": "新工作流的入口节点。",
-        "nodes.start.label": "开始",
-        "ports.next": "下一步",
-      },
-      "fr-FR": {
-        "categories.control": "Controle",
-        "nodes.start.description": "Point d'entree d'un nouveau workflow.",
-        "nodes.start.label": "Demarrer",
-        "ports.next": "Suivant",
-      },
-    },
-  },
   typeMappings: [],
 };
 
@@ -144,11 +132,11 @@ describe("NodeGraphEditor", () => {
     });
   });
 
-  it("restores a persisted domain locale on mount", async () => {
+  it("restores a persisted builtin locale on mount", async () => {
     window.localStorage.setItem(
       "nodegraph.editor.preferences.v1",
       JSON.stringify({
-        locale: "fr-FR",
+        locale: "en",
         edgeStyle: "smoothstep",
       }),
     );
@@ -165,7 +153,97 @@ describe("NodeGraphEditor", () => {
       await Promise.resolve();
     });
 
-    expect(document.documentElement.lang).toBe("fr-FR");
+    expect(document.documentElement.lang).toBe("en");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("refreshes the runtime library and surfaces invalid graph markers", async () => {
+    window.localStorage.setItem(
+      "nodegraph.editor.preferences.v1",
+      JSON.stringify({
+        locale: "en",
+        edgeStyle: "smoothstep",
+      }),
+    );
+
+    const refreshResponse = {
+      runtime: {
+        ...editorPayload.runtime,
+        libraryVersion: "hello-world@2",
+      },
+      nodeLibrary: [
+        {
+          type: "greeting_source",
+          displayName: "Greeting Source v2",
+          description: "Create the latest greeting text.",
+          category: "Hello Runtime",
+          outputs: [{ id: "message", label: "Message" }],
+        },
+      ],
+      migratedGraph: {
+        ...editorPayload.session.graph,
+        nodes: [
+          {
+            id: "node_output",
+            type: "default",
+            position: { x: 0, y: 0 },
+            data: {
+              label: "Console Output",
+              category: "Hello Runtime",
+              nodeType: "console_output",
+              templateMarkers: [
+                {
+                  code: "missingNodeType",
+                  reason: "节点类型 \"console_output\" 在最新节点库中不存在。",
+                },
+              ],
+            },
+          },
+        ],
+        edges: [
+          {
+            id: "edge_invalid",
+            source: "node_output",
+            target: "node_output",
+            invalidReason: "源端口 \"text\" 已失效。",
+          },
+        ],
+      },
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => refreshResponse,
+      }),
+    );
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<NodeGraphEditor payload={editorPayload} />);
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const refreshButton = container.querySelector('[data-testid="refresh-library-button"]');
+    expect(refreshButton).toBeTruthy();
+
+    await act(async () => {
+      (refreshButton as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[data-testid="runtime-library-version"]')?.textContent).toContain("hello-world@2");
+    expect(container.querySelector('[data-testid="invalid-graph-alert"]')?.textContent).toContain("2");
 
     await act(async () => {
       root.unmount();

@@ -17,7 +17,6 @@ const nodes: NodeGraphNode[] = [
     position: { x: 0, y: 0 },
     data: {
       label: "Start",
-      labelKey: "nodes.start.label",
       nodeType: "start",
       appearance: {
         borderColor: "#ff9d1c",
@@ -29,7 +28,6 @@ const nodes: NodeGraphNode[] = [
     position: { x: 200, y: 0 },
     data: {
       label: "Notify",
-      labelKey: "nodes.notify.label",
       nodeType: "notify",
     },
   },

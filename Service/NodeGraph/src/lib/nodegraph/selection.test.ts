@@ -20,7 +20,6 @@ const nodes: NodeGraphNode[] = [
     position: { x: 0, y: 0 },
     data: {
       label: "Start",
-      labelKey: "nodes.start.label",
       nodeType: "trigger",
     },
   },
@@ -29,7 +28,6 @@ const nodes: NodeGraphNode[] = [
     position: { x: 240, y: 80 },
     data: {
       label: "Notify",
-      labelKey: "nodes.notify.label",
       nodeType: "action",
     },
   },

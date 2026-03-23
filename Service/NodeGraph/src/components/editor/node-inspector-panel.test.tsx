@@ -62,9 +62,8 @@ const node: NodeGraphNode = {
   position: { x: 0, y: 0 },
   data: {
     label: "Approval",
-    labelKey: "nodes.approval.label",
     description: "Review node",
-    descriptionKey: "nodes.approval.description",
+    category: "Workflow",
     nodeType: "approval",
     values: {
       priority: "low",
@@ -118,20 +117,20 @@ describe("NodeInspectorPanel", () => {
             sessionId="ngs_test"
             template={{
               type: "approval",
-              labelKey: "nodes.approval.label",
-              descriptionKey: "nodes.approval.description",
-              categoryKey: "categories.workflow",
+              displayName: "Approval",
+              description: "Review node",
+              category: "Workflow",
               fields: [
                 {
                   key: "priority",
-                  labelKey: "fields.priority.label",
+                  label: "Priority",
                   kind: "select",
                   optionsEndpoint: "https://client.example.com/options/priorities",
-                  placeholderKey: "fields.priority.placeholder",
+                  placeholder: "Select a priority",
                 },
                 {
                   key: "retries",
-                  labelKey: "fields.retries.label",
+                  label: "Retries",
                   kind: "int",
                 },
               ],

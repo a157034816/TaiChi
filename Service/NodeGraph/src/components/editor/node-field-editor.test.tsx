@@ -80,12 +80,12 @@ function renderFieldEditor({
 
 describe("coerceNodeFieldValue", () => {
   it("keeps decimal values as strings while parsing numeric kinds as numbers", () => {
-    expect(coerceNodeFieldValue({ key: "budget", labelKey: "fields.budget.label", kind: "decimal" }, "99.90")).toBe(
+    expect(coerceNodeFieldValue({ key: "budget", label: "Budget", kind: "decimal" }, "99.90")).toBe(
       "99.90",
     );
-    expect(coerceNodeFieldValue({ key: "retries", labelKey: "fields.retries.label", kind: "int" }, "3")).toBe(3);
-    expect(coerceNodeFieldValue({ key: "ratio", labelKey: "fields.ratio.label", kind: "float" }, "1.5")).toBe(1.5);
-    expect(coerceNodeFieldValue({ key: "score", labelKey: "fields.score.label", kind: "double" }, "2.25")).toBe(
+    expect(coerceNodeFieldValue({ key: "retries", label: "Retries", kind: "int" }, "3")).toBe(3);
+    expect(coerceNodeFieldValue({ key: "ratio", label: "Ratio", kind: "float" }, "1.5")).toBe(1.5);
+    expect(coerceNodeFieldValue({ key: "score", label: "Score", kind: "double" }, "2.25")).toBe(
       2.25,
     );
   });
@@ -99,15 +99,15 @@ describe("NodeFieldEditor", () => {
 
   it("renders specialized controls for textarea, date, and color field kinds", () => {
     const textarea = renderFieldEditor({
-      field: { key: "notes", labelKey: "fields.notes.label", kind: "textarea" },
+      field: { key: "notes", label: "Notes", kind: "textarea" },
       value: "memo",
     });
     const date = renderFieldEditor({
-      field: { key: "dueDate", labelKey: "fields.dueDate.label", kind: "date" },
+      field: { key: "dueDate", label: "Due date", kind: "date" },
       value: "2026-03-21",
     });
     const color = renderFieldEditor({
-      field: { key: "theme", labelKey: "fields.theme.label", kind: "color" },
+      field: { key: "theme", label: "Theme", kind: "color" },
       value: "#ff9d1c",
     });
 
@@ -138,9 +138,10 @@ describe("NodeFieldEditor", () => {
     const rendered = renderFieldEditor({
       field: {
         key: "priority",
-        labelKey: "fields.priority.label",
+        label: "Priority",
         kind: "select",
         optionsEndpoint: "https://client.example.com/options/priorities",
+        placeholder: "Select a priority",
       },
       onChange,
       value: "low",
