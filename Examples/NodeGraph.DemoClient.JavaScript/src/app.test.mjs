@@ -4,9 +4,9 @@ import { createServer } from "node:http";
 import test from "node:test";
 
 import { createApp } from "./app.mjs";
-import { createDemoState } from "./state.mjs";
 import { getDemoConfig } from "./config.mjs";
-import * as contracts from "./contracts.mjs";
+import { createDemoState } from "./state.mjs";
+import { createGraphDocument, createHelloWorldRuntime } from "./demo-data.mjs";
 
 async function withServer(handler, callback) {
   const server = createServer(handler);
@@ -24,127 +24,53 @@ async function withServer(handler, callback) {
   }
 }
 
-test("GET /api/node-library returns the visual playground node library", async () => {
+function createRuntime(config) {
+  return createHelloWorldRuntime(config, {
+    runtimeId: "rt_demo_001",
+    now: () => Date.parse("2026-03-21T00:00:00.000Z"),
+  });
+}
+
+test("GET /api/runtime/library returns the embedded hello-world node library", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config }), async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/node-library`);
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/runtime/library`);
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.ok(Array.isArray(payload.nodes));
-    assert.equal(payload.nodes.length, 5);
-    assert.ok(Array.isArray(payload.typeMappings));
-    assert.equal(payload.typeMappings.length, 3);
-    assert.ok(payload.nodes.some((node) => Array.isArray(node.outputs) && node.outputs.length > 1));
-    assert.ok(payload.nodes.some((node) => Array.isArray(node.inputs) && node.inputs.length > 1));
+    assert.equal(payload.runtime.runtimeId, "rt_demo_001");
+    assert.equal(payload.runtime.libraryVersion, "hello-world@1");
     assert.deepEqual(
-      payload.nodes.map((node) => node.type),
-      ["seed_source", "layer_fanout", "color_mix", "stylize_branch", "preview_output"],
+      payload.library.nodes.map((node) => node.type),
+      ["greeting_source", "console_output"],
     );
-    assert.ok(payload.typeMappings.some((mapping) => mapping.canonicalId === "playground/seed"));
-    assert.ok(payload.typeMappings.some((mapping) => mapping.canonicalId === "playground/layer"));
-    assert.ok(payload.typeMappings.some((mapping) => mapping.canonicalId === "playground/frame"));
-    assert.ok(payload.typeMappings.some((mapping) => mapping.type === contracts.GeneratorSeed?.name));
-    assert.ok(payload.typeMappings.some((mapping) => mapping.type === contracts.LayerSignal?.name));
-    assert.ok(payload.typeMappings.some((mapping) => mapping.type === contracts.PreviewFrame?.name));
-
-    const fieldKinds = payload.nodes.flatMap((node) => node.fields ?? []).map((field) => field.kind);
-    assert.deepEqual(fieldKinds.sort(), [
-      "boolean",
-      "color",
-      "date",
-      "decimal",
-      "double",
-      "float",
-      "int",
-      "select",
-      "select",
-      "select",
-      "text",
-      "textarea",
-    ]);
-
-    const remoteSelectFields = payload.nodes
-      .flatMap((node) => node.fields ?? [])
-      .filter((field) => field.kind === "select");
-    assert.deepEqual(
-      remoteSelectFields.map((field) => field.optionsEndpoint),
-      [
-        "http://demo-client.test/api/node-field-options/distributionMode",
-        "http://demo-client.test/api/node-field-options/blendMode",
-        "http://demo-client.test/api/node-field-options/previewShape",
-      ],
-    );
+    assert.equal(payload.library.nodes[0].displayName, "Greeting Source");
+    assert.equal(payload.library.nodes[1].displayName, "Console Output");
+    assert.equal(payload.library.typeMappings[0].canonicalId, "hello/text");
+    assert.equal(payload.library.typeMappings[0].type, "String");
   });
 });
 
-test("GET /api/node-field-options/:fieldKey returns localized remote options", async () => {
-  const config = getDemoConfig({
-    demoClientBaseUrl: "http://demo-client.test",
-  });
-
-  await withServer(createApp({ config }), async (baseUrl) => {
-    const cases = [
-      {
-        fieldKey: "distributionMode",
-        locale: "en",
-        expectedOptions: [
-          { value: "burst", label: "Burst scatter" },
-          { value: "spiral", label: "Spiral drift" },
-          { value: "ribbon", label: "Ribbon sweep" },
-        ],
-      },
-      {
-        fieldKey: "blendMode",
-        locale: "zh-CN",
-        expectedOptions: [
-          { value: "screen", label: "滤色叠加" },
-          { value: "multiply", label: "正片叠底" },
-          { value: "difference", label: "差值混合" },
-        ],
-      },
-      {
-        fieldKey: "previewShape",
-        locale: "zh-CN",
-        expectedOptions: [
-          { value: "poster", label: "海报竖幅" },
-          { value: "landscape", label: "横向画布" },
-          { value: "square", label: "方形画布" },
-        ],
-      },
-    ];
-
-    for (const entry of cases) {
-      const response = await fetch(
-        `${baseUrl}/api/node-field-options/${entry.fieldKey}?locale=${encodeURIComponent(entry.locale)}&domain=demo-visual-playground&nodeType=preview_output&fieldKey=${entry.fieldKey}`,
-      );
-      const payload = await response.json();
-
-      assert.equal(response.status, 200);
-      assert.deepEqual(payload, {
-        options: entry.expectedOptions,
-      });
-    }
-  });
-});
-
-test("GET /api/health returns the demo client health payload", async () => {
+test("GET /api/health returns runtime metadata", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
     nodeGraphBaseUrl: "http://nodegraph.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config }), async (baseUrl) => {
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/health`);
     const payload = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(payload.status, "ok");
-    assert.equal(payload.service, "NodeGraph Demo Client");
     assert.equal(payload.nodeGraphBaseUrl, "http://nodegraph.test");
+    assert.equal(payload.runtime.runtimeId, "rt_demo_001");
+    assert.equal(payload.runtime.controlBaseUrl, "http://demo-client.test/api/runtime");
   });
 });
 
@@ -153,17 +79,13 @@ test("POST /api/completed stores the latest completion payload", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config, state }), async (baseUrl) => {
+  await withServer(createApp({ config, state, runtime }), async (baseUrl) => {
     const completionPayload = {
       sessionId: "ngs_demo",
-      domain: "demo-visual-playground",
-      graph: {
-        name: "Visual Playground Composition",
-        nodes: [],
-        edges: [],
-        viewport: { x: 0, y: 0, zoom: 1 },
-      },
+      runtimeId: "rt_demo_001",
+      graph: createGraphDocument("Hello World Pipeline", "existing"),
     };
 
     const postResponse = await fetch(`${baseUrl}/api/completed`, {
@@ -184,65 +106,84 @@ test("POST /api/completed stores the latest completion payload", async () => {
   });
 });
 
-test("GET / renders the latest editor URL when a session already exists", async () => {
-  const state = createDemoState();
-  state.lastSession = {
-    createdAt: "2026-03-17T08:00:00.000Z",
-    request: {
-      graphMode: "existing",
-      graphName: "Existing Demo Flow",
-    },
-    response: {
-      sessionId: "ngs_render",
-      editorUrl: "http://localhost:3300/editor/ngs_render",
-      accessType: "private",
-      domainCached: true,
-    },
-  };
-
+test("POST /api/runtime/execute runs the Hello World graph and records profiler output", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config, state }), async (baseUrl) => {
-    const response = await fetch(baseUrl);
-    const html = await response.text();
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/runtime/execute`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        graphMode: "existing",
+        graphName: "Hello World Pipeline",
+      }),
+    });
+    const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.match(html, /Open editor page/);
-    assert.match(html, /http:\/\/localhost:3300\/editor\/ngs_render/);
+    assert.equal(payload.snapshot.status, "completed");
+    assert.deepEqual(payload.snapshot.results.console, ["Hello, Codex!"]);
+    assert.equal(payload.snapshot.profiler.node_source.callCount, 1);
+    assert.equal(payload.snapshot.profiler.node_output.callCount, 1);
   });
 });
 
-test("GET / renders visual playground copy for the demo home page", async () => {
+test("POST /api/runtime/debug/sample returns a breakpoint walkthrough", async () => {
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config }), async (baseUrl) => {
-    const response = await fetch(baseUrl);
-    const html = await response.text();
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/runtime/debug/sample`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        graphMode: "existing",
+        graphName: "Hello World Pipeline",
+      }),
+    });
+    const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.match(html, /Visual Playground/);
-    assert.match(html, /seed_source/);
-    assert.match(html, /value="Visual Playground Composition"/);
-    assert.doesNotMatch(html, /Business-side Example/);
+    assert.equal(payload.firstStep.status, "paused");
+    assert.equal(payload.firstStep.lastEvent.nodeId, "node_source");
+    assert.equal(payload.paused.status, "paused");
+    assert.equal(payload.paused.pauseReason, "breakpoint");
+    assert.equal(payload.paused.pendingNodeId, "node_output");
+    assert.equal(payload.completed.status, "completed");
+    assert.deepEqual(payload.completed.results.console, ["Hello, Codex!"]);
   });
 });
 
-test("POST /api/create-session uses the provided NodeGraph client", async () => {
-  let capturedRequest;
+test("POST /api/create-session registers the runtime and then creates a session with runtimeId", async () => {
+  let registrationRequest;
+  let sessionRequest;
 
   const fakeClient = {
+    async registerRuntime(request) {
+      registrationRequest = request;
+      return {
+        runtimeId: request.runtimeId,
+        cached: false,
+        expiresAt: "2026-03-21T00:30:00.000Z",
+        libraryVersion: request.libraryVersion,
+      };
+    },
     async createSession(request) {
-      capturedRequest = request;
-
+      sessionRequest = request;
       return {
         sessionId: "ngs_fake",
+        runtimeId: request.runtimeId,
         editorUrl: "http://localhost:3000/editor/ngs_fake",
         accessType: "private",
-        domainCached: true,
       };
     },
   };
@@ -251,8 +192,9 @@ test("POST /api/create-session uses the provided NodeGraph client", async () => 
   const config = getDemoConfig({
     demoClientBaseUrl: "http://demo-client.test",
   });
+  const runtime = createRuntime(config);
 
-  await withServer(createApp({ config, state, nodeGraphClient: fakeClient }), async (baseUrl) => {
+  await withServer(createApp({ config, state, runtime, nodeGraphClient: fakeClient }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/create-session`, {
       method: "POST",
       headers: {
@@ -260,33 +202,41 @@ test("POST /api/create-session uses the provided NodeGraph client", async () => 
       },
       body: JSON.stringify({
         graphMode: "existing",
-        graphName: "Existing Demo Flow",
+        graphName: "Hello World Pipeline",
       }),
     });
-
     const payload = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(payload.sessionId, "ngs_fake");
+    assert.equal(registrationRequest.runtimeId, "rt_demo_001");
+    assert.equal(registrationRequest.library.nodes.length, 2);
+    assert.equal(sessionRequest.runtimeId, "rt_demo_001");
+    assert.equal(sessionRequest.completionWebhook, "http://demo-client.test/api/completed");
+    assert.equal(sessionRequest.graph.nodes.length, 2);
+    assert.deepEqual(
+      sessionRequest.graph.nodes.map((node) => node.data.nodeType),
+      ["greeting_source", "console_output"],
+    );
+    assert.equal(state.lastSession.registration.libraryVersion, "hello-world@1");
     assert.equal(state.lastSession.response.editorUrl, "http://localhost:3000/editor/ngs_fake");
-    assert.equal(state.lastSession.request.graphMode, "existing");
-    assert.equal(capturedRequest.domain, "demo-visual-playground");
-    assert.deepEqual(
-      capturedRequest.graph.nodes.map((node) => node.data.nodeType),
-      ["seed_source", "layer_fanout", "color_mix", "stylize_branch", "preview_output"],
-    );
-    assert.equal(capturedRequest.graph.edges.length, 7);
-    assert.deepEqual(
-      capturedRequest.graph.edges.map((edge) => `${edge.sourceHandle}->${edge.targetHandle}`),
-      [
-        "seed->seed",
-        "warm->warm",
-        "cool->cool",
-        "noise->noise",
-        "frame->frame",
-        "main->main",
-        "variant->variant",
-      ],
-    );
+  });
+});
+
+test("GET / renders the Hello World runtime copy", async () => {
+  const config = getDemoConfig({
+    demoClientBaseUrl: "http://demo-client.test",
+  });
+  const runtime = createRuntime(config);
+
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const response = await fetch(baseUrl);
+    const html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /Hello World Runtime/);
+    assert.match(html, /Create editor session/);
+    assert.match(html, /Greeting Source/);
+    assert.match(html, /rt_demo_001/);
   });
 });

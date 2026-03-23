@@ -2,464 +2,131 @@ function serializeForHtml(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-export function renderHomePage({ config, library, state }) {
+export function renderHomePage({ config, state, runtime, library, sampleGraph }) {
   const bootstrap = serializeForHtml({
     config,
+    state,
+    runtime,
     library,
-    latestCompletion: state.latestCompletion,
-    lastSession: state.lastSession,
+    sampleGraph,
   });
 
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NodeGraph Demo Client</title>
-    <style>
-      :root {
-        color-scheme: light;
-        --bg: #f8f6ef;
-        --ink: #17212b;
-        --card: rgba(255, 255, 255, 0.8);
-        --line: rgba(23, 33, 43, 0.12);
-        --accent: #0f766e;
-        --accent-2: #f59e0b;
-      }
-
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at top, rgba(15, 118, 110, 0.16), transparent 26%),
-          radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.22), transparent 22%),
-          linear-gradient(135deg, #fffdf8, var(--bg));
-      }
-
-      main {
-        width: min(1180px, calc(100% - 32px));
-        margin: 0 auto;
-        padding: 28px 0 40px;
-      }
-
-      .hero,
-      .panel {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        backdrop-filter: blur(16px);
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
-      }
-
-      .hero {
-        padding: 32px;
-        display: grid;
-        gap: 24px;
-      }
-
-      .hero h1 {
-        margin: 0;
-        font-size: clamp(36px, 4vw, 58px);
-        line-height: 1.04;
-      }
-
-      .hero p {
-        margin: 0;
-        max-width: 820px;
-        font-size: 18px;
-        line-height: 1.8;
-        color: #5c6773;
-      }
-
-      .badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .badge {
-        display: inline-flex;
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        background: white;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-      }
-
-      .grid {
-        display: grid;
-        gap: 18px;
-        margin-top: 22px;
-      }
-
-      @media (min-width: 980px) {
-        .grid {
-          grid-template-columns: 1.3fr 0.9fr;
-        }
-      }
-
-      .panel {
-        padding: 24px;
-      }
-
-      .panel h2 {
-        margin: 0 0 8px;
-        font-size: 24px;
-      }
-
-      .panel p,
-      .panel li,
-      .panel label,
-      .panel small {
-        color: #5c6773;
-        line-height: 1.7;
-      }
-
-      .stack {
-        display: grid;
-        gap: 14px;
-      }
-
-      input,
-      select,
-      textarea,
-      button {
-        font: inherit;
-      }
-
-      input,
-      select {
-        width: 100%;
-        border-radius: 16px;
-        border: 1px solid var(--line);
-        background: rgba(255,255,255,0.82);
-        padding: 12px 14px;
-      }
-
-      button,
-      .link-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        border: none;
-        border-radius: 999px;
-        padding: 13px 20px;
-        background: var(--accent);
-        color: white;
-        cursor: pointer;
-        font-weight: 600;
-      }
-
-      button.secondary,
-      .link-button.secondary {
-        background: white;
-        color: var(--ink);
-        border: 1px solid var(--line);
-      }
-
-      .button-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-
-      .link-button {
-        display: none;
-      }
-
-      .link-button.is-visible {
-        display: inline-flex;
-      }
-
-      .meta {
-        display: grid;
-        gap: 10px;
-      }
-
-      .meta strong {
-        display: block;
-        color: var(--ink);
-      }
-
-      pre {
-        margin: 0;
-        overflow: auto;
-        border-radius: 18px;
-        background: #132130;
-        color: #d7f8f1;
-        padding: 18px;
-        min-height: 180px;
-        line-height: 1.65;
-      }
-
-      .hint {
-        padding: 14px 16px;
-        border-radius: 18px;
-        background: rgba(245, 158, 11, 0.12);
-        color: #7c5609;
-      }
-
-      .session-card {
-        display: grid;
-        gap: 12px;
-        padding: 18px;
-        border-radius: 22px;
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid var(--line);
-      }
-
-      .session-grid {
-        display: grid;
-        gap: 12px;
-      }
-
-      @media (min-width: 720px) {
-        .session-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      .session-cell {
-        display: grid;
-        gap: 6px;
-      }
-
-      .session-cell strong {
-        color: var(--ink);
-      }
-
-      .mono {
-        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-        word-break: break-all;
-      }
-
-      .status-note {
-        padding: 14px 16px;
-        border-radius: 18px;
-        background: rgba(15, 118, 110, 0.1);
-        color: #115e59;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <section class="hero">
-        <div class="badges">
-          <span class="badge">NodeGraph Demo Client</span>
-          <span class="badge">Visual Playground</span>
-          <span class="badge">JavaScript SDK</span>
-        </div>
-        <div class="stack">
-          <h1>直接演示视觉编程 playground 如何给 NodeGraph 提供节点库、远端字段选项，并创建编辑会话。</h1>
-          <p>
-            这个页面就是一个最小可运行的创意编程 demo client。你可以在这里发起空白画布，
-            或直接打开带有 seed_source、layer_fanout、color_mix 等节点的现成 playground，并查看最新完成回调。
-          </p>
-        </div>
-      </section>
-
-      <section class="grid">
-        <div class="panel stack">
-          <div>
-            <h2>1. 创建编辑会话</h2>
-            <p>选择模式、填一个图名称，然后让 demo client 通过 JavaScript SDK 去请求 NodeGraph。</p>
-          </div>
-          <div class="stack">
-            <label>
-              节点图模式
-              <select id="graphMode">
-                <option value="new">新建视觉编程图</option>
-                <option value="existing">编辑已有 playground</option>
-              </select>
-            </label>
-            <label>
-              节点图名称
-              <input id="graphName" value="Visual Playground Composition" />
-            </label>
-            <div class="button-row">
-              <button id="createSessionButton" type="button">Create editor session</button>
-              <button id="refreshButton" class="secondary" type="button">Refresh latest callback</button>
-            </div>
-          </div>
-          <div class="meta">
-            <div>
-              <strong>NodeGraph base URL</strong>
-              <span id="nodeGraphBaseUrl"></span>
-            </div>
-            <div>
-              <strong>Demo client base URL</strong>
-              <span id="demoClientBaseUrl"></span>
-            </div>
-            <div>
-              <strong>Current domain</strong>
-              <span id="demoDomain"></span>
-            </div>
-          </div>
-          <div class="hint">
-            如果创建成功，你会看到 <code>editorUrl</code>。打开它后，在 NodeGraph 编辑器里点击 “Complete editing”，
-            demo client 就会收到最新的视觉编程结果回调。
-          </div>
-        </div>
-
-        <div class="panel stack">
-          <div>
-            <h2>2. 最新会话</h2>
-            <p>最近一次通过 demo client 创建出来的编辑会话。你可以直接从这里拿到并打开 <code>editorUrl</code>。</p>
-          </div>
-          <div class="session-card">
-            <div class="session-grid">
-              <div class="session-cell">
-                <strong>Session ID</strong>
-                <span id="sessionId" class="mono">Not created yet.</span>
-              </div>
-              <div class="session-cell">
-                <strong>Access type</strong>
-                <span id="accessType">-</span>
-              </div>
-              <div class="session-cell">
-                <strong>Domain cache</strong>
-                <span id="domainCached">-</span>
-              </div>
-              <div class="session-cell">
-                <strong>Created at</strong>
-                <span id="createdAt">-</span>
-              </div>
-              <div class="session-cell" style="grid-column: 1 / -1;">
-                <strong>Editor URL</strong>
-                <span id="editorUrl" class="mono">Create a session to receive an editor URL.</span>
-              </div>
-            </div>
-            <div class="button-row">
-              <a id="editorLink" class="link-button secondary" href="/" target="_blank" rel="noreferrer">Open editor page</a>
-            </div>
-            <div id="sessionHint" class="status-note">
-              你也可以使用一键联调脚本自动创建 session。拿到 <code>editorUrl</code> 之后，手动打开编辑页试玩并点击保存，再回到这里查看最新回调。
-            </div>
-          </div>
-          <pre id="sessionOutput">No session has been created yet.</pre>
-        </div>
-      </section>
-
-      <section class="grid">
-        <div class="panel stack">
-          <div>
-            <h2>3. 最新完成回调</h2>
-            <p>NodeGraph 调用 <code>/api/completed</code> 后，最新 playground 节点图结果会显示在这里。</p>
-          </div>
-          <pre id="completionOutput">No completion payload received yet.</pre>
-        </div>
-
-        <div class="panel stack">
-          <div>
-            <h2>4. 当前节点库</h2>
-            <p>NodeGraph 首次见到当前 domain 时，会从本服务的 <code>/api/node-library</code> 拉取这些视觉编程节点与远端字段定义。</p>
-          </div>
-          <pre id="libraryOutput"></pre>
-        </div>
-      </section>
-    </main>
-
-    <script>
-      const bootstrap = ${bootstrap};
-      const graphModeInput = document.getElementById("graphMode");
-      const graphNameInput = document.getElementById("graphName");
-      const sessionOutput = document.getElementById("sessionOutput");
-      const completionOutput = document.getElementById("completionOutput");
-      const libraryOutput = document.getElementById("libraryOutput");
-      const nodeGraphBaseUrl = document.getElementById("nodeGraphBaseUrl");
-      const demoClientBaseUrl = document.getElementById("demoClientBaseUrl");
-      const demoDomain = document.getElementById("demoDomain");
-      const sessionId = document.getElementById("sessionId");
-      const accessType = document.getElementById("accessType");
-      const domainCached = document.getElementById("domainCached");
-      const createdAt = document.getElementById("createdAt");
-      const editorUrl = document.getElementById("editorUrl");
-      const editorLink = document.getElementById("editorLink");
-      const sessionHint = document.getElementById("sessionHint");
-
-      function pretty(value, fallback) {
-        return value ? JSON.stringify(value, null, 2) : fallback;
-      }
-
-      function applySession(lastSession) {
-        const response = lastSession?.response ?? null;
-        const latestEditorUrl = response?.editorUrl ?? "";
-
-        sessionOutput.textContent = pretty(lastSession, "No session has been created yet.");
-        sessionId.textContent = response?.sessionId ?? "Not created yet.";
-        accessType.textContent = response?.accessType ?? "-";
-        domainCached.textContent = typeof response?.domainCached === "boolean" ? String(response.domainCached) : "-";
-        createdAt.textContent = lastSession?.createdAt ?? "-";
-        editorUrl.textContent = latestEditorUrl || "Create a session to receive an editor URL.";
-
-        if (latestEditorUrl) {
-          editorLink.href = latestEditorUrl;
-          editorLink.classList.add("is-visible");
-          sessionHint.textContent =
-            "已经拿到 editorUrl。现在请手动打开编辑页，拖动或修改视觉节点后点击 “Complete editing”，然后回到这个页面查看最新回调。";
-          return;
-        }
-
-        editorLink.classList.remove("is-visible");
-        sessionHint.textContent =
-          "你也可以使用一键联调脚本自动创建 session。拿到 editorUrl 之后，手动打开编辑页试玩并点击保存，再回到这里查看最新回调。";
-      }
-
-      async function loadLatest() {
-        const response = await fetch("/api/results/latest");
-        const payload = await response.json();
-        applySession(payload.lastSession);
-        completionOutput.textContent = pretty(payload.latestCompletion, "No completion payload received yet.");
-      }
-
-      async function loadLibrary() {
-        const response = await fetch("/api/node-library");
-        const payload = await response.json();
-        libraryOutput.textContent = JSON.stringify(payload, null, 2);
-      }
-
-      async function createSession() {
-        sessionOutput.textContent = "Creating session...";
-        const response = await fetch("/api/create-session", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({
-            graphMode: graphModeInput.value,
-            graphName: graphNameInput.value
-          })
-        });
-
-        const payload = await response.json();
-        if (!response.ok) {
-          sessionOutput.textContent = JSON.stringify(payload, null, 2);
-          return;
-        }
-
-        await loadLatest();
-      }
-
-      nodeGraphBaseUrl.textContent = bootstrap.config.nodeGraphBaseUrl;
-      demoClientBaseUrl.textContent = bootstrap.config.demoClientBaseUrl;
-      demoDomain.textContent = bootstrap.config.demoDomain;
-      applySession(bootstrap.lastSession);
-      libraryOutput.textContent = pretty(bootstrap.library, "Loading node library...");
-      completionOutput.textContent = pretty(bootstrap.latestCompletion, "No completion payload received yet.");
-
-      document.getElementById("createSessionButton").addEventListener("click", createSession);
-      document.getElementById("refreshButton").addEventListener("click", loadLatest);
-
-      loadLibrary();
-      setInterval(loadLatest, 3000);
-    </script>
-  </body>
-</html>`;
+  return [
+    "<!doctype html>",
+    "<html lang=\"zh-CN\">",
+    "  <head>",
+    "    <meta charset=\"utf-8\" />",
+    "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />",
+    "    <title>NodeGraph Hello World Demo</title>",
+    "    <style>",
+    "      :root { color-scheme: light; --bg: #f8fafc; --ink: #0f172a; --card: rgba(255,255,255,0.9); --line: rgba(15,23,42,0.12); --accent: #2563eb; --accent2: #16a34a; }",
+    "      * { box-sizing: border-box; }",
+    "      body { margin: 0; min-height: 100vh; font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; color: var(--ink); background: linear-gradient(135deg, #f8fafc, #eef6ff 58%, #f5fff8); }",
+    "      main { width: min(1200px, calc(100vw - 32px)); margin: 0 auto; padding: 32px 0 48px; }",
+    "      .hero, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 18px 48px rgba(15,23,42,0.08); }",
+    "      .hero { padding: 28px; margin-bottom: 24px; }",
+    "      .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }",
+    "      .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700; background: rgba(37,99,235,0.1); color: var(--accent); }",
+    "      .hero h1 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 42px); line-height: 1.1; }",
+    "      .hero p { margin: 0; line-height: 1.7; color: rgba(15,23,42,0.8); }",
+    "      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px; }",
+    "      .panel { padding: 20px; }",
+    "      .panel h2 { margin: 0 0 8px; font-size: 20px; }",
+    "      .panel p { margin: 0 0 16px; line-height: 1.6; color: rgba(15,23,42,0.78); }",
+    "      .stack { display: flex; flex-direction: column; gap: 12px; }",
+    "      label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600; }",
+    "      input, select, button { font: inherit; }",
+    "      input, select { width: 100%; border: 1px solid rgba(148,163,184,0.45); border-radius: 14px; padding: 12px 14px; background: rgba(255,255,255,0.96); }",
+    "      .button-row { display: flex; flex-wrap: wrap; gap: 10px; }",
+    "      button, a.button-link { border: none; border-radius: 14px; padding: 12px 16px; font-weight: 700; cursor: pointer; color: white; background: linear-gradient(135deg, var(--accent), #1d4ed8); text-decoration: none; }",
+    "      button.secondary { background: linear-gradient(135deg, var(--accent2), #15803d); }",
+    "      button.ghost { color: var(--ink); background: rgba(15,23,42,0.08); }",
+    "      .meta { display: grid; gap: 10px; font-size: 13px; }",
+    "      .meta strong { display: block; margin-bottom: 4px; }",
+    "      pre { margin: 0; padding: 14px; border-radius: 16px; background: rgba(15,23,42,0.92); color: #e2e8f0; overflow: auto; font-size: 12px; line-height: 1.6; }",
+    "      code { font-family: 'Cascadia Code', 'Fira Code', monospace; }",
+    "    </style>",
+    "  </head>",
+    "  <body>",
+    "    <main>",
+    "      <section class=\"hero\">",
+    "        <div class=\"badges\"><span class=\"badge\">NodeGraph Demo Client</span><span class=\"badge\">Hello World Runtime</span><span class=\"badge\">JavaScript SDK</span></div>",
+    "        <h1>这个 Demo 不再模拟业务节点库，而是用真实可运行的 Hello World 节点图演示运行时注册、图执行、性能分析和断点调试。</h1>",
+    "        <p>页面会调用内置 JavaScript SDK 运行时，先向 NodeGraph 递交节点库，再创建编辑会话；你也可以直接在本页执行示例图，或运行一个带断点的调试样例，查看 profiler 与最终输出。</p>",
+    "      </section>",
+    "      <section class=\"grid\">",
+    "        <div class=\"panel stack\">",
+    "          <div><h2>1. 创建编辑会话</h2><p>先用宿主运行时注册节点库，再向 NodeGraph 创建会话，返回真正可访问的 <code>editorUrl</code>。</p></div>",
+    "          <label>节点图模式<select id=\"graphMode\"><option value=\"existing\">编辑 Hello World 示例图</option><option value=\"new\">创建空白 Hello World 图</option></select></label>",
+    "          <label>节点图名称<input id=\"graphName\" value=\"Hello World Pipeline\" /></label>",
+    "          <div class=\"button-row\"><button id=\"createSessionButton\" type=\"button\">Create editor session</button><button id=\"forceRegisterButton\" class=\"secondary\" type=\"button\">Force refresh runtime cache</button></div>",
+    "          <div class=\"meta\"><div><strong>Runtime ID</strong><span id=\"runtimeId\"></span></div><div><strong>Library Version</strong><span id=\"libraryVersion\"></span></div><div><strong>NodeGraph Base URL</strong><span id=\"nodeGraphBaseUrl\"></span></div><div><strong>Control Base URL</strong><span id=\"controlBaseUrl\"></span></div></div>",
+    "          <pre id=\"sessionOutput\">No session has been created yet.</pre>",
+    "          <a id=\"editorLink\" class=\"button-link\" href=\"#\" target=\"_blank\" rel=\"noreferrer\" style=\"display:none;\">Open editor page</a>",
+    "        </div>",
+    "        <div class=\"panel stack\">",
+    "          <div><h2>2. 本地运行与调试</h2><p>使用 SDK 运行时直接执行 Hello World 图，或跑一个内置断点调试样例，结果里会包含 profiler。</p></div>",
+    "          <div class=\"button-row\"><button id=\"executeGraphButton\" class=\"secondary\" type=\"button\">Run Hello World graph</button><button id=\"debugGraphButton\" class=\"ghost\" type=\"button\">Run breakpoint sample</button><button id=\"refreshButton\" class=\"ghost\" type=\"button\">Refresh latest state</button></div>",
+    "          <pre id=\"executionOutput\">No execution has been run yet.</pre>",
+    "          <pre id=\"debugOutput\">No debug sample has been run yet.</pre>",
+    "        </div>",
+    "      </section>",
+    "      <section class=\"grid\">",
+    "        <div class=\"panel stack\">",
+    "          <div><h2>3. 节点库与示例图</h2><p>这里展示的是宿主程序内置的节点库 JSON 与默认 Hello World 图，不依赖 NodeGraph 端再去拉取远端业务定义。</p></div>",
+    "          <pre id=\"libraryOutput\"></pre>",
+    "          <pre id=\"graphOutput\"></pre>",
+    "        </div>",
+    "        <div class=\"panel stack\">",
+    "          <div><h2>4. 最新回调与注册</h2><p>当你在 NodeGraph 编辑页点击完成后，回调会落到 <code>/api/completed</code>；最近一次 runtime 注册信息也会显示在这里。</p></div>",
+    "          <pre id=\"registrationOutput\">Runtime has not been registered yet.</pre>",
+    "          <pre id=\"completionOutput\">No completion payload received yet.</pre>",
+    "        </div>",
+    "      </section>",
+    "    </main>",
+    "    <script type=\"module\">",
+    "      const bootstrap = JSON.parse(document.getElementById('bootstrap').textContent);",
+    "      const graphModeInput = document.getElementById('graphMode');",
+    "      const graphNameInput = document.getElementById('graphName');",
+    "      const sessionOutput = document.getElementById('sessionOutput');",
+    "      const registrationOutput = document.getElementById('registrationOutput');",
+    "      const executionOutput = document.getElementById('executionOutput');",
+    "      const debugOutput = document.getElementById('debugOutput');",
+    "      const completionOutput = document.getElementById('completionOutput');",
+    "      const libraryOutput = document.getElementById('libraryOutput');",
+    "      const graphOutput = document.getElementById('graphOutput');",
+    "      const editorLink = document.getElementById('editorLink');",
+    "      function pretty(value, emptyText) { return value ? JSON.stringify(value, null, 2) : emptyText; }",
+    "      function applyLatest(payload) {",
+    "        sessionOutput.textContent = pretty(payload.lastSession, 'No session has been created yet.');",
+    "        registrationOutput.textContent = pretty(payload.lastRegistration, 'Runtime has not been registered yet.');",
+    "        executionOutput.textContent = pretty(payload.lastExecution, 'No execution has been run yet.');",
+    "        debugOutput.textContent = pretty(payload.lastDebug, 'No debug sample has been run yet.');",
+    "        completionOutput.textContent = pretty(payload.latestCompletion, 'No completion payload received yet.');",
+    "        const latestEditorUrl = payload.lastSession?.response?.editorUrl;",
+    "        if (latestEditorUrl) { editorLink.href = latestEditorUrl; editorLink.style.display = 'inline-flex'; } else { editorLink.style.display = 'none'; }",
+    "      }",
+    "      async function loadLatest() { const response = await fetch('/api/results/latest'); applyLatest(await response.json()); }",
+    "      async function postJson(path, body) { const response = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { response, payload: await response.json() }; }",
+    "      async function forceRegister() { registrationOutput.textContent = 'Refreshing runtime cache...'; await postJson('/api/runtime/register', { force: true }); await loadLatest(); }",
+    "      async function createSession() { sessionOutput.textContent = 'Creating session...'; const { response, payload } = await postJson('/api/create-session', { graphMode: graphModeInput.value, graphName: graphNameInput.value }); if (!response.ok) { sessionOutput.textContent = JSON.stringify(payload, null, 2); return; } await loadLatest(); }",
+    "      async function executeGraph() { executionOutput.textContent = 'Running graph...'; await postJson('/api/runtime/execute', { graphMode: graphModeInput.value, graphName: graphNameInput.value }); await loadLatest(); }",
+    "      async function debugGraph() { debugOutput.textContent = 'Running breakpoint sample...'; await postJson('/api/runtime/debug/sample', { graphMode: graphModeInput.value, graphName: graphNameInput.value }); await loadLatest(); }",
+    "      document.getElementById('runtimeId').textContent = bootstrap.runtime.runtimeId;",
+    "      document.getElementById('libraryVersion').textContent = bootstrap.runtime.libraryVersion;",
+    "      document.getElementById('nodeGraphBaseUrl').textContent = bootstrap.config.nodeGraphBaseUrl;",
+    "      document.getElementById('controlBaseUrl').textContent = bootstrap.runtime.controlBaseUrl;",
+    "      libraryOutput.textContent = JSON.stringify(bootstrap.library, null, 2);",
+    "      graphOutput.textContent = JSON.stringify(bootstrap.sampleGraph, null, 2);",
+    "      applyLatest(bootstrap.state);",
+    "      document.getElementById('createSessionButton').addEventListener('click', createSession);",
+    "      document.getElementById('forceRegisterButton').addEventListener('click', forceRegister);",
+    "      document.getElementById('executeGraphButton').addEventListener('click', executeGraph);",
+    "      document.getElementById('debugGraphButton').addEventListener('click', debugGraph);",
+    "      document.getElementById('refreshButton').addEventListener('click', loadLatest);",
+    "    </script>",
+    "    <script id=\"bootstrap\" type=\"application/json\">" + bootstrap + "</script>",
+    "  </body>",
+    "</html>",
+  ].join("\\n");
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-test("interactive demo launcher uses a visual playground graph name by default", () => {
+test("interactive demo launcher uses a hello world graph name by default", () => {
   const pythonCode = `
 import importlib.util
 import json
@@ -24,5 +24,5 @@ print(json.dumps(module.create_launch_config()))
   });
   const payload = JSON.parse(output);
 
-  assert.equal(payload.graph_name, "Interactive Visual Playground");
+  assert.equal(payload.graph_name, "Interactive Hello World Pipeline");
 });

@@ -1,69 +1,44 @@
-# NodeGraph Demo Client
+# NodeGraph Demo Client（JavaScript）
 
-`Examples/NodeGraph.DemoClient.JavaScript` 是一个“视觉编程 playground client”演示项目，用来完整模拟 NodeGraph 的接入方。
+`Examples/NodeGraph.DemoClient.JavaScript` 是一个基于 JavaScript SDK 的 Hello World 宿主示例，用来完整演示：
 
-它同时扮演 4 个角色：
+- 运行时初始化与 `runtimeId` 生成
+- 节点库内嵌输出
+- 注册运行时缓存
+- 创建编辑会话
+- 宿主侧执行节点图
+- 断点调试与性能统计
+- 接收编辑完成回调
 
-- 提供节点库接口：`/api/node-library`
-- 提供远端字段选项接口：`/api/node-field-options/:fieldKey`
-- 接收编辑完成回调：`/api/completed`
-- 通过 `SDK/NodeGraph/javascript` 创建编辑会话：`/api/create-session`
+## 提供的接口
 
-## 为什么它有用
+- `GET /`：Demo 首页
+- `GET /api/health`：健康检查
+- `GET /api/runtime/library`：输出当前运行时节点库
+- `GET /api/node-library`：兼容别名，返回与 `/api/runtime/library` 相同的数据
+- `POST /api/runtime/register`：触发运行时注册
+- `POST /api/runtime/execute`：执行一张 Hello World 图
+- `POST /api/runtime/debug/sample`：返回一组断点调试快照
+- `POST /api/create-session`：先注册运行时，再向 NodeGraph 创建编辑会话
+- `POST /api/completed`：接收 NodeGraph 编辑完成回调
+- `GET /api/results/latest`：查看最近一次注册、执行、调试、会话和回调状态
 
-启动这个 demo client 后，你可以不自己再造一套业务系统，就直接体验完整链路：
+## 示例节点库
 
-1. demo client 调用 NodeGraph 创建会话
-2. NodeGraph 首次见到当前 `domain` 时，从 demo client 拉取节点库
-3. NodeGraph 在需要时继续代理请求 demo client 的远端下拉选项
-4. 用户打开 NodeGraph 编辑器进行编辑
-5. 用户提交完成后，NodeGraph 回调 demo client
-6. demo client 页面实时显示最新回调结果
+当前 Demo 节点库是真实可运行的 Hello World：
 
-当前示例节点库已经改造成更接近视觉编程的 playground，内置 5 个多输入/多输出节点：
+- `greeting_source`：读取 `name` 字段并输出 `Hello, {name}!`
+- `console_output`：读取输入端口 `text`，把最终结果写入 `console` 输出通道
 
-- `seed_source`
-- `layer_fanout`
-- `color_mix`
-- `stylize_branch`
-- `preview_output`
-
-示例字段会刻意覆盖新的编辑器类型：
-
-- `text`: `seedName`
-- `textarea`: `notes`
-- `boolean`: `showGrid`
-- `select`: `distributionMode` / `blendMode` / `previewShape`
-- `date`: `anchorDate`
-- `color`: `baseTint`
-- `int`: `sampleCount`
-- `float`: `variance`
-- `double`: `frequency`
-- `decimal`: `opacity`
-
-其中 `select` 字段不是静态假数据，而是走 Demo 自己暴露的远端接口：
-
-- `GET /api/node-field-options/distributionMode`
-- `GET /api/node-field-options/blendMode`
-- `GET /api/node-field-options/previewShape`
-
-这些接口会返回：
+默认已有图执行结果为：
 
 ```json
 {
-  "options": [
-    { "value": "screen", "label": "Screen wash" }
-  ]
+  "console": ["Hello, Codex!"]
 }
 ```
 
-并兼容 NodeGraph 自动附带的查询参数，例如 `domain`、`nodeType`、`fieldKey`、`locale`。
-
-示例节点库还会返回 `typeMappings`，用于把端口 `dataType` 的 canonical id 映射回当前 JS client 的真实契约类型名。对应的示例契约类型在 `Examples/NodeGraph.DemoClient.JavaScript/src/contracts.mjs` 中定义：
-
-- `GeneratorSeed`
-- `LayerSignal`
-- `PreviewFrame`
+节点库文本不做 i18n；Demo 返回什么字符串，NodeGraph 就展示什么字符串。
 
 ## 启动前提
 
@@ -77,7 +52,7 @@ npm run dev
 
 默认假定 NodeGraph 运行在 `http://localhost:3000`。
 
-## 启动 demo client
+## 启动 Demo
 
 ```bash
 cd Examples/NodeGraph.DemoClient.JavaScript
@@ -86,80 +61,65 @@ npm start
 
 默认访问地址：`http://localhost:3100`
 
-## 一键启动联调
+## 一键联调
 
-如果你希望直接从仓库根目录拉起 NodeGraph 与 demo client，并在启动后马上拿到一个可访问的 `editorUrl`，优先使用 `.tools` 入口：
+推荐直接从仓库根目录启动：
 
 ```powershell
 .tools/start-nodegraph-demo.ps1
 ```
 
-如果你更习惯双击或 `cmd.exe`，也可以使用：
+或：
 
 ```bat
 .tools\start-nodegraph-demo.cmd
 ```
 
-这两个入口都会转调 `Examples/NodeGraph.DemoClient.JavaScript/scripts/interactive-demo.py`，因此会继承现有联调脚本的行为，包括：
+它们会自动：
 
-1. 自动启动 `Service/NodeGraph` 与 demo client
-2. 默认端口被占用时自动让步到新的可用端口
-3. 把实际启动出来的 `NODEGRAPH_BASE_URL` 传给 demo client，保证它始终连到正确的 NodeGraph 地址
-4. 自动创建一个演示 session，并在终端打印 `editorUrl`
+1. 启动 `Service/NodeGraph`
+2. 启动当前 JavaScript Demo
+3. 自动创建一个 Hello World 编辑会话
+4. 在终端打印 `editorUrl`
 
-如果你仍然希望从示例目录内启动，也可以继续运行：
+如果你希望从示例目录内直接启动交互联调，也可以运行：
 
 ```bash
 cd Examples/NodeGraph.DemoClient.JavaScript
 npm run demo:interactive
 ```
 
-这个命令默认会创建一张 visual playground 图，并完成以下 4 件事：
+默认会优先尝试：
 
-1. 启动 `Service/NodeGraph`，默认端口 `3300`
-2. 启动 demo client，默认端口 `3101`
-3. 自动创建一个演示 session
-4. 在终端打印 `editorUrl`，等你手动打开编辑页面试玩并保存
+- NodeGraph：`3300`
+- Demo：`3101`
 
-默认流程是：
+若端口占用，脚本会自动顺延到可用端口。
 
-1. 运行 `npm run demo:interactive`
-2. 从终端复制 `Editor URL`
-3. 手动访问节点编辑页面，调整节点后点击 `Complete editing`
-4. 回到 demo client 首页 `http://localhost:3101` 查看最新完成回调
+## 演示步骤
 
-脚本会持续保活，并在收到当前 session 的完成回调后在终端提示。结束时按 `Ctrl+C` 即可。
-
-### 可选参数
-
-你也可以覆盖默认图模式、图名称和端口：
-
-```bash
-.tools/start-nodegraph-demo.ps1 --graph-mode new --graph-name "Blank Playground Scene" --nodegraph-port 3400 --demo-port 3201
-```
+1. 打开 Demo 首页
+2. 点击 `Create editor session`
+3. 打开返回的 `editorUrl`
+4. 在 NodeGraph 页面里编辑 Hello World 图
+5. 如需刷新节点库，可在编辑页触发强制刷新
+6. 点击 `Complete editing`
+7. 回到 Demo 首页或访问 `GET /api/results/latest` 查看最新回调
 
 ## 可选环境变量
 
 参见 `.env.example`：
 
 - `NODEGRAPH_BASE_URL`：NodeGraph 服务地址，默认 `http://localhost:3000`
-- `DEMO_CLIENT_PORT`：demo client 监听端口，默认 `3100`
+- `DEMO_CLIENT_PORT`：Demo 监听端口，默认 `3100`
 - `DEMO_CLIENT_HOST`：监听主机，默认 `127.0.0.1`
-- `DEMO_CLIENT_BASE_URL`：demo client 对外可访问地址，默认 `http://localhost:3100`
-- `DEMO_CLIENT_DOMAIN`：示例 domain，默认 `demo-visual-playground`
-
-## 演示步骤
-
-1. 打开 `http://localhost:3100`
-2. 选择“新建视觉编程图”或“编辑已有 playground”
-3. 点击 `Create editor session`
-4. 从页面里最新 session 区域拿到 `editorUrl`，或点击 `Open editor page`
-5. 在 NodeGraph 编辑页里拖动节点、修改不同字段编辑器并点击 `Complete editing`
-6. 回到 demo client 页面查看“最新完成回调”
+- `DEMO_CLIENT_BASE_URL`：Demo 对外地址，默认 `http://localhost:3100`
+- `DEMO_CLIENT_DOMAIN`：运行时业务域，默认 `demo-hello-world`
+- `DEMO_CLIENT_NAME`：客户端名称
 
 ## 验证
 
 ```bash
+npm test
 npm run check
-npm run test
 ```

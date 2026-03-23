@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive visual playground launcher for NodeGraph and the demo client."""
+"""启动 NodeGraph 与 Hello World Demo 的交互联调脚本。"""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def read_positive_integer(value: Any, fallback: int) -> int:
 
 
 def create_launch_config() -> dict[str, Any]:
-    parser = argparse.ArgumentParser(description="Launch the interactive NodeGraph visual playground.")
+    parser = argparse.ArgumentParser(description="Launch the interactive NodeGraph Hello World demo.")
     parser.add_argument("--graph-mode", choices=("new", "existing"))
     parser.add_argument("--graph-name")
     parser.add_argument("--nodegraph-port", type=int)
@@ -51,7 +51,7 @@ def create_launch_config() -> dict[str, Any]:
 
     return {
         "graph_mode": args.graph_mode or ("new" if os.environ.get("INTERACTIVE_GRAPH_MODE") == "new" else "existing"),
-        "graph_name": args.graph_name or os.environ.get("INTERACTIVE_GRAPH_NAME") or "Interactive Visual Playground",
+        "graph_name": args.graph_name or os.environ.get("INTERACTIVE_GRAPH_NAME") or "Interactive Hello World Pipeline",
         "preferred_nodegraph_port": read_positive_integer(
             args.nodegraph_port or os.environ.get("INTERACTIVE_NODEGRAPH_PORT"),
             3300,

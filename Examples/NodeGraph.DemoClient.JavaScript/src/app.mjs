@@ -1,8 +1,9 @@
 import {
-  createDemoFieldOptionsPayload,
-  createDemoLibraryBundle,
   createGraphDocument,
-  demoI18n,
+  createHelloWorldRuntime,
+  defaultDebugBreakpoints,
+  defaultExistingGraphName,
+  defaultNewGraphName,
 } from "./demo-data.mjs";
 import { renderHomePage } from "./html.mjs";
 import { createDemoState } from "./state.mjs";
@@ -46,9 +47,46 @@ async function readJsonBody(request) {
   return raw ? JSON.parse(raw) : {};
 }
 
-export function createApp({ config = getDemoConfig(), state = createDemoState(), nodeGraphClient } = {}) {
+function normalizeGraphMode(value) {
+  return value === "new" ? "new" : "existing";
+}
+
+function resolveGraphName(graphMode, graphName) {
+  if (typeof graphName === "string" && graphName.trim()) {
+    return graphName.trim();
+  }
+
+  return graphMode === "new" ? defaultNewGraphName : defaultExistingGraphName;
+}
+
+function createRuntimeInfo(runtime) {
+  return {
+    runtimeId: runtime.runtimeId,
+    libraryVersion: runtime.libraryVersion,
+    controlBaseUrl: runtime.controlBaseUrl,
+    domain: runtime.domain,
+    capabilities: runtime.capabilities,
+  };
+}
+
+export function createApp({
+  config = getDemoConfig(),
+  state = createDemoState(),
+  nodeGraphClient,
+  runtime = createHelloWorldRuntime(config),
+} = {}) {
   const client = nodeGraphClient ?? createNodeGraphClient(config);
-  const libraryBundle = createDemoLibraryBundle(config);
+
+  async function registerRuntime(force = false) {
+    const response = await runtime.ensureRegistered(client, { force });
+    state.lastRegistration = {
+      registeredAt: new Date().toISOString(),
+      force,
+      request: runtime.createRegistrationRequest(),
+      response,
+    };
+    return response;
+  }
 
   return async function app(request, response) {
     const url = new URL(request.url ?? "/", config.demoClientBaseUrl);
@@ -60,39 +98,40 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
         demoClientBaseUrl: config.demoClientBaseUrl,
         nodeGraphBaseUrl: config.nodeGraphBaseUrl,
         demoDomain: config.demoDomain,
+        runtime: createRuntimeInfo(runtime),
       });
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/") {
-      sendHtml(response, renderHomePage({ config, library: libraryBundle, state }));
+      sendHtml(
+        response,
+        renderHomePage({
+          config,
+          state,
+          runtime: createRuntimeInfo(runtime),
+          library: runtime.getLibrary(),
+          sampleGraph: createGraphDocument(defaultExistingGraphName, "existing"),
+        }),
+      );
       return;
     }
 
-    if (request.method === "GET" && url.pathname === "/api/node-library") {
-      sendJson(response, 200, libraryBundle);
-      return;
-    }
-
-    if (request.method === "GET" && url.pathname.startsWith("/api/node-field-options/")) {
-      const fieldKey = decodeURIComponent(url.pathname.slice("/api/node-field-options/".length));
-      const locale = url.searchParams.get("locale") ?? demoI18n.defaultLocale;
-      const payload = createDemoFieldOptionsPayload(fieldKey, locale);
-
-      if (!payload) {
-        sendJson(response, 404, {
-          error: "Demo field options not found.",
-        });
-        return;
-      }
-
-      sendJson(response, 200, payload);
+    if (request.method === "GET" && (url.pathname === "/api/node-library" || url.pathname === "/api/runtime/library")) {
+      sendJson(response, 200, {
+        runtime: createRuntimeInfo(runtime),
+        library: runtime.getLibrary(),
+      });
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/results/latest") {
       sendJson(response, 200, {
+        runtime: createRuntimeInfo(runtime),
+        lastRegistration: state.lastRegistration,
         lastSession: state.lastSession,
+        lastExecution: state.lastExecution,
+        lastDebug: state.lastDebug,
         latestCompletion: state.latestCompletion,
         callbackCount: state.callbackHistory.length,
       });
@@ -124,26 +163,98 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/runtime/register") {
+      try {
+        const body = await readJsonBody(request);
+        const registration = await registerRuntime(body.force === true);
+        sendJson(response, 200, registration);
+      } catch (error) {
+        sendJson(response, 502, {
+          error: error instanceof Error ? error.message : "Failed to register runtime.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/runtime/execute") {
+      try {
+        const body = await readJsonBody(request);
+        const graphMode = normalizeGraphMode(body.graphMode);
+        const graphName = resolveGraphName(graphMode, body.graphName);
+        const graph = body.graph ?? createGraphDocument(graphName, graphMode);
+        const snapshot = await runtime.executeGraph(graph);
+
+        state.lastExecution = {
+          executedAt: new Date().toISOString(),
+          graphMode,
+          graphName,
+          graph,
+          snapshot,
+        };
+
+        sendJson(response, 200, state.lastExecution);
+      } catch (error) {
+        sendJson(response, 500, {
+          error: error instanceof Error ? error.message : "Failed to execute runtime graph.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/runtime/debug/sample") {
+      try {
+        const body = await readJsonBody(request);
+        const graphMode = normalizeGraphMode(body.graphMode);
+        const graphName = resolveGraphName(graphMode, body.graphName);
+        const graph = body.graph ?? createGraphDocument(graphName, graphMode);
+        const breakpoints =
+          Array.isArray(body.breakpoints) && body.breakpoints.length
+            ? body.breakpoints.map((entry) => String(entry))
+            : defaultDebugBreakpoints;
+        const debuggerSession = runtime.createDebugger(graph, {
+          breakpoints,
+        });
+
+        const firstStep = await debuggerSession.step();
+        const paused = await debuggerSession.continue();
+        const completed = await debuggerSession.continue();
+
+        state.lastDebug = {
+          debuggedAt: new Date().toISOString(),
+          graphMode,
+          graphName,
+          graph,
+          breakpoints,
+          firstStep,
+          paused,
+          completed,
+        };
+
+        sendJson(response, 200, state.lastDebug);
+      } catch (error) {
+        sendJson(response, 500, {
+          error: error instanceof Error ? error.message : "Failed to run the debug sample.",
+        });
+      }
+
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/create-session") {
       try {
         const body = await readJsonBody(request);
-        const graphMode = body.graphMode === "existing" ? "existing" : "new";
-        const graphName =
-          typeof body.graphName === "string" && body.graphName.trim()
-            ? body.graphName.trim()
-            : graphMode === "existing"
-              ? "Demo Existing Visual Playground"
-              : "Visual Playground Composition";
-
+        const graphMode = normalizeGraphMode(body.graphMode);
+        const graphName = resolveGraphName(graphMode, body.graphName);
+        const registration = await registerRuntime(body.forceRefresh === true);
         const payload = await client.createSession({
-          domain: config.demoDomain,
-          clientName: config.clientName,
-          nodeLibraryEndpoint: `${config.demoClientBaseUrl}/api/node-library`,
+          runtimeId: runtime.runtimeId,
           completionWebhook: `${config.demoClientBaseUrl}/api/completed`,
           graph: createGraphDocument(graphName, graphMode),
           metadata: {
             graphMode,
-            source: "NodeGraph.DemoClient.JavaScript",
+            source: "NodeGraph.DemoClient.JavaScript.HelloWorld",
           },
         });
 
@@ -152,7 +263,9 @@ export function createApp({ config = getDemoConfig(), state = createDemoState(),
           request: {
             graphMode,
             graphName,
+            forceRefresh: body.forceRefresh === true,
           },
+          registration,
           response: payload,
         };
 
