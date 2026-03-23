@@ -3,7 +3,20 @@ using System.Text.Json;
 
 namespace NodeGraphSdk;
 
-public sealed class NodeGraphClient
+/// <summary>
+/// 供运行时缓存注册使用的最小客户端接口。
+/// </summary>
+public interface INodeGraphRuntimeClient
+{
+    Task<RuntimeRegistrationResponse> RegisterRuntimeAsync(
+        RuntimeRegistrationRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// NodeGraph HTTP API 客户端。
+/// </summary>
+public sealed class NodeGraphClient : INodeGraphRuntimeClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -16,6 +29,14 @@ public sealed class NodeGraphClient
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    }
+
+    public async Task<RuntimeRegistrationResponse> RegisterRuntimeAsync(
+        RuntimeRegistrationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/sdk/runtimes/register", request, JsonOptions, cancellationToken);
+        return await ReadResponseAsync<RuntimeRegistrationResponse>(response, cancellationToken);
     }
 
     public async Task<CreateSessionResponse> CreateSessionAsync(

@@ -1,29 +1,115 @@
 # .NET NodeGraph SDK
 
+## 快速开始
+
 ```csharp
 using NodeGraphSdk;
 
-var httpClient = new HttpClient();
-var client = new NodeGraphClient(httpClient, "http://localhost:3000");
+var client = new NodeGraphClient(new HttpClient(), "http://localhost:3000");
+
+var runtime = new NodeGraphRuntime(new NodeGraphRuntimeOptions
+{
+    Domain = "hello-world",
+    ClientName = "Hello World Host",
+    ControlBaseUrl = "http://localhost:3200/api/runtime",
+    LibraryVersion = "hello-world@1",
+});
+
+runtime
+    .RegisterTypeMapping(new TypeMappingEntry
+    {
+        CanonicalId = "hello/text",
+        Type = typeof(string).FullName ?? nameof(String),
+        Color = "#2563eb",
+    })
+    .RegisterNode(new NodeDefinition
+    {
+        Type = "greeting_source",
+        DisplayName = "Greeting Source",
+        Description = "Create the greeting text.",
+        Category = "Hello World",
+        Outputs =
+        [
+            new NodePortDefinition
+            {
+                Id = "text",
+                Label = "Text",
+                DataType = "hello/text",
+            },
+        ],
+        ExecuteAsync = context =>
+        {
+            var name = context.Values.TryGetValue("name", out var value)
+                ? Convert.ToString(value)
+                : "World";
+            context.Emit("text", $"Hello, {name}!");
+            return Task.CompletedTask;
+        },
+    })
+    .RegisterNode(new NodeDefinition
+    {
+        Type = "console_output",
+        DisplayName = "Console Output",
+        Description = "Collect the greeting into the result buffer.",
+        Category = "Hello World",
+        Inputs =
+        [
+            new NodePortDefinition
+            {
+                Id = "text",
+                Label = "Text",
+                DataType = "hello/text",
+            },
+        ],
+        ExecuteAsync = context =>
+        {
+            context.PushResult("console", context.ReadInput("text") ?? "Hello, World!");
+            return Task.CompletedTask;
+        },
+    });
+
+await runtime.EnsureRegisteredAsync(client);
 
 var session = await client.CreateSessionAsync(new CreateSessionRequest
 {
-    Domain = "erp-workflow",
-    ClientName = "TaiChi ERP",
-    NodeLibraryEndpoint = "https://client.example.com/nodegraph/library",
-    CompletionWebhook = "https://client.example.com/nodegraph/completed",
-    Graph = new NodeGraphDocument
-    {
-        Name = "审批流程",
-        Viewport = new NodeGraphViewport { X = 0, Y = 0, Zoom = 1 }
-    }
+    RuntimeId = runtime.RuntimeId,
+    CompletionWebhook = "http://localhost:3200/api/completed",
 });
 
 Console.WriteLine(session.EditorUrl);
 ```
 
-说明：
+## 执行、调试与性能分析
 
-- SDK 通过 `HttpClient` 调用 NodeGraph HTTP API。
-- 编辑完成后的结果回传仍由业务方自己的 webhook 地址接收。
-- 如果你希望把 canonical id 映射回当前 `.NET` SDK 的类型名，端口 `dataType` 应使用 canonical id，例如 `workflow/request`；再通过 `typeMappings` 把它映射到 `.NET` 类型名，如 `TaiChi.Workflow.Contracts.WorkflowRequest`。
+```csharp
+var snapshot = await runtime.ExecuteGraphAsync(graph);
+
+var debugger = runtime.CreateDebugger(graph, new NodeGraphExecutionOptions
+{
+    Breakpoints = ["node_output"],
+});
+
+await debugger.StepAsync();
+await debugger.ContinueAsync();
+```
+
+返回快照中包含：
+
+- `Status`
+- `PauseReason`
+- `PendingNodeId`
+- `Results`
+- `Events`
+- `Profiler`
+
+## 宿主侧还需要做什么
+
+- 提供 `CompletionWebhook`
+- 在 `ControlBaseUrl` 下实现 `GET /library`
+- 当节点库变化时，可调用 `EnsureRegisteredAsync(client, force: true)`
+
+## 说明
+
+- SDK 通过 `HttpClient` 调用 NodeGraph
+- 节点库文本不参与 i18n
+- `DataType` 推荐使用 canonical id，再用 `TypeMappingEntry` 映射回宿主类型名
