@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
+import { useDebuggerNodeContext } from "@/components/editor/debugger-node-context";
 import { useEditorI18n } from "@/components/editor/editor-i18n-context";
 import { useTypeColors } from "@/components/editor/type-colors";
 import {
@@ -100,14 +101,28 @@ function getPortDisplayLabel(port: NodePortDefinition, i18n: ReturnType<typeof u
 /**
  * Renders the custom blueprint node body used inside the React Flow canvas.
  */
-export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
+export function BlueprintNode({ id, data, selected }: NodeProps<NodeGraphNode>) {
   const i18n = useEditorI18n();
+  const debuggerContext = useDebuggerNodeContext();
   const typeColors = useTypeColors();
   const valueEntries = Object.entries(data.values ?? {}).slice(0, 3);
   const hiddenFieldCount = Math.max(Object.keys(data.values ?? {}).length - valueEntries.length, 0);
   const inputPorts = data.inputs ?? [];
   const outputPorts = data.outputs ?? [];
   const theme = getNodeTheme(data);
+  const hasBreakpoint = debuggerContext?.breakpoints.has(id) ?? false;
+  const isPending = debuggerContext?.pendingNodeId === id;
+  const isFailed = debuggerContext?.failedNodeId === id;
+  const isLastExecuted = debuggerContext?.lastEventNodeId === id;
+  const statusLabel = isFailed
+    ? i18n.text("editor.debugger.nodeFailed")
+    : isPending
+      ? i18n.text("editor.debugger.nodePending")
+      : isLastExecuted
+        ? i18n.text("editor.debugger.nodeExecuted")
+        : hasBreakpoint
+          ? i18n.text("editor.debugger.breakpointSet")
+          : i18n.text("editor.blueprint.ready");
   const nodeStyle = {
     "--node-accent": theme.accent,
     "--node-accent-muted": theme.accentMuted,
@@ -119,20 +134,36 @@ export function BlueprintNode({ data, selected }: NodeProps<NodeGraphNode>) {
 
   return (
     <div
-      className={`blueprint-node${selected ? " blueprint-node--selected" : ""}`}
+      className={`blueprint-node${selected ? " blueprint-node--selected" : ""}${hasBreakpoint ? " blueprint-node--debug-breakpoint" : ""}${isPending ? " blueprint-node--debug-pending" : ""}${isFailed ? " blueprint-node--debug-failed" : ""}${isLastExecuted ? " blueprint-node--debug-last" : ""}`}
       style={nodeStyle}
     >
       <div className="blueprint-node__header">
         <span className="blueprint-node__category">
           {resolveNodeCategory(data, i18n) ?? i18n.text("editor.blueprint.fallbackCategory")}
         </span>
-        <span className="blueprint-node__type">{data.nodeType}</span>
+        <div className="blueprint-node__actions">
+          {debuggerContext ? (
+            <button
+              className={`blueprint-node__debug-button${hasBreakpoint ? " blueprint-node__debug-button--active" : ""}`}
+              data-testid={`debug-node-breakpoint-toggle-${id}`}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                debuggerContext.onToggleBreakpoint(id);
+              }}
+              type="button"
+            >
+              {hasBreakpoint ? i18n.text("editor.debugger.clearBreakpoint") : i18n.text("editor.debugger.setBreakpoint")}
+            </button>
+          ) : null}
+          <span className="blueprint-node__type">{data.nodeType}</span>
+        </div>
       </div>
 
       <div className="blueprint-node__body">
         <div className="blueprint-node__title-row">
           <h3 className="blueprint-node__title">{resolveNodeLabel(data, i18n)}</h3>
-          <span className="blueprint-node__status">{i18n.text("editor.blueprint.ready")}</span>
+          <span className="blueprint-node__status">{statusLabel}</span>
         </div>
 
         <p className="blueprint-node__description">

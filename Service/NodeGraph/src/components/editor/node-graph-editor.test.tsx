@@ -249,4 +249,62 @@ describe("NodeGraphEditor", () => {
       root.unmount();
     });
   });
+
+  it("starts a debug session from the current draft and opens the debugger page in a new tab", async () => {
+    const openSpy = vi.fn();
+    vi.stubGlobal("open", openSpy);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          debugSessionId: "dbg_001",
+          graph: editorPayload.session.graph,
+          breakpoints: [],
+          snapshot: {
+            status: "idle",
+            pauseReason: null,
+            pendingNodeId: null,
+            lastError: null,
+            lastEvent: null,
+            profiler: {},
+            results: {},
+            events: [],
+          },
+        }),
+      }),
+    );
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<NodeGraphEditor payload={editorPayload} />);
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const debugButton = container.querySelector('[data-testid="open-debugger-button"]');
+    expect(debugButton).toBeTruthy();
+
+    await act(async () => {
+      (debugButton as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/editor/sessions/ngs_test/debug",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+    expect(openSpy).toHaveBeenCalledWith("/editor/ngs_test/debug", "_blank", "noopener,noreferrer");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

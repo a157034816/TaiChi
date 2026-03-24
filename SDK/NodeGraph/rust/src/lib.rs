@@ -1068,6 +1068,11 @@ impl NodeGraphRuntimeDebugSession {
         self.drain(false)
     }
 
+    /// 使用新的节点 ID 集合替换当前调试会话的全部断点。
+    pub fn set_breakpoints(&mut self, breakpoints: HashSet<String>) {
+        self.breakpoints = breakpoints;
+    }
+
     fn drain(&mut self, single_step: bool) -> NodeGraphExecutionSnapshot {
         let mut ignore_breakpoint_for_node_id = None;
         if self.status == STATUS_PAUSED

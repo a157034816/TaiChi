@@ -76,7 +76,8 @@ class RuntimeDebuggerSession {
     this.pendingNodeId = null;
     this.lastEvent = null;
     this.lastError = null;
-    this.startedAtMs = getNowMs(runtime.now);
+    this.accumulatedWallTimeMs = 0;
+    this.drainStartedAtMs = null;
     this.stepCount = 0;
     this.results = {};
     this.events = [];
@@ -102,6 +103,14 @@ class RuntimeDebuggerSession {
     }
   }
 
+  /**
+   * 用新的节点 ID 集合替换当前调试会话的全部断点。
+   */
+  setBreakpoints(breakpoints = []) {
+    this.breakpoints = new Set((breakpoints ?? []).map((entry) => String(entry)));
+    return this;
+  }
+
   #recordEvent(event) {
     this.lastEvent = event;
     this.events.push(event);
@@ -109,19 +118,34 @@ class RuntimeDebuggerSession {
 
   #ensureBudget() {
     const nowMs = getNowMs(this.runtime.now);
+    const activeDrainDurationMs =
+      this.drainStartedAtMs === null ? 0 : Math.max(0, nowMs - this.drainStartedAtMs);
+
     if (this.stepCount >= this.maxSteps) {
       this.status = "budget_exceeded";
       this.pauseReason = "maxSteps";
       return false;
     }
 
-    if (nowMs - this.startedAtMs > this.maxWallTimeMs) {
+    if (this.accumulatedWallTimeMs + activeDrainDurationMs > this.maxWallTimeMs) {
       this.status = "budget_exceeded";
       this.pauseReason = "maxWallTimeMs";
       return false;
     }
 
     return true;
+  }
+
+  /**
+   * 只累计真正执行队列时消耗的 wall-time，避免把用户停在断点上的等待时间算进预算。
+   */
+  #finalizeDrainBudget() {
+    if (this.drainStartedAtMs === null) {
+      return;
+    }
+
+    this.accumulatedWallTimeMs += Math.max(0, getNowMs(this.runtime.now) - this.drainStartedAtMs);
+    this.drainStartedAtMs = null;
   }
 
   #getNodeState(nodeId) {
@@ -233,47 +257,52 @@ class RuntimeDebuggerSession {
 
     this.status = "running";
     this.pauseReason = null;
+    this.drainStartedAtMs = getNowMs(this.runtime.now);
 
-    while (this.queue.length > 0) {
-      if (!this.#ensureBudget()) {
-        return this.#buildSnapshot();
+    try {
+      while (this.queue.length > 0) {
+        if (!this.#ensureBudget()) {
+          return this.#buildSnapshot();
+        }
+
+        const nextItem = this.queue[0];
+        if (
+          this.breakpoints.has(nextItem.nodeId) &&
+          ignoreBreakpointForNodeId !== nextItem.nodeId
+        ) {
+          this.status = "paused";
+          this.pauseReason = "breakpoint";
+          this.pendingNodeId = nextItem.nodeId;
+          return this.#buildSnapshot();
+        }
+
+        ignoreBreakpointForNodeId = null;
+        this.stepCount += 1;
+        const item = this.queue.shift();
+
+        try {
+          await this.#executeQueueItem(item);
+        } catch (error) {
+          this.status = "failed";
+          this.pauseReason = "error";
+          this.lastError = error instanceof Error ? error : new Error(String(error));
+          return this.#buildSnapshot();
+        }
+
+        if (singleStep) {
+          this.status = this.queue.length ? "paused" : "completed";
+          this.pauseReason = this.queue.length ? "step" : null;
+          this.pendingNodeId = this.queue[0]?.nodeId ?? null;
+          return this.#buildSnapshot();
+        }
       }
 
-      const nextItem = this.queue[0];
-      if (
-        this.breakpoints.has(nextItem.nodeId) &&
-        ignoreBreakpointForNodeId !== nextItem.nodeId
-      ) {
-        this.status = "paused";
-        this.pauseReason = "breakpoint";
-        this.pendingNodeId = nextItem.nodeId;
-        return this.#buildSnapshot();
-      }
-
-      ignoreBreakpointForNodeId = null;
-      this.stepCount += 1;
-      const item = this.queue.shift();
-
-      try {
-        await this.#executeQueueItem(item);
-      } catch (error) {
-        this.status = "failed";
-        this.pauseReason = "error";
-        this.lastError = error instanceof Error ? error : new Error(String(error));
-        return this.#buildSnapshot();
-      }
-
-      if (singleStep) {
-        this.status = this.queue.length ? "paused" : "completed";
-        this.pauseReason = this.queue.length ? "step" : null;
-        this.pendingNodeId = this.queue[0]?.nodeId ?? null;
-        return this.#buildSnapshot();
-      }
+      this.status = "completed";
+      this.pendingNodeId = null;
+      return this.#buildSnapshot();
+    } finally {
+      this.#finalizeDrainBudget();
     }
-
-    this.status = "completed";
-    this.pendingNodeId = null;
-    return this.#buildSnapshot();
   }
 
   #buildSnapshot() {

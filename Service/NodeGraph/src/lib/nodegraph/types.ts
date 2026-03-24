@@ -286,3 +286,43 @@ export interface RuntimeLibraryRefreshResult {
   typeMappings?: TypeMappingEntry[];
   migratedGraph?: NodeGraphDocument;
 }
+
+export type DebugSessionStatus = "idle" | "running" | "paused" | "completed" | "budget_exceeded" | "failed";
+
+export interface DebugSessionSnapshot {
+  status: DebugSessionStatus;
+  pauseReason: string | null;
+  pendingNodeId: string | null;
+  lastError?: unknown | null;
+  lastEvent?: Record<string, unknown> | null;
+  profiler: Record<string, Record<string, number>>;
+  results: Record<string, unknown[]>;
+  events: Array<Record<string, unknown>>;
+}
+
+export interface CreateDebugSessionRequest {
+  graph: NodeGraphDocument;
+  breakpoints?: string[];
+}
+
+export interface UpdateDebugBreakpointsRequest {
+  breakpoints: string[];
+}
+
+export interface DebugSessionPayload {
+  debugSessionId: string;
+  graph: NodeGraphDocument;
+  breakpoints: string[];
+  snapshot: DebugSessionSnapshot;
+}
+
+export interface ActiveDebugSession extends DebugSessionPayload {
+  sessionId: string;
+  runtimeId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CloseDebugSessionResponse {
+  closed: boolean;
+}

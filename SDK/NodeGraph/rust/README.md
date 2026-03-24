@@ -102,9 +102,12 @@ let mut debugger = runtime.create_debugger(
 );
 
 let first_step = debugger.step();
+debugger.set_breakpoints(std::collections::HashSet::new());
 let paused = debugger.continue_execution();
 let completed = debugger.continue_execution();
 ```
+
+`set_breakpoints(...)` 会直接替换当前调试会话的断点集合，因此可以和 NodeGraph 可视化调试页联动，在同一会话里动态设断点/取消断点。
 
 ## 宿主侧还需要做什么
 

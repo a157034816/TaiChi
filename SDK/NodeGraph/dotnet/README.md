@@ -90,8 +90,11 @@ var debugger = runtime.CreateDebugger(graph, new NodeGraphExecutionOptions
 });
 
 await debugger.StepAsync();
+debugger.SetBreakpoints([]);
 await debugger.ContinueAsync();
 ```
+
+`SetBreakpoints(...)` 会在当前调试会话内整体替换断点列表，适合配合 NodeGraph 可视化调试页动态设断点/取消断点。
 
 返回快照中包含：
 

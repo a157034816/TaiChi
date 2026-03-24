@@ -74,8 +74,11 @@ const debuggerSession = runtime.createDebugger(graph, {
 });
 
 await debuggerSession.step();
+debuggerSession.setBreakpoints([]);
 await debuggerSession.continue();
 ```
+
+`setBreakpoints([...])` 可以在不重建 `debuggerSession` 的前提下直接替换当前断点集合，适合给 NodeGraph 可视化调试页做“设断点 / 取消断点”交互。
 
 `snapshot` 中会包含：
 

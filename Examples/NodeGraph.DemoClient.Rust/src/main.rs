@@ -1,16 +1,17 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use nodegraph_sdk::{
     CreateSessionRequest, CreateSessionResponse, NodeAppearance, NodeDefinition, NodeExecutionContext,
-    NodeGraphClient, NodeGraphDocument, NodeGraphEdge, NodeGraphExecutionOptions, NodeGraphNode,
-    NodeGraphRuntime, NodeGraphRuntimeOptions, NodeGraphViewport, NodeLibraryFieldDefinition,
-    NodePortDefinition, Position, RuntimeRegistrationResponse, TypeMappingEntry,
+    NodeGraphClient, NodeGraphDocument, NodeGraphEdge, NodeGraphExecutionOptions,
+    NodeGraphExecutionSnapshot, NodeGraphNode, NodeGraphRuntime, NodeGraphRuntimeDebugSession,
+    NodeGraphRuntimeOptions, NodeGraphViewport, NodeLibraryFieldDefinition, NodePortDefinition,
+    Position, RuntimeRegistrationResponse, TypeMappingEntry,
 };
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -40,6 +41,8 @@ const DEFAULT_TEMPLATE: &str =
     "Greeting: {greeting}\nLucky: {lucky}\nDate: {today}\nTheme: {theme}\nAmount: {amount}";
 /// 用于“只发射一次”的节点状态键（避免因多输入触发导致重复 emit）。
 const EMITTED_STATE_KEY: &str = "__emitted";
+/// Demo 调试样例默认会命中的节点级断点。
+const DEFAULT_DEBUG_BREAKPOINT: &str = "node_output";
 
 /// Demo 宿主共享状态。
 type SharedHost = Arc<Mutex<DemoHost>>;
@@ -50,6 +53,65 @@ fn create_port(id: &str, label: &str, data_type: &str) -> NodePortDefinition {
         id: id.to_string(),
         label: label.to_string(),
         data_type: Some(data_type.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 创建仅用于测试的 Demo 宿主配置，避免依赖外部环境变量。
+    fn create_test_config() -> DemoConfig {
+        DemoConfig {
+            nodegraph_base_url: "http://127.0.0.1:3000".to_string(),
+            demo_client_base_url: "http://127.0.0.1:3300".to_string(),
+            listen_addr: "127.0.0.1:3300".to_string(),
+            demo_domain: "demo-hello-world-rust-test".to_string(),
+            client_name: "NodeGraph Demo Client (Rust Test)".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_debug_sessions_support_dynamic_breakpoint_updates() {
+        let mut host = DemoHost::new(create_test_config());
+        let graph = create_graph(Some(DEFAULT_EXISTING_GRAPH_NAME), Some("existing"));
+
+        let created = host.create_debug_session(graph, Some(Vec::new()));
+        assert_eq!(created["snapshot"]["status"], "idle");
+        assert_eq!(created["breakpoints"], json!([]));
+
+        let debug_session_id = created["debugSessionId"]
+            .as_str()
+            .expect("debugSessionId should exist")
+            .to_string();
+
+        let updated = host
+            .set_debug_session_breakpoints(&debug_session_id, Some(vec!["node_output".to_string()]))
+            .expect("debug session should exist when updating breakpoints");
+        assert_eq!(updated["breakpoints"], json!(["node_output"]));
+
+        let paused = host
+            .continue_debug_session(&debug_session_id)
+            .expect("debug session should exist when continuing");
+        assert_eq!(paused["snapshot"]["status"], "paused");
+        assert_eq!(paused["snapshot"]["pauseReason"], "breakpoint");
+        assert_eq!(paused["snapshot"]["pendingNodeId"], "node_output");
+
+        let cleared = host
+            .set_debug_session_breakpoints(&debug_session_id, Some(Vec::new()))
+            .expect("debug session should exist when clearing breakpoints");
+        assert_eq!(cleared["breakpoints"], json!([]));
+
+        let completed = host
+            .continue_debug_session(&debug_session_id)
+            .expect("debug session should exist when finishing");
+        assert_eq!(completed["snapshot"]["status"], "completed");
+        assert_eq!(
+            completed["snapshot"]["results"]["console"],
+            json!(["Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45"])
+        );
+
+        assert!(host.close_debug_session(&debug_session_id));
     }
 }
 
@@ -176,7 +238,16 @@ struct RegisterRequest {
 struct GraphRequest {
     graph_mode: Option<String>,
     graph_name: Option<String>,
+    graph: Option<NodeGraphDocument>,
+    breakpoints: Option<Vec<String>>,
     force_refresh: Option<bool>,
+}
+
+/// 更新断点接口的请求体。
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct BreakpointsRequest {
+    breakpoints: Option<Vec<String>>,
 }
 
 /// 字段选项接口查询参数。
@@ -190,10 +261,21 @@ struct FieldOptionsQuery {
 }
 
 /// Rust Demo 宿主。
+struct StoredDebugSession {
+    debug_session_id: String,
+    graph: NodeGraphDocument,
+    breakpoints: Vec<String>,
+    snapshot: NodeGraphExecutionSnapshot,
+    debugger_session: NodeGraphRuntimeDebugSession,
+}
+
+/// Rust Demo 宿主。
 struct DemoHost {
     config: DemoConfig,
     client: NodeGraphClient,
     runtime: NodeGraphRuntime,
+    debug_sessions: HashMap<String, StoredDebugSession>,
+    next_debug_session_id: u64,
     last_registration: Option<Value>,
     last_session: Option<Value>,
     last_execution: Option<Value>,
@@ -212,6 +294,8 @@ impl DemoHost {
             config,
             client,
             runtime,
+            debug_sessions: HashMap::new(),
+            next_debug_session_id: 1,
             last_registration: None,
             last_session: None,
             last_execution: None,
@@ -245,6 +329,7 @@ impl DemoHost {
                 "/api/runtime/field-options",
                 "/api/runtime/register",
                 "/api/runtime/execute",
+                "/api/runtime/debug/sessions",
                 "/api/runtime/debug/sample",
                 "/api/create-session",
                 "/api/completed",
@@ -349,30 +434,152 @@ impl DemoHost {
     }
 
     /// 运行断点调试样例。
-    fn debug_sample(&mut self, graph_mode: Option<String>, graph_name: Option<String>) -> Value {
-        let graph = create_graph(graph_name.as_deref(), graph_mode.as_deref());
-        let mut debugger = self.runtime.create_debugger(
-            &graph,
-            Some(NodeGraphExecutionOptions {
-                breakpoints: Some(HashSet::from(["node_output".to_string()])),
-                max_steps: None,
-                max_wall_time: None,
-            }),
+    fn debug_sample(
+        &mut self,
+        graph_mode: Option<String>,
+        graph_name: Option<String>,
+        graph: Option<NodeGraphDocument>,
+        breakpoints: Option<Vec<String>>,
+    ) -> Value {
+        let resolved_mode = normalize_graph_mode(graph_mode.as_deref());
+        let resolved_graph =
+            graph.unwrap_or_else(|| create_graph(graph_name.as_deref(), graph_mode.as_deref()));
+        let resolved_name = resolve_graph_name(&resolved_graph, graph_name.as_deref(), resolved_mode);
+        let normalized_breakpoints = normalize_breakpoints(
+            breakpoints,
+            Some(vec![DEFAULT_DEBUG_BREAKPOINT.to_string()]),
         );
-        let first_step = debugger.step();
-        let paused = debugger.continue_execution();
-        let completed = debugger.continue_execution();
+        let created = self.create_debug_session(resolved_graph, Some(normalized_breakpoints.clone()));
+        let debug_session_id = created["debugSessionId"]
+            .as_str()
+            .expect("created debug session should contain debugSessionId")
+            .to_string();
+        let first_step = self
+            .step_debug_session(&debug_session_id)
+            .expect("created debug session should be available for stepping")["snapshot"]
+            .clone();
+        let paused = self
+            .continue_debug_session(&debug_session_id)
+            .expect("created debug session should be available for continue")["snapshot"]
+            .clone();
+        let completed = self
+            .continue_debug_session(&debug_session_id)
+            .expect("created debug session should be available for completion")["snapshot"]
+            .clone();
+        self.debug_sessions.remove(&debug_session_id);
 
         let record = json!({
             "debuggedAt": chrono_like_now(),
-            "graph": graph,
-            "breakpoints": ["node_output"],
+            "graphMode": resolved_mode,
+            "graphName": resolved_name,
+            "graph": created["graph"].clone(),
+            "breakpoints": normalized_breakpoints,
             "firstStep": first_step,
             "paused": paused,
             "completed": completed,
         });
         self.last_debug = Some(record.clone());
         record
+    }
+
+    /// 创建宿主内调试会话，供可视化调试页反复拉取和推进。
+    fn create_debug_session(
+        &mut self,
+        graph: NodeGraphDocument,
+        breakpoints: Option<Vec<String>>,
+    ) -> Value {
+        let normalized_breakpoints = normalize_breakpoints(breakpoints, None);
+        let debug_session_id = format!("ngd_{}", self.next_debug_session_id);
+        self.next_debug_session_id += 1;
+        let debugger_session = self.runtime.create_debugger(
+            &graph,
+            Some(NodeGraphExecutionOptions {
+                breakpoints: Some(HashSet::from_iter(normalized_breakpoints.iter().cloned())),
+                max_steps: None,
+                max_wall_time: None,
+            }),
+        );
+        let stored_session = StoredDebugSession {
+            debug_session_id: debug_session_id.clone(),
+            graph,
+            breakpoints: normalized_breakpoints,
+            snapshot: create_idle_debug_snapshot(),
+            debugger_session,
+        };
+        let payload = build_debug_session_payload(&stored_session);
+        self.last_debug = Some(build_debug_session_state_record(&stored_session));
+        self.debug_sessions
+            .insert(debug_session_id, stored_session);
+        payload
+    }
+
+    /// 查询指定调试会话；若会话不存在则返回 None。
+    fn get_debug_session(&self, debug_session_id: &str) -> Option<Value> {
+        self.debug_sessions
+            .get(debug_session_id)
+            .map(build_debug_session_payload)
+    }
+
+    /// 单步推进指定调试会话。
+    fn step_debug_session(&mut self, debug_session_id: &str) -> Option<Value> {
+        let snapshot = self
+            .debug_sessions
+            .get_mut(debug_session_id)
+            .map(|stored_session| stored_session.debugger_session.step())?;
+        self.update_debug_session_snapshot(debug_session_id, snapshot)
+    }
+
+    /// 继续运行指定调试会话。
+    fn continue_debug_session(&mut self, debug_session_id: &str) -> Option<Value> {
+        let snapshot = self
+            .debug_sessions
+            .get_mut(debug_session_id)
+            .map(|stored_session| stored_session.debugger_session.continue_execution())?;
+        self.update_debug_session_snapshot(debug_session_id, snapshot)
+    }
+
+    /// 动态替换指定调试会话的断点集合。
+    fn set_debug_session_breakpoints(
+        &mut self,
+        debug_session_id: &str,
+        breakpoints: Option<Vec<String>>,
+    ) -> Option<Value> {
+        let (payload, state_record) = {
+            let stored_session = self.debug_sessions.get_mut(debug_session_id)?;
+            stored_session.breakpoints = normalize_breakpoints(breakpoints, None);
+            stored_session
+                .debugger_session
+                .set_breakpoints(HashSet::from_iter(stored_session.breakpoints.iter().cloned()));
+            (
+                build_debug_session_payload(stored_session),
+                build_debug_session_state_record(stored_session),
+            )
+        };
+        self.last_debug = Some(state_record);
+        Some(payload)
+    }
+
+    /// 关闭指定调试会话。
+    fn close_debug_session(&mut self, debug_session_id: &str) -> bool {
+        self.debug_sessions.remove(debug_session_id).is_some()
+    }
+
+    /// 更新指定调试会话的最新快照，并同步 lastDebug 记录。
+    fn update_debug_session_snapshot(
+        &mut self,
+        debug_session_id: &str,
+        snapshot: NodeGraphExecutionSnapshot,
+    ) -> Option<Value> {
+        let (payload, state_record) = {
+            let stored_session = self.debug_sessions.get_mut(debug_session_id)?;
+            stored_session.snapshot = snapshot;
+            (
+                build_debug_session_payload(stored_session),
+                build_debug_session_state_record(stored_session),
+            )
+        };
+        self.last_debug = Some(state_record);
+        Some(payload)
     }
 
     /// 保存最近一次编辑完成回调。
@@ -419,6 +626,23 @@ async fn main() {
         .route("/api/runtime/field-options", get(get_field_options))
         .route("/api/runtime/register", post(post_register_runtime))
         .route("/api/runtime/execute", post(post_execute))
+        .route("/api/runtime/debug/sessions", post(post_create_debug_session))
+        .route(
+            "/api/runtime/debug/sessions/{debug_session_id}",
+            get(get_debug_session).delete(delete_debug_session),
+        )
+        .route(
+            "/api/runtime/debug/sessions/{debug_session_id}/step",
+            post(post_debug_session_step),
+        )
+        .route(
+            "/api/runtime/debug/sessions/{debug_session_id}/continue",
+            post(post_debug_session_continue),
+        )
+        .route(
+            "/api/runtime/debug/sessions/{debug_session_id}/breakpoints",
+            put(put_debug_session_breakpoints),
+        )
         .route("/api/runtime/debug/sample", post(post_debug_sample))
         .route("/api/create-session", post(post_create_session))
         .route("/api/completed", post(post_completed))
@@ -510,6 +734,87 @@ async fn post_execute(
     Json(host.execute(payload.graph_mode, payload.graph_name))
 }
 
+/// 创建调试会话接口。
+async fn post_create_debug_session(
+    State(host): State<SharedHost>,
+    payload: Option<Json<GraphRequest>>,
+) -> (StatusCode, Json<Value>) {
+    let payload = payload.map(|body| body.0).unwrap_or_default();
+    let graph = payload
+        .graph
+        .unwrap_or_else(|| create_graph(payload.graph_name.as_deref(), payload.graph_mode.as_deref()));
+    let mut host = host.lock().await;
+    (
+        StatusCode::CREATED,
+        Json(host.create_debug_session(graph, payload.breakpoints)),
+    )
+}
+
+/// 获取调试会话接口。
+async fn get_debug_session(
+    State(host): State<SharedHost>,
+    Path(debug_session_id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let host = host.lock().await;
+    host.get_debug_session(&debug_session_id)
+        .map(Json)
+        .ok_or_else(|| debug_session_not_found_response(&debug_session_id))
+}
+
+/// 调试会话单步接口。
+async fn post_debug_session_step(
+    State(host): State<SharedHost>,
+    Path(debug_session_id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let mut host = host.lock().await;
+    host.step_debug_session(&debug_session_id)
+        .map(Json)
+        .ok_or_else(|| debug_session_not_found_response(&debug_session_id))
+}
+
+/// 调试会话继续接口。
+async fn post_debug_session_continue(
+    State(host): State<SharedHost>,
+    Path(debug_session_id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let mut host = host.lock().await;
+    host.continue_debug_session(&debug_session_id)
+        .map(Json)
+        .ok_or_else(|| debug_session_not_found_response(&debug_session_id))
+}
+
+/// 调试会话断点更新接口。
+async fn put_debug_session_breakpoints(
+    State(host): State<SharedHost>,
+    Path(debug_session_id): Path<String>,
+    payload: Option<Json<BreakpointsRequest>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let payload = payload.map(|body| body.0).unwrap_or_default();
+    let mut host = host.lock().await;
+    host.set_debug_session_breakpoints(&debug_session_id, payload.breakpoints)
+        .map(Json)
+        .ok_or_else(|| debug_session_not_found_response(&debug_session_id))
+}
+
+/// 删除调试会话接口。
+async fn delete_debug_session(
+    State(host): State<SharedHost>,
+    Path(debug_session_id): Path<String>,
+) -> (StatusCode, Json<Value>) {
+    let mut host = host.lock().await;
+    let closed = host.close_debug_session(&debug_session_id);
+    (
+        if closed {
+            StatusCode::OK
+        } else {
+            StatusCode::NOT_FOUND
+        },
+        Json(json!({
+            "closed": closed,
+        })),
+    )
+}
+
 /// 调试样例接口。
 async fn post_debug_sample(
     State(host): State<SharedHost>,
@@ -517,7 +822,12 @@ async fn post_debug_sample(
 ) -> Json<Value> {
     let payload = payload.map(|body| body.0).unwrap_or_default();
     let mut host = host.lock().await;
-    Json(host.debug_sample(payload.graph_mode, payload.graph_name))
+    Json(host.debug_sample(
+        payload.graph_mode,
+        payload.graph_name,
+        payload.graph,
+        payload.breakpoints,
+    ))
 }
 
 /// 创建会话接口。
@@ -563,6 +873,84 @@ fn normalize_graph_mode(value: Option<&str>) -> &'static str {
     } else {
         "existing"
     }
+}
+
+/// 根据请求显式名称或图快照中的名称补齐最终图名。
+fn resolve_graph_name(graph: &NodeGraphDocument, graph_name: Option<&str>, graph_mode: &str) -> String {
+    if let Some(value) = graph_name.map(str::trim).filter(|value| !value.is_empty()) {
+        return value.to_string();
+    }
+
+    if !graph.name.trim().is_empty() {
+        return graph.name.trim().to_string();
+    }
+
+    if graph_mode == "new" {
+        DEFAULT_NEW_GRAPH_NAME.to_string()
+    } else {
+        DEFAULT_EXISTING_GRAPH_NAME.to_string()
+    }
+}
+
+/// 规范化断点列表，移除空白项并按出现顺序去重。
+fn normalize_breakpoints(
+    breakpoints: Option<Vec<String>>,
+    fallback: Option<Vec<String>>,
+) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for entry in breakpoints.or(fallback).unwrap_or_default() {
+        let trimmed = entry.trim();
+        if !trimmed.is_empty() && !normalized.iter().any(|current| current == trimmed) {
+            normalized.push(trimmed.to_string());
+        }
+    }
+
+    normalized
+}
+
+/// 创建“尚未开始执行”的调试快照。
+fn create_idle_debug_snapshot() -> NodeGraphExecutionSnapshot {
+    NodeGraphExecutionSnapshot {
+        status: "idle".to_string(),
+        pause_reason: None,
+        pending_node_id: None,
+        last_error: None,
+        last_event: None,
+        profiler: HashMap::new(),
+        results: HashMap::new(),
+        events: Vec::new(),
+    }
+}
+
+/// 构造调试会话标准返回体。
+fn build_debug_session_payload(stored_session: &StoredDebugSession) -> Value {
+    json!({
+        "debugSessionId": stored_session.debug_session_id,
+        "graph": stored_session.graph,
+        "breakpoints": stored_session.breakpoints,
+        "snapshot": stored_session.snapshot,
+    })
+}
+
+/// 构造 `/api/results/latest` 需要保存的最近一次调试状态。
+fn build_debug_session_state_record(stored_session: &StoredDebugSession) -> Value {
+    json!({
+        "debuggedAt": chrono_like_now(),
+        "debugSessionId": stored_session.debug_session_id,
+        "graph": stored_session.graph,
+        "breakpoints": stored_session.breakpoints,
+        "snapshot": stored_session.snapshot,
+    })
+}
+
+/// 生成统一的“调试会话不存在”错误响应。
+fn debug_session_not_found_response(debug_session_id: &str) -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({
+            "error": format!("Debug session \"{debug_session_id}\" was not found."),
+        })),
+    )
 }
 
 /// 生成伪 ISO 时间戳。

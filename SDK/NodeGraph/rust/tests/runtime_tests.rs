@@ -320,3 +320,26 @@ fn runtime_debugger_pauses_on_breakpoint_and_can_continue() {
     assert_eq!(completed.results["console"], vec![json!("Hello, Codex!")]);
     assert_eq!(completed.profiler["node_output"].call_count, 1);
 }
+
+#[test]
+fn runtime_debugger_can_replace_breakpoints_while_reusing_the_same_session() {
+    let runtime = create_hello_runtime(None);
+    let mut debug_session = runtime.create_debugger(&create_hello_graph(), None);
+
+    let first_step = debug_session.step();
+    assert_eq!(first_step.status, "paused");
+    assert_eq!(first_step.pending_node_id.as_deref(), Some("node_output"));
+
+    debug_session.set_breakpoints(HashSet::from(["node_output".to_string()]));
+
+    let paused = debug_session.continue_execution();
+    assert_eq!(paused.status, "paused");
+    assert_eq!(paused.pause_reason.as_deref(), Some("breakpoint"));
+    assert_eq!(paused.pending_node_id.as_deref(), Some("node_output"));
+
+    debug_session.set_breakpoints(HashSet::new());
+
+    let completed = debug_session.continue_execution();
+    assert_eq!(completed.status, "completed");
+    assert_eq!(completed.results["console"], vec![json!("Hello, Codex!")]);
+}

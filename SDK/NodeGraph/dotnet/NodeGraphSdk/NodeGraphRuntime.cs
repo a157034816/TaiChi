@@ -253,6 +253,28 @@ public sealed class NodeGraphRuntimeDebugSession
         return DrainAsync(singleStep: false);
     }
 
+    /// <summary>
+    /// 使用新的节点 ID 集合替换当前调试会话的全部断点。
+    /// </summary>
+    /// <param name="breakpoints">新的断点节点 ID 列表；传入 <see langword="null" /> 等价于清空。</param>
+    public void SetBreakpoints(IEnumerable<string>? breakpoints)
+    {
+        _breakpoints.Clear();
+
+        if (breakpoints is null)
+        {
+            return;
+        }
+
+        foreach (var breakpoint in breakpoints)
+        {
+            if (!string.IsNullOrWhiteSpace(breakpoint))
+            {
+                _breakpoints.Add(breakpoint);
+            }
+        }
+    }
+
     internal static NodePortDefinition ClonePort(NodePortDefinition port)
     {
         return new NodePortDefinition

@@ -10,6 +10,7 @@
 - 远端字段选项（`/api/runtime/field-options`，用于下拉框动态选项）
 - 宿主侧执行节点图
 - 断点调试与性能统计
+- 同一调试会话内动态设置/取消节点级断点
 - 接收编辑完成回调
 
 ## 提供的接口
@@ -21,6 +22,12 @@
 - `GET /api/runtime/field-options`：远端字段选项（当前仅 `demo_source.punctuation` 返回 4 个标点选项）
 - `POST /api/runtime/register`：触发运行时注册
 - `POST /api/runtime/execute`：执行一张 Demo Showcase 图
+- `POST /api/runtime/debug/sessions`：创建宿主内调试会话
+- `GET /api/runtime/debug/sessions/{debugSessionId}`：读取调试会话
+- `POST /api/runtime/debug/sessions/{debugSessionId}/step`：单步推进调试会话
+- `POST /api/runtime/debug/sessions/{debugSessionId}/continue`：继续运行调试会话
+- `PUT /api/runtime/debug/sessions/{debugSessionId}/breakpoints`：动态替换断点集合
+- `DELETE /api/runtime/debug/sessions/{debugSessionId}`：关闭调试会话
 - `POST /api/runtime/debug/sample`：返回一组断点调试快照
 - `POST /api/create-session`：先注册运行时，再向 NodeGraph 创建编辑会话
 - `POST /api/completed`：接收 NodeGraph 编辑完成回调

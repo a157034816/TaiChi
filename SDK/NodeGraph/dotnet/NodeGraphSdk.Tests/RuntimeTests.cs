@@ -269,6 +269,30 @@ public sealed class RuntimeTests
         Assert.Equal(1, completed.Profiler["node_output"].CallCount);
     }
 
+    [Fact]
+    public async Task RuntimeDebuggerCanReplaceBreakpointsWhileReusingTheSameSessionAsync()
+    {
+        var runtime = CreateHelloRuntime();
+        var debugSession = runtime.CreateDebugger(CreateHelloGraph());
+
+        var firstStep = await debugSession.StepAsync();
+        Assert.Equal("paused", firstStep.Status);
+        Assert.Equal("node_output", firstStep.PendingNodeId);
+
+        debugSession.SetBreakpoints(["node_output"]);
+
+        var paused = await debugSession.ContinueAsync();
+        Assert.Equal("paused", paused.Status);
+        Assert.Equal("breakpoint", paused.PauseReason);
+        Assert.Equal("node_output", paused.PendingNodeId);
+
+        debugSession.SetBreakpoints([]);
+
+        var completed = await debugSession.ContinueAsync();
+        Assert.Equal("completed", completed.Status);
+        Assert.Equal(["Hello, Codex!"], completed.Results["console"].Cast<string>().ToArray());
+    }
+
     private sealed class RecordingRuntimeClient(Func<RuntimeRegistrationRequest, RuntimeRegistrationResponse> handler) : INodeGraphRuntimeClient
     {
         public Task<RuntimeRegistrationResponse> RegisterRuntimeAsync(RuntimeRegistrationRequest request, CancellationToken cancellationToken = default)

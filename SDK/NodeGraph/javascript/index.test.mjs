@@ -214,3 +214,45 @@ test("NodeGraphRuntime debugger pauses on breakpoints and can continue to comple
   assert.deepEqual(completed.results.console, ["Hello, Codex!"]);
   assert.equal(completed.profiler.node_output.callCount, 1);
 });
+
+test("NodeGraphRuntime debugger can replace breakpoints while reusing the same session", async () => {
+  const runtime = createHelloRuntime();
+  const debugSession = runtime.createDebugger(createHelloGraph());
+
+  const firstStep = await debugSession.step();
+  assert.equal(firstStep.status, "paused");
+  assert.equal(firstStep.pendingNodeId, "node_output");
+
+  debugSession.setBreakpoints(["node_output"]);
+
+  const paused = await debugSession.continue();
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.pauseReason, "breakpoint");
+  assert.equal(paused.pendingNodeId, "node_output");
+
+  debugSession.setBreakpoints([]);
+
+  const completed = await debugSession.continue();
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.results.console, ["Hello, Codex!"]);
+});
+
+test("NodeGraphRuntime debugger does not count paused wait time between step calls against the wall-time budget", async () => {
+  let currentTime = Date.parse("2026-03-21T00:00:00.000Z");
+  const runtime = createHelloRuntime({
+    now: () => currentTime,
+  });
+  const debugSession = runtime.createDebugger(createHelloGraph(), {
+    maxWallTimeMs: 5_000,
+  });
+
+  const firstStep = await debugSession.step();
+  assert.equal(firstStep.status, "paused");
+  assert.equal(firstStep.pendingNodeId, "node_output");
+
+  currentTime += 60_000;
+
+  const completed = await debugSession.step();
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.results.console, ["Hello, Codex!"]);
+});

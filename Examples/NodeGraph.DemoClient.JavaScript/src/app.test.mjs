@@ -201,6 +201,105 @@ test("POST /api/runtime/debug/sample returns a breakpoint walkthrough", async ()
   });
 });
 
+test("runtime debug session endpoints support dynamic breakpoint updates", async () => {
+  const config = getDemoConfig({
+    demoClientBaseUrl: "http://demo-client.test",
+  });
+  const runtime = createRuntime(config);
+
+  await withServer(createApp({ config, runtime }), async (baseUrl) => {
+    const graph = createGraphDocument("Demo Showcase Pipeline", "existing");
+    const createdResponse = await fetch(`${baseUrl}/api/runtime/debug/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        graph,
+        breakpoints: [],
+      }),
+    });
+    const createdPayload = await createdResponse.json();
+
+    assert.equal(createdResponse.status, 201);
+    assert.equal(typeof createdPayload.debugSessionId, "string");
+    assert.equal(createdPayload.snapshot.status, "idle");
+    assert.deepEqual(createdPayload.breakpoints, []);
+
+    const breakpointResponse = await fetch(
+      `${baseUrl}/api/runtime/debug/sessions/${createdPayload.debugSessionId}/breakpoints`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          breakpoints: ["node_output"],
+        }),
+      },
+    );
+    const breakpointPayload = await breakpointResponse.json();
+
+    assert.equal(breakpointResponse.status, 200);
+    assert.deepEqual(breakpointPayload.breakpoints, ["node_output"]);
+
+    const pausedResponse = await fetch(
+      `${baseUrl}/api/runtime/debug/sessions/${createdPayload.debugSessionId}/continue`,
+      {
+        method: "POST",
+      },
+    );
+    const pausedPayload = await pausedResponse.json();
+
+    assert.equal(pausedResponse.status, 200);
+    assert.equal(pausedPayload.snapshot.status, "paused");
+    assert.equal(pausedPayload.snapshot.pauseReason, "breakpoint");
+    assert.equal(pausedPayload.snapshot.pendingNodeId, "node_output");
+
+    const clearResponse = await fetch(
+      `${baseUrl}/api/runtime/debug/sessions/${createdPayload.debugSessionId}/breakpoints`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          breakpoints: [],
+        }),
+      },
+    );
+    const clearedPayload = await clearResponse.json();
+
+    assert.equal(clearResponse.status, 200);
+    assert.deepEqual(clearedPayload.breakpoints, []);
+
+    const completedResponse = await fetch(
+      `${baseUrl}/api/runtime/debug/sessions/${createdPayload.debugSessionId}/continue`,
+      {
+        method: "POST",
+      },
+    );
+    const completedPayload = await completedResponse.json();
+
+    assert.equal(completedResponse.status, 200);
+    assert.equal(completedPayload.snapshot.status, "completed");
+    assert.deepEqual(completedPayload.snapshot.results.console, [
+      "Greeting: Hello, Codex!\nLucky: 12\nDate: 2026-03-21\nTheme: #2563eb\nAmount: 123.45",
+    ]);
+
+    const closedResponse = await fetch(
+      `${baseUrl}/api/runtime/debug/sessions/${createdPayload.debugSessionId}`,
+      {
+        method: "DELETE",
+      },
+    );
+    const closedPayload = await closedResponse.json();
+
+    assert.equal(closedResponse.status, 200);
+    assert.equal(closedPayload.closed, true);
+  });
+});
+
 test("POST /api/create-session registers the runtime and then creates a session with runtimeId", async () => {
   let registrationRequest;
   let sessionRequest;

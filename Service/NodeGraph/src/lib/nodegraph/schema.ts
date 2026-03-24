@@ -186,6 +186,33 @@ export const refreshRuntimeLibraryRequestSchema = z.object({
   graph: nodeGraphDocumentSchema.optional(),
 });
 
+export const debugSessionSnapshotSchema = z.object({
+  status: z.enum(["idle", "running", "paused", "completed", "budget_exceeded", "failed"]),
+  pauseReason: z.string().nullable(),
+  pendingNodeId: z.string().nullable(),
+  lastError: z.unknown().nullable().optional(),
+  lastEvent: z.record(z.string(), z.unknown()).nullable().optional(),
+  profiler: z.record(z.string(), z.record(z.string(), z.number())),
+  results: z.record(z.string(), z.array(z.unknown())),
+  events: z.array(z.record(z.string(), z.unknown())),
+});
+
+export const createDebugSessionRequestSchema = z.object({
+  graph: nodeGraphDocumentSchema,
+  breakpoints: z.array(z.string().min(1)).optional(),
+});
+
+export const updateDebugBreakpointsRequestSchema = z.object({
+  breakpoints: z.array(z.string().min(1)),
+});
+
+export const debugSessionPayloadSchema = z.object({
+  debugSessionId: z.string().min(1),
+  graph: nodeGraphDocumentSchema,
+  breakpoints: z.array(z.string().min(1)),
+  snapshot: debugSessionSnapshotSchema,
+});
+
 export const nodeLibraryEnvelopeSchema = z.object({
   nodes: z.array(nodeLibraryItemSchema),
   typeMappings: z.array(typeMappingEntrySchema).optional(),

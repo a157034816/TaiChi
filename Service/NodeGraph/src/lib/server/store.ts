@@ -1,8 +1,9 @@
-import type { NodeGraphSession, RuntimeRegistryEntry } from "@/lib/nodegraph/types";
+import type { ActiveDebugSession, NodeGraphSession, RuntimeRegistryEntry } from "@/lib/nodegraph/types";
 
 interface RuntimeStore {
   runtimes: Map<string, RuntimeRegistryEntry>;
   sessions: Map<string, NodeGraphSession>;
+  debugSessions: Map<string, ActiveDebugSession>;
 }
 
 declare global {
@@ -14,6 +15,7 @@ export function getRuntimeStore(): RuntimeStore {
     globalThis.__nodeGraphStore = {
       runtimes: new Map(),
       sessions: new Map(),
+      debugSessions: new Map(),
     };
   }
 

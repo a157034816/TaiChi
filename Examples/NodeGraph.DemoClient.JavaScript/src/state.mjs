@@ -5,6 +5,7 @@ export function createDemoState() {
     lastSession: null,
     lastExecution: null,
     lastDebug: null,
+    debugSessions: new Map(),
     callbackHistory: [],
   };
 }

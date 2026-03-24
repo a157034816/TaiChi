@@ -260,6 +260,7 @@ export declare class NodeGraphRuntime {
     },
   ): Promise<RuntimeRegistrationResponse>;
   createDebugger(graph: NodeGraphDocument, options?: RuntimeExecuteOptions): {
+    setBreakpoints(breakpoints?: string[]): unknown;
     step(): Promise<DebuggerSnapshot>;
     continue(): Promise<DebuggerSnapshot>;
   };

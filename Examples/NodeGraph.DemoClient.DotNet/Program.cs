@@ -62,9 +62,68 @@ app.MapPost("/api/runtime/execute", async (GraphRequest? request, DemoHost demoH
     return Results.Json(await demoHost.ExecuteAsync(request?.GraphMode, request?.GraphName));
 });
 
+app.MapPost("/api/runtime/debug/sessions", async (GraphRequest? request, DemoHost demoHost) =>
+{
+    var payload = await demoHost.CreateDebugSessionAsync(request?.GraphMode, request?.GraphName, request?.Graph, request?.Breakpoints);
+    return Results.Json(payload, statusCode: StatusCodes.Status201Created);
+});
+
+app.MapGet("/api/runtime/debug/sessions/{debugSessionId}", async (string debugSessionId, DemoHost demoHost) =>
+{
+    var payload = await demoHost.GetDebugSessionAsync(debugSessionId);
+    return payload is null
+        ? Results.Json(new
+        {
+            error = $"Debug session \"{debugSessionId}\" was not found.",
+        }, statusCode: StatusCodes.Status404NotFound)
+        : Results.Json(payload);
+});
+
+app.MapDelete("/api/runtime/debug/sessions/{debugSessionId}", async (string debugSessionId, DemoHost demoHost) =>
+{
+    var closed = await demoHost.CloseDebugSessionAsync(debugSessionId);
+    return Results.Json(new
+    {
+        closed,
+    }, statusCode: closed ? StatusCodes.Status200OK : StatusCodes.Status404NotFound);
+});
+
+app.MapPost("/api/runtime/debug/sessions/{debugSessionId}/step", async (string debugSessionId, DemoHost demoHost) =>
+{
+    var payload = await demoHost.StepDebugSessionAsync(debugSessionId);
+    return payload is null
+        ? Results.Json(new
+        {
+            error = $"Debug session \"{debugSessionId}\" was not found.",
+        }, statusCode: StatusCodes.Status404NotFound)
+        : Results.Json(payload);
+});
+
+app.MapPost("/api/runtime/debug/sessions/{debugSessionId}/continue", async (string debugSessionId, DemoHost demoHost) =>
+{
+    var payload = await demoHost.ContinueDebugSessionAsync(debugSessionId);
+    return payload is null
+        ? Results.Json(new
+        {
+            error = $"Debug session \"{debugSessionId}\" was not found.",
+        }, statusCode: StatusCodes.Status404NotFound)
+        : Results.Json(payload);
+});
+
+app.MapPut("/api/runtime/debug/sessions/{debugSessionId}/breakpoints", async (string debugSessionId, BreakpointsRequest? request, DemoHost demoHost) =>
+{
+    var payload = await demoHost.UpdateDebugSessionBreakpointsAsync(debugSessionId, request?.Breakpoints);
+    return payload is null
+        ? Results.Json(new
+        {
+            error = $"Debug session \"{debugSessionId}\" was not found.",
+        }, statusCode: StatusCodes.Status404NotFound)
+        : Results.Json(payload);
+});
+
 app.MapPost("/api/runtime/debug/sample", async (GraphRequest? request, DemoHost demoHost) =>
 {
-    return Results.Json(await demoHost.DebugSampleAsync(request?.GraphMode, request?.GraphName));
+    return Results.Json(await demoHost.DebugSampleAsync(request?.GraphMode, request?.GraphName, request?.Graph, request?.Breakpoints));
 });
 
 app.MapPost("/api/create-session", async (CreateSessionPayload? request, DemoHost demoHost) =>
@@ -1344,13 +1403,15 @@ internal static class HelloWorldFactory
 /// </summary>
 internal sealed class DemoHost
 {
+    private static readonly string[] DefaultDebugBreakpoints = ["node_output"];
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly NodeGraphRuntime _runtime;
     private readonly NodeGraphClient _client;
+    private readonly Dictionary<string, StoredDebugSession> _debugSessions = [];
     private DemoRegistrationRecord? _lastRegistration;
     private DemoSessionRecord? _lastSession;
     private DemoExecutionRecord? _lastExecution;
-    private DemoDebugRecord? _lastDebug;
+    private object? _lastDebug;
     private DemoCompletionRecord? _latestCompletion;
     private readonly List<DemoCompletionRecord> _callbackHistory = [];
 
@@ -1384,6 +1445,7 @@ internal sealed class DemoHost
                 "/api/runtime/field-options",
                 "/api/runtime/register",
                 "/api/runtime/execute",
+                "/api/runtime/debug/sessions",
                 "/api/runtime/debug/sample",
                 "/api/create-session",
                 "/api/completed",
@@ -1510,31 +1572,160 @@ internal sealed class DemoHost
     }
 
     /// <summary>
-    /// 运行一次带断点的调试样例。
+    /// 创建一个可在同一宿主进程内反复单步/继续/改断点的调试会话。
     /// </summary>
-    public async Task<DemoDebugRecord> DebugSampleAsync(string? graphMode, string? graphName)
+    public async Task<DemoDebugSessionPayload> CreateDebugSessionAsync(
+        string? graphMode,
+        string? graphName,
+        NodeGraphDocument? graph,
+        IEnumerable<string>? breakpoints)
     {
         await _gate.WaitAsync();
         try
         {
-            var graph = HelloWorldFactory.CreateGraph(graphName, graphMode);
-            var debugger = _runtime.CreateDebugger(graph, new NodeGraphExecutionOptions
+            var storedSession = CreateStoredDebugSession(ResolveGraph(graphMode, graphName, graph), breakpoints);
+            _lastDebug = BuildDebugSessionStateRecord(storedSession);
+            return ToDebugSessionPayload(storedSession);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 返回指定调试会话的当前快照；不存在时返回 <see langword="null" />。
+    /// </summary>
+    public async Task<DemoDebugSessionPayload?> GetDebugSessionAsync(string debugSessionId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            return _debugSessions.TryGetValue(debugSessionId, out var storedSession)
+                ? ToDebugSessionPayload(storedSession)
+                : null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 单步推进指定调试会话；若会话不存在则返回 <see langword="null" />。
+    /// </summary>
+    public async Task<DemoDebugSessionPayload?> StepDebugSessionAsync(string debugSessionId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (!_debugSessions.TryGetValue(debugSessionId, out var storedSession))
             {
-                Breakpoints = ["node_output"],
-            });
+                return null;
+            }
 
-            var firstStep = await debugger.StepAsync();
-            var paused = await debugger.ContinueAsync();
-            var completed = await debugger.ContinueAsync();
+            return UpdateStoredDebugSnapshot(storedSession, await storedSession.DebuggerSession.StepAsync());
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
-            _lastDebug = new DemoDebugRecord(
+    /// <summary>
+    /// 继续执行指定调试会话直到完成、命中断点或预算耗尽；若会话不存在则返回 <see langword="null" />。
+    /// </summary>
+    public async Task<DemoDebugSessionPayload?> ContinueDebugSessionAsync(string debugSessionId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (!_debugSessions.TryGetValue(debugSessionId, out var storedSession))
+            {
+                return null;
+            }
+
+            return UpdateStoredDebugSnapshot(storedSession, await storedSession.DebuggerSession.ContinueAsync());
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 使用新的节点 ID 列表整体替换指定调试会话的断点集合。
+    /// </summary>
+    public async Task<DemoDebugSessionPayload?> UpdateDebugSessionBreakpointsAsync(string debugSessionId, IEnumerable<string>? breakpoints)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (!_debugSessions.TryGetValue(debugSessionId, out var storedSession))
+            {
+                return null;
+            }
+
+            storedSession.Breakpoints = NormalizeBreakpoints(breakpoints);
+            storedSession.DebuggerSession.SetBreakpoints(storedSession.Breakpoints);
+            _lastDebug = BuildDebugSessionStateRecord(storedSession);
+            return ToDebugSessionPayload(storedSession);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 关闭并移除指定调试会话。
+    /// </summary>
+    public async Task<bool> CloseDebugSessionAsync(string debugSessionId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            return _debugSessions.Remove(debugSessionId);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 运行一次带断点的调试样例。
+    /// </summary>
+    public async Task<DemoDebugRecord> DebugSampleAsync(
+        string? graphMode,
+        string? graphName,
+        NodeGraphDocument? graph,
+        IEnumerable<string>? breakpoints)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            var resolvedGraph = ResolveGraph(graphMode, graphName, graph);
+            var resolvedMode = NormalizeGraphMode(graphMode);
+            var resolvedName = ResolveGraphName(resolvedGraph, graphName, resolvedMode);
+            var normalizedBreakpoints = NormalizeBreakpoints(breakpoints, DefaultDebugBreakpoints);
+            var storedSession = CreateStoredDebugSession(resolvedGraph, normalizedBreakpoints);
+            var firstStep = UpdateStoredDebugSnapshot(storedSession, await storedSession.DebuggerSession.StepAsync()).Snapshot;
+            var paused = UpdateStoredDebugSnapshot(storedSession, await storedSession.DebuggerSession.ContinueAsync()).Snapshot;
+            var completed = UpdateStoredDebugSnapshot(storedSession, await storedSession.DebuggerSession.ContinueAsync()).Snapshot;
+            _debugSessions.Remove(storedSession.DebugSessionId);
+
+            var record = new DemoDebugRecord(
                 DateTimeOffset.UtcNow.ToString("O"),
-                graph,
-                new[] { "node_output" },
+                resolvedMode,
+                resolvedName,
+                storedSession.Graph,
+                normalizedBreakpoints,
                 firstStep,
                 paused,
                 completed);
-            return _lastDebug;
+            _lastDebug = record;
+            return record;
         }
         finally
         {
@@ -1607,6 +1798,149 @@ internal sealed class DemoHost
             capabilities = _runtime.Capabilities,
         };
     }
+
+    /// <summary>
+    /// 将请求携带的图或 graphMode / graphName 统一解析为宿主内部图文档。
+    /// </summary>
+    private static NodeGraphDocument ResolveGraph(string? graphMode, string? graphName, NodeGraphDocument? graph)
+    {
+        return graph ?? HelloWorldFactory.CreateGraph(graphName, graphMode);
+    }
+
+    /// <summary>
+    /// 统一归一化图模式，只暴露 existing / new 两种取值。
+    /// </summary>
+    private static string NormalizeGraphMode(string? graphMode)
+    {
+        return string.Equals(graphMode, "new", StringComparison.OrdinalIgnoreCase) ? "new" : "existing";
+    }
+
+    /// <summary>
+    /// 在样例接口中补齐最终图名称，确保响应里能准确反映当前执行图。
+    /// </summary>
+    private static string ResolveGraphName(NodeGraphDocument graph, string? graphName, string graphMode)
+    {
+        if (!string.IsNullOrWhiteSpace(graphName))
+        {
+            return graphName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(graph.Name))
+        {
+            return graph.Name.Trim();
+        }
+
+        return graphMode == "new" ? "Blank Demo Showcase Graph" : "Demo Showcase Pipeline";
+    }
+
+    /// <summary>
+    /// 将传入断点列表规范化为去重、去空白的节点 ID 集合。
+    /// </summary>
+    private static List<string> NormalizeBreakpoints(IEnumerable<string>? breakpoints, IEnumerable<string>? fallback = null)
+    {
+        var normalized = new List<string>();
+        foreach (var breakpoint in breakpoints ?? fallback ?? [])
+        {
+            var value = breakpoint?.Trim();
+            if (!string.IsNullOrWhiteSpace(value) && !normalized.Contains(value, StringComparer.Ordinal))
+            {
+                normalized.Add(value);
+            }
+        }
+
+        return normalized;
+    }
+
+    /// <summary>
+    /// 创建尚未开始执行的调试快照，供新会话首次返回与断点更新复用。
+    /// </summary>
+    private static NodeGraphExecutionSnapshot CreateIdleDebugSnapshot()
+    {
+        return new NodeGraphExecutionSnapshot
+        {
+            Status = "idle",
+            PauseReason = null,
+            PendingNodeId = null,
+            LastError = null,
+            LastEvent = null,
+            Profiler = [],
+            Results = [],
+            Events = [],
+        };
+    }
+
+    /// <summary>
+    /// 创建并缓存新的宿主调试会话。
+    /// </summary>
+    private StoredDebugSession CreateStoredDebugSession(NodeGraphDocument graph, IEnumerable<string>? breakpoints)
+    {
+        var normalizedBreakpoints = NormalizeBreakpoints(breakpoints);
+        var storedSession = new StoredDebugSession
+        {
+            DebugSessionId = $"ngd_{Guid.NewGuid()}",
+            Graph = graph,
+            Breakpoints = normalizedBreakpoints,
+            Snapshot = CreateIdleDebugSnapshot(),
+            DebuggerSession = _runtime.CreateDebugger(graph, new NodeGraphExecutionOptions
+            {
+                Breakpoints = [.. normalizedBreakpoints],
+            }),
+        };
+
+        _debugSessions[storedSession.DebugSessionId] = storedSession;
+        return storedSession;
+    }
+
+    /// <summary>
+    /// 把内部调试会话投影成对外接口返回的稳定结构。
+    /// </summary>
+    private static DemoDebugSessionPayload ToDebugSessionPayload(StoredDebugSession storedSession)
+    {
+        return new DemoDebugSessionPayload(
+            storedSession.DebugSessionId,
+            storedSession.Graph,
+            storedSession.Breakpoints.ToArray(),
+            storedSession.Snapshot);
+    }
+
+    /// <summary>
+    /// 把内部调试会话投影成最近一次调试状态记录。
+    /// </summary>
+    private static DemoDebugSessionStateRecord BuildDebugSessionStateRecord(StoredDebugSession storedSession)
+    {
+        return new DemoDebugSessionStateRecord(
+            DateTimeOffset.UtcNow.ToString("O"),
+            storedSession.DebugSessionId,
+            storedSession.Graph,
+            storedSession.Breakpoints.ToArray(),
+            storedSession.Snapshot);
+    }
+
+    /// <summary>
+    /// 刷新指定调试会话的最新快照，并同步更新 `/api/results/latest` 使用的 lastDebug。
+    /// </summary>
+    private DemoDebugSessionPayload UpdateStoredDebugSnapshot(StoredDebugSession storedSession, NodeGraphExecutionSnapshot snapshot)
+    {
+        storedSession.Snapshot = snapshot;
+        _lastDebug = BuildDebugSessionStateRecord(storedSession);
+        return ToDebugSessionPayload(storedSession);
+    }
+
+    /// <summary>
+    /// 宿主进程内保存的调试会话状态。
+    /// </summary>
+    private sealed class StoredDebugSession
+    {
+        public required string DebugSessionId { get; init; }
+
+        public required NodeGraphDocument Graph { get; init; }
+
+        public required List<string> Breakpoints { get; set; }
+
+        public required NodeGraphExecutionSnapshot Snapshot { get; set; }
+
+        public required NodeGraphRuntimeDebugSession DebuggerSession { get; init; }
+    }
 }
 
 /// <summary>
@@ -1617,7 +1951,16 @@ internal sealed record RegisterRequest(bool Force);
 /// <summary>
 /// 基于图模式和图名称的请求体。
 /// </summary>
-internal sealed record GraphRequest(string? GraphMode, string? GraphName);
+internal sealed record GraphRequest(
+    string? GraphMode,
+    string? GraphName,
+    NodeGraphDocument? Graph,
+    IReadOnlyList<string>? Breakpoints);
+
+/// <summary>
+/// 断点更新接口的请求体。
+/// </summary>
+internal sealed record BreakpointsRequest(IReadOnlyList<string>? Breakpoints);
 
 /// <summary>
 /// 创建会话时的扩展请求体。
@@ -1663,11 +2006,32 @@ internal sealed record DemoExecutionRecord(
 /// </summary>
 internal sealed record DemoDebugRecord(
     string DebuggedAt,
+    string GraphMode,
+    string GraphName,
     NodeGraphDocument Graph,
     IReadOnlyList<string> Breakpoints,
     NodeGraphExecutionSnapshot FirstStep,
     NodeGraphExecutionSnapshot Paused,
     NodeGraphExecutionSnapshot Completed);
+
+/// <summary>
+/// 调试会话接口的标准返回体。
+/// </summary>
+internal sealed record DemoDebugSessionPayload(
+    string DebugSessionId,
+    NodeGraphDocument Graph,
+    IReadOnlyList<string> Breakpoints,
+    NodeGraphExecutionSnapshot Snapshot);
+
+/// <summary>
+/// `/api/results/latest` 中记录的最近一次调试会话状态。
+/// </summary>
+internal sealed record DemoDebugSessionStateRecord(
+    string DebuggedAt,
+    string DebugSessionId,
+    NodeGraphDocument Graph,
+    IReadOnlyList<string> Breakpoints,
+    NodeGraphExecutionSnapshot Snapshot);
 
 /// <summary>
 /// 最近一次编辑完成回调记录。

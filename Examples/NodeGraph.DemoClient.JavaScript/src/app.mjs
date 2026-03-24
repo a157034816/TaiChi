@@ -69,6 +69,41 @@ function createRuntimeInfo(runtime) {
   };
 }
 
+/**
+ * 构造尚未开始执行时的调试快照，占位给宿主调试接口返回。
+ */
+function createIdleDebugSnapshot() {
+  return {
+    status: "idle",
+    pauseReason: null,
+    pendingNodeId: null,
+    lastError: null,
+    lastEvent: null,
+    profiler: {},
+    results: {},
+    events: [],
+  };
+}
+
+function normalizeBreakpoints(value, fallback = []) {
+  if (!Array.isArray(value)) {
+    return [...fallback];
+  }
+
+  return value
+    .map((entry) => String(entry).trim())
+    .filter((entry, index, values) => entry && values.indexOf(entry) === index);
+}
+
+function toStoredDebugSessionPayload(session) {
+  return {
+    debugSessionId: session.debugSessionId,
+    graph: session.graph,
+    breakpoints: [...session.breakpoints],
+    snapshot: session.snapshot,
+  };
+}
+
 export function createApp({
   config = getDemoConfig(),
   state = createDemoState(),
@@ -76,6 +111,9 @@ export function createApp({
   runtime = createHelloWorldRuntime(config),
 } = {}) {
   const client = nodeGraphClient ?? createNodeGraphClient(config);
+  if (!(state.debugSessions instanceof Map)) {
+    state.debugSessions = new Map();
+  }
 
   async function registerRuntime(force = false) {
     const response = await runtime.ensureRegistered(client, { force });
@@ -88,8 +126,63 @@ export function createApp({
     return response;
   }
 
+  function createStoredDebugSession(graph, breakpoints = []) {
+    const session = {
+      debugSessionId: `ngd_${crypto.randomUUID()}`,
+      graph,
+      breakpoints: normalizeBreakpoints(breakpoints),
+      snapshot: createIdleDebugSnapshot(),
+      debuggerSession: runtime.createDebugger(graph, {
+        breakpoints: normalizeBreakpoints(breakpoints),
+      }),
+    };
+
+    state.debugSessions.set(session.debugSessionId, session);
+    return session;
+  }
+
+  function requireStoredDebugSession(debugSessionId) {
+    const stored = state.debugSessions.get(debugSessionId);
+    if (!stored) {
+      const error = new Error(`Debug session "${debugSessionId}" was not found.`);
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return stored;
+  }
+
+  function updateStoredDebugSnapshot(storedSession, snapshot) {
+    storedSession.snapshot = snapshot;
+    state.lastDebug = {
+      debuggedAt: new Date().toISOString(),
+      debugSessionId: storedSession.debugSessionId,
+      graph: storedSession.graph,
+      breakpoints: [...storedSession.breakpoints],
+      snapshot,
+    };
+
+    return toStoredDebugSessionPayload(storedSession);
+  }
+
+  async function stepStoredDebugSession(debugSessionId) {
+    const storedSession = requireStoredDebugSession(debugSessionId);
+    const snapshot = await storedSession.debuggerSession.step();
+    return updateStoredDebugSnapshot(storedSession, snapshot);
+  }
+
+  async function continueStoredDebugSession(debugSessionId) {
+    const storedSession = requireStoredDebugSession(debugSessionId);
+    const snapshot = await storedSession.debuggerSession.continue();
+    return updateStoredDebugSnapshot(storedSession, snapshot);
+  }
+
   return async function app(request, response) {
     const url = new URL(request.url ?? "/", config.demoClientBaseUrl);
+    const debugSessionRouteMatch = url.pathname.match(/^\/api\/runtime\/debug\/sessions\/([^/]+)$/);
+    const debugSessionStepMatch = url.pathname.match(/^\/api\/runtime\/debug\/sessions\/([^/]+)\/step$/);
+    const debugSessionContinueMatch = url.pathname.match(/^\/api\/runtime\/debug\/sessions\/([^/]+)\/continue$/);
+    const debugSessionBreakpointsMatch = url.pathname.match(/^\/api\/runtime\/debug\/sessions\/([^/]+)\/breakpoints$/);
 
     if (request.method === "GET" && url.pathname === "/api/health") {
       sendJson(response, 200, {
@@ -227,23 +320,107 @@ export function createApp({
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/runtime/debug/sessions") {
+      try {
+        const body = await readJsonBody(request);
+        const graphMode = normalizeGraphMode(body.graphMode);
+        const graphName = resolveGraphName(graphMode, body.graphName);
+        const graph = body.graph ?? createGraphDocument(graphName, graphMode);
+        const storedSession = createStoredDebugSession(graph, normalizeBreakpoints(body.breakpoints));
+        const payload = toStoredDebugSessionPayload(storedSession);
+
+        state.lastDebug = {
+          debuggedAt: new Date().toISOString(),
+          debugSessionId: storedSession.debugSessionId,
+          graph: storedSession.graph,
+          breakpoints: [...storedSession.breakpoints],
+          snapshot: storedSession.snapshot,
+        };
+
+        sendJson(response, 201, payload);
+      } catch (error) {
+        sendJson(response, 500, {
+          error: error instanceof Error ? error.message : "Failed to create the debug session.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "GET" && debugSessionRouteMatch) {
+      try {
+        const storedSession = requireStoredDebugSession(decodeURIComponent(debugSessionRouteMatch[1]));
+        sendJson(response, 200, toStoredDebugSessionPayload(storedSession));
+      } catch (error) {
+        sendJson(response, error?.statusCode ?? 404, {
+          error: error instanceof Error ? error.message : "Debug session not found.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "DELETE" && debugSessionRouteMatch) {
+      const debugSessionId = decodeURIComponent(debugSessionRouteMatch[1]);
+      const closed = state.debugSessions.delete(debugSessionId);
+
+      sendJson(response, closed ? 200 : 404, {
+        closed,
+      });
+      return;
+    }
+
+    if (request.method === "POST" && debugSessionStepMatch) {
+      try {
+        sendJson(response, 200, await stepStoredDebugSession(decodeURIComponent(debugSessionStepMatch[1])));
+      } catch (error) {
+        sendJson(response, error?.statusCode ?? 500, {
+          error: error instanceof Error ? error.message : "Failed to step the debug session.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "POST" && debugSessionContinueMatch) {
+      try {
+        sendJson(response, 200, await continueStoredDebugSession(decodeURIComponent(debugSessionContinueMatch[1])));
+      } catch (error) {
+        sendJson(response, error?.statusCode ?? 500, {
+          error: error instanceof Error ? error.message : "Failed to continue the debug session.",
+        });
+      }
+
+      return;
+    }
+
+    if (request.method === "PUT" && debugSessionBreakpointsMatch) {
+      try {
+        const body = await readJsonBody(request);
+        const storedSession = requireStoredDebugSession(decodeURIComponent(debugSessionBreakpointsMatch[1]));
+        storedSession.breakpoints = normalizeBreakpoints(body.breakpoints);
+        storedSession.debuggerSession.setBreakpoints(storedSession.breakpoints);
+        sendJson(response, 200, updateStoredDebugSnapshot(storedSession, storedSession.snapshot));
+      } catch (error) {
+        sendJson(response, error?.statusCode ?? 500, {
+          error: error instanceof Error ? error.message : "Failed to update debug breakpoints.",
+        });
+      }
+
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/runtime/debug/sample") {
       try {
         const body = await readJsonBody(request);
         const graphMode = normalizeGraphMode(body.graphMode);
         const graphName = resolveGraphName(graphMode, body.graphName);
         const graph = body.graph ?? createGraphDocument(graphName, graphMode);
-        const breakpoints =
-          Array.isArray(body.breakpoints) && body.breakpoints.length
-            ? body.breakpoints.map((entry) => String(entry))
-            : defaultDebugBreakpoints;
-        const debuggerSession = runtime.createDebugger(graph, {
-          breakpoints,
-        });
-
-        const firstStep = await debuggerSession.step();
-        const paused = await debuggerSession.continue();
-        const completed = await debuggerSession.continue();
+        const breakpoints = normalizeBreakpoints(body.breakpoints, defaultDebugBreakpoints);
+        const storedSession = createStoredDebugSession(graph, breakpoints);
+        const firstStep = (await stepStoredDebugSession(storedSession.debugSessionId)).snapshot;
+        const paused = (await continueStoredDebugSession(storedSession.debugSessionId)).snapshot;
+        const completed = (await continueStoredDebugSession(storedSession.debugSessionId)).snapshot;
 
         state.lastDebug = {
           debuggedAt: new Date().toISOString(),
@@ -255,6 +432,7 @@ export function createApp({
           paused,
           completed,
         };
+        state.debugSessions.delete(storedSession.debugSessionId);
 
         sendJson(response, 200, state.lastDebug);
       } catch (error) {

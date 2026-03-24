@@ -41,6 +41,7 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [refreshState, setRefreshState] = useState<"idle" | "refreshing" | "refreshed" | "error">("idle");
+  const [debugState, setDebugState] = useState<"idle" | "starting" | "error">("idle");
   const [preferences, setPreferences] = useState(DEFAULT_EDITOR_PREFERENCES);
   const availableLocales = useMemo(() => getAvailableLocaleCodes(), []);
   const i18n = useMemo(
@@ -256,6 +257,33 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
     }
   }
 
+  async function openDebugger() {
+    setDebugState("starting");
+
+    try {
+      const response = await fetch(`/api/editor/sessions/${editorPayload.session.sessionId}/debug`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          graph: buildCurrentGraphSnapshot(),
+          breakpoints: [],
+        }),
+      });
+
+      if (!response.ok) {
+        setDebugState("error");
+        return;
+      }
+
+      window.open(`/editor/${editorPayload.session.sessionId}/debug`, "_blank", "noopener,noreferrer");
+      setDebugState("idle");
+    } catch {
+      setDebugState("error");
+    }
+  }
+
   return (
     <EditorI18nProvider value={i18n}>
       <TypeColorsProvider value={typeColors}>
@@ -346,6 +374,12 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                         </span>
                       ) : null}
 
+                      {debugState === "error" ? (
+                        <span className="rounded-full border border-rose-400/20 bg-rose-500/12 px-4 py-2 text-sm text-rose-200">
+                          {i18n.text("editor.runtime.debugStartFailed")}
+                        </span>
+                      ) : null}
+
                       {saveState === "saved" ? (
                         <span
                           className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
@@ -377,6 +411,21 @@ export function NodeGraphEditor({ payload }: NodeGraphEditorProps) {
                           ? i18n.text("editor.runtime.refreshingLibrary")
                           : i18n.text("editor.runtime.refreshLibrary")}
                       </Button>
+
+                      {editorPayload.runtime.capabilities.canDebug ? (
+                        <Button
+                          className="h-12 rounded-2xl border border-sky-300/20 bg-sky-500/10 px-6 text-sky-100 hover:bg-sky-500/20"
+                          data-testid="open-debugger-button"
+                          onClick={openDebugger}
+                          size="lg"
+                          variant="outline"
+                        >
+                          <Crosshair className="size-4" />
+                          {debugState === "starting"
+                            ? i18n.text("editor.runtime.startingDebugger")
+                            : i18n.text("editor.runtime.openDebugger")}
+                        </Button>
+                      ) : null}
 
                       <Button
                         className="h-12 rounded-2xl border border-amber-300/10 bg-[linear-gradient(135deg,#ff9d1c,#ffb44c)] px-6 text-[#1d1305] shadow-[0_18px_38px_rgba(255,157,28,0.2)] hover:bg-[linear-gradient(135deg,#ffad38,#ffc261)]"
