@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net6.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <PackageId>CentralService.Client</PackageId>
+    <Title>中心服务 SDK（客户端）</Title>
+    <Description>中心服务 SDK 的客户端项目，提供服务列表、服务发现与网络评估能力。</Description>
+    <Authors>ERP</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://example.invalid/erp</RepositoryUrl>
+    <PackageTags>centralservice;service-client</PackageTags>
+    <Version>0.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Internal\ICentralServiceTransport.cs" Link="Shared\Internal\ICentralServiceTransport.cs" />
+    <Compile Include="..\Shared\Internal\CentralServiceCircuitBreakerState.cs" Link="Shared\Internal\CentralServiceCircuitBreakerState.cs" />
+    <Compile Include="..\Shared\Internal\CentralServiceTransportEndpoint.cs" Link="Shared\Internal\CentralServiceTransportEndpoint.cs" />
+    <Compile Include="..\Shared\Internal\CentralServiceMultiEndpointTransport.cs" Link="Shared\Internal\CentralServiceMultiEndpointTransport.cs" />
+    <Compile Include="..\Shared\Internal\CentralServiceHttpClientMultiEndpointTransport.cs" Link="Shared\Internal\CentralServiceHttpClientMultiEndpointTransport.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,2 @@
+[tool.centralservice-sdk]
+projects = ["service", "client"]

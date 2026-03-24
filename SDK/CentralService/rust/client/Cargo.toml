@@ -1,0 +1,12 @@
+[package]
+name = "centralservice_client"
+version = "0.1.0"
+edition = "2021"
+description = "CentralService 服务消费方 Rust SDK，用于服务列表、服务发现与网络评估。"
+
+[lib]
+name = "centralservice_client"
+path = "src/lib.rs"
+
+[dependencies]
+

@@ -1,0 +1,9 @@
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "请求参数无效",
+  "instance": "/api/Service/register",
+  "traceId": "00-00000000000000000000000000000000-0000000000000000-00"
+}
+

@@ -1,0 +1,11 @@
+{
+  "name": "@ensoai/erp-centralservice-service",
+  "version": "0.1.0",
+  "description": "CentralService 服务端 SDK（注册 / 心跳 / 注销）。",
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "license": "MIT"
+}

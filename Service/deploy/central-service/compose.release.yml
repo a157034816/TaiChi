@@ -1,0 +1,49 @@
+services:
+  centralservice:
+    image: ${CENTRALSERVICE_IMAGE:-taichi/centralservice:latest}
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:15700
+      ASPNETCORE_ENVIRONMENT: Production
+      TAICHI_CONTAINER: "true"
+      CentralServiceHttpsRedirection__Enabled: "false"
+      CentralServiceReverseProxy__Secret: ${PROXY_SECRET}
+      CentralServiceAuth__CookiePath: /
+      CentralServiceAdminSeed__Enabled: "true"
+      CentralServiceAdminSeed__AdminUsername: ${CENTRAL_ADMIN_USERNAME}
+      CentralServiceAdminSeed__AdminPassword: ${CENTRAL_ADMIN_PASSWORD}
+    ports:
+      - "15700:15700"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  admin-site:
+    image: ${ADMIN_SITE_IMAGE:-taichi/centralservice-admin-site:latest}
+    environment:
+      CENTRAL_SERVICE_BASE_URL: http://centralservice:15700
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CENTRAL_DOMAIN: ${CENTRAL_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+      PROXY_SECRET: ${PROXY_SECRET}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - centralservice
+      - admin-site
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

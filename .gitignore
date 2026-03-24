@@ -365,3 +365,5 @@ FodyWeavers.xsd
 # 手动添加
 /.idea/.idea.ERP/.idea
 target/
+Service/deploy/**/.env
+Service/deploy/**/release/
