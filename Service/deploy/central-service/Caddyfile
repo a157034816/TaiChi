@@ -1,0 +1,22 @@
+{
+    email {env.LETSENCRYPT_EMAIL}
+}
+
+{$API_DOMAIN} {
+    reverse_proxy centralservice:15700 {
+        header_up X-CentralService-Proxy-Secret {env.PROXY_SECRET}
+    }
+}
+
+{$CENTRAL_DOMAIN} {
+    @centralserviceApi path /api/*
+    handle @centralserviceApi {
+        reverse_proxy centralservice:15700 {
+            header_up X-CentralService-Proxy-Secret {env.PROXY_SECRET}
+        }
+    }
+
+    handle {
+        reverse_proxy admin-site:3000
+    }
+}

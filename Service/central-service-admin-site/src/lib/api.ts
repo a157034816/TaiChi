@@ -63,7 +63,10 @@ function isProbablyHtml(text: string) {
 }
 
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, credentials: "include" });
+  const res = await fetch(url, {
+    ...init,
+    credentials: "include",
+  });
   const json = await parseJson<T>(res);
 
   if (!json.success) {
@@ -204,7 +207,10 @@ async function parseRawJson<T>(res: Response): Promise<T> {
 }
 
 async function apiRawRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, credentials: "include" });
+  const res = await fetch(url, {
+    ...init,
+    credentials: "include",
+  });
   return await parseRawJson<T>(res);
 }
 

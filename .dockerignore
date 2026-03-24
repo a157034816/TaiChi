@@ -1,0 +1,15 @@
+.git
+.vs
+.idea
+.ace-tool
+
+**/bin
+**/obj
+
+**/node_modules
+**/.next
+**/out
+
+**/TestResults
+**/*.log
+

@@ -15,7 +15,17 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        var isContainer = string.Equals(
+            Environment.GetEnvironmentVariable("TAICHI_CONTAINER"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
         var builder = WebApplication.CreateBuilder(args);
+
+        if (isContainer)
+        {
+            builder.Configuration.AddJsonFile("appsettings.Container.json", optional: true, reloadOnChange: false);
+        }
 
         // Add services to the container.
         builder.Services.AddControllers();
@@ -25,6 +35,13 @@ public class Program
             .AddCookie(options =>
             {
                 options.Cookie.Name = builder.Configuration.GetValue<string>("CentralServiceAuth:CookieName") ?? "CentralServiceAdmin.Auth";
+
+                var cookiePath = builder.Configuration.GetValue<string?>("CentralServiceAuth:CookiePath")?.Trim();
+                if (!string.IsNullOrWhiteSpace(cookiePath))
+                {
+                    options.Cookie.Path = cookiePath;
+                }
+
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
@@ -143,6 +160,7 @@ public class Program
         });
 
         var app = builder.Build();
+        var httpsRedirectionEnabled = builder.Configuration.GetValue<bool?>("CentralServiceHttpsRedirection:Enabled") ?? true;
 
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
@@ -156,10 +174,13 @@ public class Program
             app.UseHsts();
         }
 
+        // 反向代理适配：在携带代理密钥时恢复 Scheme / 客户端 IP，避免直连伪造 X-Forwarded-* 头。
+        app.UseMiddleware<CentralServiceReverseProxyMiddleware>();
+
         // 启用跨域（默认策略 + [EnableCors] 覆盖）
         app.UseCors();
 
-        if (!app.Environment.IsDevelopment())
+        if (!app.Environment.IsDevelopment() && httpsRedirectionEnabled)
         {
             app.UseWhen(
                 CentralServiceHttpsRedirectionPolicy.ShouldApply,
