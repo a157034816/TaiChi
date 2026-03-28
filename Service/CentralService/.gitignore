@@ -1,4 +1,4 @@
-data
+/data/
 
 # CentralService runtime SQLite database
-data/*.db*
+/data/*.db*

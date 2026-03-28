@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async rewrites() {
     const centralServiceBaseUrl =
       process.env.CENTRAL_SERVICE_BASE_URL ?? "http://localhost:15700";

@@ -24,6 +24,22 @@ cd TaiChi/Service/CentralService
 dotnet run --launch-profile http
 ```
 
+### 使用 TaiChi/.tools 通用启动器
+
+如果你希望通过菜单式启动器构建并启动项目，可以在 `TaiChi` 根目录执行：
+
+```bat
+.\.tools\构建启动项目.bat
+```
+
+然后在菜单中选择 `CentralService`。
+
+补充：
+
+- 如需指定 MSBuild 路径，可设置环境变量 `TAICHI_MSBUILD_EXE`（或兼容使用 `ERP_MSBUILD_EXE`）。
+- 如需指定 Python 路径，可设置环境变量 `TAICHI_PYTHON_EXE`。
+- 如果本机暂未安装/准备 Node.js，建议用“自定义启动参数”追加 `--ManagedWebApps:Definitions:0:Enabled=false`，先禁用托管站点。
+
 ### CentralService 托管 admin site（默认启用）
 
 `TaiChi/Service/CentralService/appsettings.json` 默认启用了 `ManagedWebApps`，中心服务启动后会自动拉起并守护 `central-service-admin-site`：
@@ -96,3 +112,11 @@ npm run dev
 - `GET /api/admin/monitoring/summary`：关键指标汇总（服务数量/故障数/网络评分/后台任务状态）
 - `GET /api/admin/monitoring/health`：HealthChecks 详情（需登录且具备 `centralservice.monitoring.read` 权限）
 - `BackgroundTasks` 中的 `ManagedWebApp:central-service-admin-site`：表示前端托管进程当前健康状态
+
+## Docker / Docker Compose 一键部署
+
+如果你希望在服务器上通过 Docker 一键部署（前后端拆分容器 + Caddy 统一反代 + Let’s Encrypt 自动签证书），可参考：
+
+- `TaiChi/Service/deploy/central-service/README.md`
+- 管理站点：`https://centralservice.y-bf.lol/`
+- 独立 API：`https://api.y-bf.lol`

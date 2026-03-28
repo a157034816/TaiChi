@@ -4,6 +4,8 @@
 - 前端：Next.js（App Router）+ Tailwind CSS + shadcn/ui
 - 鉴权：通过 Next.js `rewrites` 代理到后端（同源），后端使用 Cookie Authentication
 
+本站点默认按根路径部署，通过同源 `/api/*` 代理到后端，适配 `centralservice.y-bf.lol` 这一独立管理域名。
+
 ## 环境要求
 
 - Node.js 22+（建议与仓库一致）
@@ -46,7 +48,7 @@ dotnet run --launch-profile http
 - 环境变量：`CENTRAL_SERVICE_BASE_URL=http://127.0.0.1:15700`
 - 启动前检查：若缺少 `.next/BUILD_ID`，会先执行 `npm run build`
 
-此时打开 `http://localhost:3000` 即可访问管理站点；如果前端进程异常退出，中心服务会继续尝试拉起并将状态上报到 `/api/admin/monitoring/summary`。首次启动若触发自动构建，耗时会明显长于直接启动已构建产物。
+此时打开 `http://localhost:3000/` 即可访问管理站点；如果前端进程异常退出，中心服务会继续尝试拉起并将状态上报到 `/api/admin/monitoring/summary`。首次启动若触发自动构建，耗时会明显长于直接启动已构建产物。
 
 在 Windows 上，如果 `CentralService` 自身因为崩溃或被强制结束而来不及执行正常停机逻辑，系统也会通过 `Job Object` 自动回收本前端站点及其派生子进程，避免管理站点残留为孤儿进程。
 
@@ -69,7 +71,7 @@ npm install
 npm run dev
 ```
 
-打开 `http://localhost:3000`。
+打开 `http://localhost:3000/`。
 
 ### 首次初始化（本机）
 
@@ -102,7 +104,7 @@ npm start
 - `/api/ServiceDiscovery/*`
 - `/health`
 
-浏览器侧始终请求同源的 `http://localhost:3000/...`，避免 CORS 与 SameSite 的复杂度。
+浏览器侧始终请求同源的 `http://localhost:3000/api/...` 与 `http://localhost:3000/health`，避免 CORS 与 SameSite 的复杂度。
 
 ## 安全提示
 
