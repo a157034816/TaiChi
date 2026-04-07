@@ -6,7 +6,7 @@
 
 - `LuaScriptHost`：宿主封装（`ExecuteAsync`/`ExecuteFileAsync`、全局注入等）
 - `Proxies/*`：.NET 对象/静态类型代理壳（`LuaProxyTableFactory`、`LuaStaticProxyTableFactory` 等）
-- `RemoteLuaModuleLoader`：从 `ERP.ScriptHost.WebApi` 与本地缓存加载 Lua 模块
+- `RemoteLuaModuleLoader`：从 `Lua.Script.Provider.Api` 与本地缓存加载 Lua 模块
 - `Exceptions/*`：统一异常（如 `LuaMappingException`）
 - `Attributes/LuaOverloadPreferredAttribute.cs`：代理方法重载选择提示（可选）
 
