@@ -10,7 +10,7 @@
 ### Service
 
 - `POST /api/Service/register`
-- `POST /api/Service/heartbeat`
+- `GET /api/Service/heartbeat/ws?serviceId={serviceId}`（WebSocket）
 - `DELETE /api/Service/deregister/{id}`
 
 ### Client

@@ -27,8 +27,6 @@ public final class ServiceInfo {
     public String healthCheckUrl;
     /** 健康检查端口。 */
     public int healthCheckPort;
-    /** 健康检查方式。 */
-    public String healthCheckType;
     /** 注册时间。 */
     public String registerTime;
     /** 最近一次心跳时间。 */
@@ -73,7 +71,6 @@ public final class ServiceInfo {
         s.healthCheckUrl = CentralServiceJson.asString(m.get("healthCheckUrl"));
         Integer hcp = CentralServiceJson.asIntNullable(m.get("healthCheckPort"));
         s.healthCheckPort = hcp != null ? hcp : 0;
-        s.healthCheckType = CentralServiceJson.asString(m.get("healthCheckType"));
         s.registerTime = CentralServiceJson.asString(m.get("registerTime"));
         s.lastHeartbeatTime = CentralServiceJson.asString(m.get("lastHeartbeatTime"));
         Integer w = CentralServiceJson.asIntNullable(m.get("weight"));

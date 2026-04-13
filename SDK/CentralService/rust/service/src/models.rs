@@ -63,8 +63,6 @@ pub struct ServiceRegistrationRequest {
     pub health_check_url: String,
     /// 健康检查端口；使用 `i64` 以保持与后端合同一致。
     pub health_check_port: i64,
-    /// 健康检查方式标识。
-    pub health_check_type: String,
     /// 负载均衡权重。
     pub weight: i64,
     /// 附加元数据，仅支持字符串键值。
@@ -95,10 +93,6 @@ impl ServiceRegistrationRequest {
         obj.insert(
             "healthCheckPort".to_string(),
             JsonValue::Number(JsonNumber::I64(self.health_check_port)),
-        );
-        obj.insert(
-            "healthCheckType".to_string(),
-            JsonValue::String(self.health_check_type.clone()),
         );
         obj.insert("weight".to_string(), JsonValue::Number(JsonNumber::I64(self.weight)));
 
@@ -193,8 +187,6 @@ pub struct ServiceInfo {
     pub health_check_url: String,
     /// 健康检查端口。
     pub health_check_port: i64,
-    /// 健康检查方式标识。
-    pub health_check_type: String,
     /// 注册时间文本。
     pub register_time: Option<String>,
     /// 最近一次心跳时间文本。
@@ -221,7 +213,6 @@ impl ServiceInfo {
             status: get_i64(obj, "status")?,
             health_check_url: get_string(obj, "healthCheckUrl")?,
             health_check_port: get_i64(obj, "healthCheckPort")?,
-            health_check_type: get_string(obj, "healthCheckType")?,
             register_time: get_string_opt(obj, "registerTime")?,
             last_heartbeat_time: get_string_opt(obj, "lastHeartbeatTime")?,
             weight: get_i64(obj, "weight")?,

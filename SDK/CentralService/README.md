@@ -2,7 +2,7 @@
 
 CentralService SDK 为 `TaiChi/Service/CentralService/` 提供多语言接入层，统一按 `service` 与 `client` 两类项目拆分交付：
 
-- `service`：面向服务提供方，负责注册、心跳、注销。
+- `service`：面向服务提供方，负责注册、WebSocket 心跳响应与注销。
 - `client`：面向服务消费方，负责服务列表、发现与网络状态查询/评估。
 
 当前目录版本来自 `VERSION`，当前值为 `0.1.0`。各语言的工作区文件仅用于组织双项目源码，不代表仍提供单一“聚合 SDK”入口。
@@ -11,7 +11,7 @@ CentralService SDK 为 `TaiChi/Service/CentralService/` 提供多语言接入层
 
 | 维度 | 说明 |
 | --- | --- |
-| 服务端 SDK | 封装 `POST /api/Service/register`、`POST /api/Service/heartbeat`、`DELETE /api/Service/deregister/{id}` |
+| 服务端 SDK | 封装 `POST /api/Service/register`、`GET /api/Service/heartbeat/ws`（WebSocket）、`DELETE /api/Service/deregister/{id}` |
 | 客户端 SDK | 封装 `GET /api/Service/list`、`GET /api/ServiceDiscovery/discover/*`、`GET /api/ServiceDiscovery/network/*`、`POST /api/ServiceDiscovery/network/evaluate/{serviceId}` |
 | 覆盖语言 | `.NET`、`JavaScript`、`Python`、`Java`、`Go`、`Rust` |
 | 运行时覆盖 | `.NET Framework 4.0`、`.NET Core 2.0`、`.NET 6`、`.NET 10` |
@@ -22,7 +22,7 @@ CentralService SDK 为 `TaiChi/Service/CentralService/` 提供多语言接入层
 
 ### 已包含
 
-- `service` 侧的服务注册、心跳、注销能力
+- `service` 侧的服务注册、WebSocket 心跳响应与注销能力
 - `client` 侧的服务列表、服务发现、网络状态查询与评估能力
 - 跨语言一致的契约模型、E2E 示例与打包清单
 

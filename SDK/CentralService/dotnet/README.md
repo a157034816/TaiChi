@@ -6,7 +6,7 @@
 
 `.NET` 目录按 `service` 与 `client` 两类项目拆分，并同时维护现代运行时与 `.NET Framework 4.0` 变体：
 
-- `CentralService.Service`：服务提供方接入，负责 `register`、`heartbeat`、`deregister`
+- `CentralService.Service`：服务提供方接入，负责 `register`、WebSocket 心跳响应与 `deregister`
 - `CentralService.Client`：服务消费方接入，负责 `list`、`discover`、`network`
 - `net40` 目录：为 `CentralService.Service.Net40` 与 `CentralService.Client.Net40` 提供单独源码、编译与打包入口
 

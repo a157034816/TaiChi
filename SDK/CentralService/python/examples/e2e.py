@@ -79,7 +79,7 @@ def create_registration(service_id: str) -> dict:
         "serviceType": "Web",
         "healthCheckUrl": "/health",
         "healthCheckPort": 0,
-        "healthCheckType": "Http",
+        "heartbeatIntervalSeconds": 0,
         "weight": 1,
         "metadata": {"sdk": "python", "scenario": get_scenario()},
     }
@@ -119,7 +119,6 @@ def run_smoke() -> None:
         reg = service.register(create_registration(""))
         service_id = reg["id"]
         print(f"[py][smoke] registered id={service_id}")
-        service.heartbeat(service_id)
         listed = discovery.list(get_service_name())
         assert_condition(any(item.get("id") == service_id for item in listed.get("services") or []), "list 未包含刚注册的服务")
         best = discovery.discover_best(get_service_name())
@@ -141,7 +140,6 @@ def run_service_fanout() -> None:
         for endpoint in endpoints:
             client = CentralServiceServiceClient(create_single_endpoint_options(endpoint))
             reg = client.register(create_registration(service_id))
-            client.heartbeat(reg["id"])
             sessions.append((endpoint, client, reg["id"]))
 
         for endpoint, _, registered_id in sessions:

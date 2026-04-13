@@ -70,7 +70,6 @@ public class E2EMain {
         ServiceRegistrationResponse reg = service.register(request);
         System.out.println("[java] smoke registered id=" + reg.id);
         try {
-            service.heartbeat(reg.id);
             ServiceListResponse listed = discovery.list(request.name);
             if (listed == null || listed.services == null || listed.services.length == 0) {
                 throw new IllegalStateException("smoke list 未返回服务");
@@ -103,7 +102,6 @@ public class E2EMain {
             if (!serviceId.equals(reg.id)) {
                 throw new IllegalStateException("service_fanout 注册返回了不同 serviceId endpoint=" + endpoint.baseUrl);
             }
-            client.heartbeat(serviceId);
         }
 
         for (int i = 0; i < endpoints.size(); i++) {
@@ -228,7 +226,6 @@ public class E2EMain {
             try {
                 CentralServiceServiceClient client = new CentralServiceServiceClient(singleServiceOptions(endpoints.get(i), timeoutMs));
                 ServiceRegistrationResponse reg = client.register(request);
-                client.heartbeat(reg.id);
             } catch (Exception ignored) {
             }
         }
@@ -324,7 +321,6 @@ public class E2EMain {
         request.serviceType = "Web";
         request.healthCheckUrl = "/health";
         request.healthCheckPort = 0;
-        request.healthCheckType = "Http";
         request.weight = 1;
         request.metadata = new HashMap<String, String>();
         request.metadata.put("sdk", sdkLabel);

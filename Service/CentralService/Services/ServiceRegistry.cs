@@ -22,6 +22,7 @@ namespace CentralService.Services
         private readonly ConcurrentDictionary<string, int> _roundRobinCounters = new ConcurrentDictionary<string, int>();
 
         // 服务心跳超时时间（秒）
+        // 作为最小阈值；实际超时时间会根据服务注册时的 HeartbeatIntervalSeconds 动态放大。
         private readonly int _heartbeatTimeoutSeconds = 30;
 
         // 用于线程同步的锁对象
@@ -44,7 +45,11 @@ namespace CentralService.Services
                 // 设置注册时间和心跳时间
                 serviceInfo.RegisterTime = DateTime.Now;
                 serviceInfo.LastHeartbeatTime = DateTime.Now;
-                serviceInfo.Status = 1; // 在线状态
+
+                // WebSocket 心跳模式下：
+                // - 当 HeartbeatIntervalSeconds > 0 时，注册仅表示“登记”，在线状态由心跳通道建立并成功响应后更新。
+                // - 当 HeartbeatIntervalSeconds <= 0 时，表示禁用心跳监控，注册即视为在线。
+                serviceInfo.Status = serviceInfo.HeartbeatIntervalSeconds > 0 ? 0 : 1;
 
                 // 添加或更新服务信息
                 _services[serviceInfo.Id] = serviceInfo;
@@ -133,6 +138,70 @@ namespace CentralService.Services
                 {
                     service.LastHeartbeatTime = DateTime.Now;
                     service.Status = 1; // 在线状态
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        /// <summary>
+        /// 将服务标记为离线状态（不会移除注册信息）。
+        /// </summary>
+        /// <param name="serviceId">服务ID</param>
+        /// <returns>是否更新成功</returns>
+        public bool MarkOffline(string serviceId)
+        {
+            if (string.IsNullOrEmpty(serviceId))
+                return false;
+
+            try
+            {
+                _lock.EnterReadLock();
+
+                if (_services.TryGetValue(serviceId, out ServiceInfo service))
+                {
+                    service.Status = 0; // 离线状态
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        /// <summary>
+        /// 将服务标记为故障状态（不会移除注册信息）。
+        /// </summary>
+        /// <param name="serviceId">服务ID</param>
+        /// <returns>是否更新成功</returns>
+        public bool MarkFault(string serviceId)
+        {
+            if (string.IsNullOrEmpty(serviceId))
+                return false;
+
+            try
+            {
+                _lock.EnterReadLock();
+
+                if (_services.TryGetValue(serviceId, out ServiceInfo service))
+                {
+                    service.Status = 2; // 故障状态
                     return true;
                 }
 
@@ -294,8 +363,15 @@ namespace CentralService.Services
                 // 找出超时的服务
                 foreach (var service in _services.Values)
                 {
+                    var timeoutSeconds = ResolveHeartbeatTimeoutSeconds(service);
+                    if (timeoutSeconds <= 0)
+                    {
+                        // 服务显式关闭心跳监控时，不参与超时剔除。
+                        continue;
+                    }
+
                     TimeSpan timeSinceLastHeartbeat = now - service.LastHeartbeatTime;
-                    if (timeSinceLastHeartbeat.TotalSeconds > _heartbeatTimeoutSeconds)
+                    if (timeSinceLastHeartbeat.TotalSeconds > timeoutSeconds)
                     {
                         deadServices.Add(service.Id);
                     }
@@ -311,6 +387,23 @@ namespace CentralService.Services
             {
                 DeregisterService(serviceId);
             }
+        }
+
+        private int ResolveHeartbeatTimeoutSeconds(ServiceInfo service)
+        {
+            if (service == null)
+            {
+                return _heartbeatTimeoutSeconds;
+            }
+
+            if (service.HeartbeatIntervalSeconds <= 0)
+            {
+                return 0;
+            }
+
+            // 允许短暂抖动：默认容忍连续 3 个周期未收到心跳响应。
+            var dynamicTimeoutSeconds = service.HeartbeatIntervalSeconds * 3;
+            return Math.Max(_heartbeatTimeoutSeconds, dynamicTimeoutSeconds);
         }
 
         /// <summary>

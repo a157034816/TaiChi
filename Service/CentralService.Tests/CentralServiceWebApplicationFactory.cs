@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace CentralService.Tests;
 
@@ -82,6 +84,27 @@ public sealed class CentralServiceWebApplicationFactory : WebApplicationFactory<
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Development);
+
+        // 集成测试运行在普通用户权限下时，Windows EventLog 可能因权限不足而抛异常，进而导致 Host 启动失败。
+        // 为保证测试稳定性，这里显式使用控制台/调试输出日志提供器，避免写入事件日志。
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddConsole();
+            logging.AddDebug();
+        });
+
+        // 集成测试运行在沙箱环境时，默认 DataProtection Keys 目录（LocalAppData\ASP.NET\DataProtection-Keys）可能不可写，
+        // 会导致 Cookie 登录/签名阶段抛出异常（500）。这里将 Key 持久化目录指向测试临时目录，避免依赖用户目录权限。
+        builder.ConfigureServices(services =>
+        {
+            var keyDirectory = Path.Combine(Path.GetTempPath(), "central-service-admin-tests", "data-protection-keys");
+            Directory.CreateDirectory(keyDirectory);
+
+            services.AddDataProtection()
+                .PersistKeysToFileSystem(new DirectoryInfo(keyDirectory))
+                .SetApplicationName("CentralService.Tests");
+        });
 
         builder.ConfigureAppConfiguration((context, configBuilder) =>
         {

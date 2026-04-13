@@ -301,7 +301,7 @@ public sealed class CentralServiceServiceSelector
             Status = service.Status,
             HealthCheckUrl = service.HealthCheckUrl,
             HealthCheckPort = service.HealthCheckPort,
-            HealthCheckType = service.HealthCheckType,
+            HeartbeatIntervalSeconds = service.HeartbeatIntervalSeconds,
             RegisterTime = service.RegisterTime,
             LastHeartbeatTime = service.LastHeartbeatTime,
             Weight = service.Weight,

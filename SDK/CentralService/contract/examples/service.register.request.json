@@ -6,7 +6,7 @@
   "serviceType": "Web",
   "healthCheckUrl": "/health",
   "healthCheckPort": 0,
-  "healthCheckType": "Http",
+  "heartbeatIntervalSeconds": 30,
   "weight": 1,
   "metadata": {
     "env": "dev"

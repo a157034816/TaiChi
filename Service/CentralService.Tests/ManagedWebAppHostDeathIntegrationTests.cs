@@ -141,6 +141,11 @@ public sealed class ManagedWebAppHostDeathIntegrationTests
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
         startInfo.ArgumentList.Add(assemblyPath);
+
+        // 该集成测试会以“外部进程”的方式启动中心服务。
+        // 在当前沙箱环境中，默认启用的 Windows EventLog 日志提供器会因为权限不足而抛异常，导致宿主无法正常启动。
+        // 这里显式关闭 EventLog 输出，避免日志链路异常影响功能验证。
+        AddCommandLineSetting(startInfo, "Logging:EventLog:LogLevel:Default", "None");
         AddCommandLineSetting(startInfo, "CentralServiceAdminDb:DatabaseType", "Sqlite");
         AddCommandLineSetting(startInfo, "CentralServiceAdminDb:ConnectionString", $"Data Source={dbPath}");
         AddCommandLineSetting(startInfo, "CentralServiceAdminSeed:Enabled", "true");
@@ -415,31 +420,42 @@ $child = [System.Diagnostics.Process]::Start($childStartInfo)
 Set-Content -Path $PidFile -Value $PID -Encoding UTF8
 Set-Content -Path $ChildPidFile -Value $child.Id -Encoding UTF8
 
-$listener = [System.Net.HttpListener]::new()
-$listener.Prefixes.Add("http://127.0.0.1:$Port/")
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
 $listener.Start()
 
 try {
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $buffer = [System.Text.Encoding]::UTF8.GetBytes('ok')
-        $context.Response.StatusCode = 200
-        $context.Response.ContentType = 'text/plain; charset=utf-8'
-        $context.Response.OutputStream.Write($buffer, 0, $buffer.Length)
-        $context.Response.OutputStream.Close()
-        $context.Response.Close()
+    while ($true) {
+        $client = $listener.AcceptTcpClient()
+
+        try {
+            $stream = $client.GetStream()
+            $stream.ReadTimeout = 1000
+
+            # 尝试读取并丢弃请求头，避免某些客户端在未发送/未读取时出现异常行为。
+            $buffer = New-Object byte[] 4096
+            try { $null = $stream.Read($buffer, 0, $buffer.Length) } catch { }
+
+            $body = "ok"
+            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+            $headers = "HTTP/1.1 200 OK`r`n" +
+                       "Content-Type: text/plain; charset=utf-8`r`n" +
+                       "Content-Length: $($bodyBytes.Length)`r`n" +
+                       "Connection: close`r`n`r`n"
+            $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($headers)
+            $stream.Write($headerBytes, 0, $headerBytes.Length)
+            $stream.Write($bodyBytes, 0, $bodyBytes.Length)
+        }
+        finally {
+            $client.Close()
+        }
     }
 }
 finally {
     try {
-        if ($listener.IsListening) {
-            $listener.Stop()
-        }
+        $listener.Stop()
     }
     catch {
     }
-
-    $listener.Close()
 
     try {
         if (-not $child.HasExited) {

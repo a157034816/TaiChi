@@ -58,7 +58,7 @@ function createRegistration(serviceId) {
     serviceType: "Web",
     healthCheckUrl: "/health",
     healthCheckPort: 0,
-    healthCheckType: "Http",
+    heartbeatIntervalSeconds: 0,
     weight: 1,
     metadata: { sdk: "javascript", scenario: getScenario() },
   };
@@ -85,7 +85,6 @@ function assertOptionalExpectedId(stepName, actualId) {
 async function registerOnEndpoint(endpoint, serviceId) {
   const client = new CentralServiceServiceClient(createSingleEndpointOptions(endpoint));
   const registration = await client.register(createRegistration(serviceId));
-  await client.heartbeat(registration.id);
   return { client, serviceId: registration.id };
 }
 
@@ -106,7 +105,6 @@ async function runSmoke() {
     const reg = await service.register(createRegistration(""));
     serviceId = reg.id;
     console.log("[js][smoke] registered id=" + serviceId);
-    await service.heartbeat(serviceId);
     const listed = await discovery.list(getServiceName());
     assertCondition((listed?.services || []).some((item) => item.id === serviceId), "list 未包含刚注册的服务");
     const best = await discovery.discoverBest(getServiceName());

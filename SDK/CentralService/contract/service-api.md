@@ -29,13 +29,14 @@
 - `contract/examples/service.register.request.json`
 - `contract/examples/service.register.response.json`
 
-### POST `/api/Service/heartbeat`
+### GET `/api/Service/heartbeat/ws?serviceId={serviceId}`（WebSocket）
 
-上报服务心跳。
+服务心跳 WebSocket 通道（由周边服务主动连接）。
 
-请求：`ServiceHeartbeatRequest`
+- 中心 -> 服务：Text `"heartbeat"`
+- 服务 -> 中心：Text `"heartbeat_ok"`
 
-响应：`ApiResponse<object>`
+中心服务会按注册时的 `heartbeatIntervalSeconds` 周期发送心跳请求；当该值为 `0` 时不会发送心跳请求。
 
 ### DELETE `/api/Service/deregister/{id}`
 
@@ -74,7 +75,7 @@
 - `serviceType` string，常见值：`Web` / `Socket`
 - `healthCheckUrl` string
 - `healthCheckPort` int
-- `healthCheckType` string，常见值：`Http` / `Socket`
+- `heartbeatIntervalSeconds` int，可选；中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒），为 `0` 时表示不发送
 - `weight` int
 - `metadata` object，`map<string, string>`
 
@@ -82,10 +83,6 @@
 
 - `id` string
 - `registerTimestamp` long，Unix 毫秒时间戳
-
-### ServiceHeartbeatRequest
-
-- `id` string
 
 ### ServiceInfo
 
@@ -103,7 +100,7 @@
 - `status` int
 - `healthCheckUrl` string
 - `healthCheckPort` int
-- `healthCheckType` string
+- `heartbeatIntervalSeconds` int，可选；为 `0` 时表示不发送心跳请求
 - `registerTime` string
 - `lastHeartbeatTime` string
 - `weight` int

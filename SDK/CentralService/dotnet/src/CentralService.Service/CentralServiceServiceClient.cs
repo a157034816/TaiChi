@@ -9,7 +9,7 @@ using CentralService.Shared.Internal;
 namespace CentralService.Service
 {
     /// <summary>
-    /// 提供服务注册、心跳与注销相关的中心服务客户端能力。
+    /// 提供服务注册与注销相关的中心服务客户端能力。
     /// </summary>
     public sealed class CentralServiceServiceClient : IDisposable
     {
@@ -93,41 +93,6 @@ namespace CentralService.Service
             }
 
             return parsed.Data;
-        }
-
-        /// <summary>
-        /// 向中心服务上报指定服务实例的心跳。
-        /// </summary>
-        public void Heartbeat(string serviceId)
-        {
-            if (string.IsNullOrWhiteSpace(serviceId)) throw new ArgumentNullException("serviceId");
-
-            var transport = Send(
-                "POST",
-                "/api/Service/heartbeat",
-                CentralServiceJson.Serialize(new ServiceHeartbeatRequest { Id = serviceId }));
-
-            if (!IsSuccess(transport.StatusCode))
-            {
-                throw CreateParsedError("POST", transport, CentralServiceErrorParser.Parse("POST", transport.Url, transport.StatusCode, transport.Body));
-            }
-
-            var parsed = CentralServiceJson.Deserialize<ApiResponse<object>>(transport.Body);
-            if (parsed != null && !parsed.Success)
-            {
-                throw CreateParsedError(
-                    "POST",
-                    transport,
-                    new CentralServiceError(
-                        transport.StatusCode,
-                        "POST",
-                        transport.Url,
-                        CentralServiceErrorKind.ApiResponse,
-                        parsed.ErrorMessage,
-                        parsed.ErrorCode,
-                        parsed.ErrorKey,
-                        transport.Body));
-            }
         }
 
         /// <summary>

@@ -76,7 +76,7 @@
 
 | 场景名 | 目的 | 关键验证点 | 典型测试拓扑 |
 |---|---|---|---|
-| `smoke` | 最基础的端到端冒烟验证 | `register`、`heartbeat`、`list`、`discover roundrobin`、`discover weighted`、`discover best`、`network evaluate/get/all`、`deregister` 全链路可用 | 1 个真实 CentralService |
+| `smoke` | 最基础的端到端冒烟验证 | `register`、`heartbeat(ws)`、`list`、`discover roundrobin`、`discover weighted`、`discover best`、`network evaluate/get/all`、`deregister` 全链路可用 | 1 个真实 CentralService |
 | `service_fanout` | 验证“服务端注册到所有中心”的业务语义 | 同一 `serviceId` 被注册到所有中心；各中心都能 `list/discover` 到共享实例；最终对所有中心执行清理 | 2 个真实 CentralService |
 | `transport_failover` | 验证“仅在传输层异常时切备用” | 主中心发生传输异常后，客户端切到备用中心并成功发现服务 | 主中心为 fault proxy，备用为真实 CentralService |
 | `business_no_failover` | 验证“业务失败不切备用” | 主中心返回业务失败时，客户端停留在首端点，不切到备用中心 | 2 个真实 CentralService，其中主中心没有目标服务 |
@@ -92,7 +92,7 @@
 覆盖的动作最完整，用来验证 SDK 基础能力是否整体可用：
 
 - 服务注册成功
-- 心跳成功
+- WebSocket 心跳通道可用（或按注册配置禁用心跳）
 - 服务列表查询成功
 - 三种发现策略可用：
   - 轮询发现

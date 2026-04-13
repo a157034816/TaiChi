@@ -40,7 +40,11 @@ public sealed class CentralServiceIntegrationTests
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var resp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var responseText = await resp.Content.ReadAsStringAsync();
+            Assert.Fail($"Login failed: {(int)resp.StatusCode} {resp.StatusCode}. Body: {responseText}");
+        }
 
         var body = await resp.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
         Assert.NotNull(body);
@@ -66,8 +70,8 @@ public sealed class CentralServiceIntegrationTests
             PublicIp = "95.40.60.113",
             Port = 12345,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         };
 
@@ -82,6 +86,9 @@ public sealed class CentralServiceIntegrationTests
 
         var serviceId = registerBody.Data.Id;
 
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
+
         var listResp = await client.GetAsync("/api/Service/list");
         listResp.EnsureSuccessStatusCode();
 
@@ -92,19 +99,17 @@ public sealed class CentralServiceIntegrationTests
         Assert.Equal("192.168.3.249", registered.LocalIp);
         Assert.Equal("218.71.4.73", registered.OperatorIp);
         Assert.Equal("95.40.60.113", registered.PublicIp);
-
-        var heartbeatResp = await client.PostAsJsonAsync(
-            "/api/Service/heartbeat",
-            new ServiceHeartbeatRequest { Id = serviceId });
-        Assert.Equal(HttpStatusCode.OK, heartbeatResp.StatusCode);
+        Assert.Equal(1, registered.Status);
 
         var deregisterResp = await client.DeleteAsync($"/api/Service/deregister/{serviceId}");
         Assert.Equal(HttpStatusCode.OK, deregisterResp.StatusCode);
 
-        var heartbeatAfterDeregisterResp = await client.PostAsJsonAsync(
-            "/api/Service/heartbeat",
-            new ServiceHeartbeatRequest { Id = serviceId });
-        Assert.Equal(HttpStatusCode.NotFound, heartbeatAfterDeregisterResp.StatusCode);
+        var listAfterDeregisterResp = await client.GetAsync("/api/Service/list");
+        listAfterDeregisterResp.EnsureSuccessStatusCode();
+        var listAfterDeregisterBody = await listAfterDeregisterResp.Content.ReadFromJsonAsync<ApiResponse<ServiceListResponse>>();
+        Assert.NotNull(listAfterDeregisterBody);
+        Assert.True(listAfterDeregisterBody!.Success);
+        Assert.DoesNotContain(listAfterDeregisterBody.Data.Services ?? Array.Empty<ServiceInfo>(), x => x.Id == serviceId);
     }
 
     /// <summary>
@@ -312,8 +317,8 @@ public sealed class CentralServiceIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18001,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 0,
             Weight = 1,
         };
 
@@ -326,8 +331,8 @@ public sealed class CentralServiceIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18002,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 0,
             Weight = 1,
         };
 
@@ -372,8 +377,8 @@ public sealed class CentralServiceIntegrationTests
                 PublicIp = "127.0.0.1",
                 Port = 18002,
                 ServiceType = "Web",
-                HealthCheckType = "Http",
                 HealthCheckUrl = "/health",
+                HeartbeatIntervalSeconds = 1,
                 Weight = 1,
             });
         registerResp.EnsureSuccessStatusCode();
@@ -381,6 +386,9 @@ public sealed class CentralServiceIntegrationTests
         var registerBody = await registerResp.Content.ReadFromJsonAsync<ApiResponse<ServiceRegistrationResponse>>();
         Assert.NotNull(registerBody);
         var serviceId = registerBody!.Data.Id;
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         for (var index = 0; index < 3; index++)
         {
@@ -489,8 +497,8 @@ public sealed class CentralServiceIntegrationTests
                 PublicIp = "127.0.0.1",
                 Port = 18003,
                 ServiceType = "Web",
-                HealthCheckType = "Http",
                 HealthCheckUrl = "/health",
+                HeartbeatIntervalSeconds = 0,
                 Weight = 1,
             });
         registerResp.EnsureSuccessStatusCode();

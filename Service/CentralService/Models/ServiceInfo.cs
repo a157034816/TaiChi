@@ -69,9 +69,10 @@ namespace CentralService.Models
         public int HealthCheckPort { get; set; }
 
         /// <summary>
-        /// 健康检查类型 (Http, Socket)
+        /// 中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）。
+        /// 为 0 时表示不发送心跳请求。
         /// </summary>
-        public string HealthCheckType { get; set; } = "Http";
+        public int HeartbeatIntervalSeconds { get; set; }
 
         /// <summary>
         /// 服务注册时间

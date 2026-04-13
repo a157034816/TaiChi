@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Client = CentralService.Client;
 using ClientErrors = CentralService.Client.Errors;
 using Service = CentralService.Service;
@@ -71,14 +72,18 @@ namespace CentralService.DotNetE2eShared
             EnsureEndpointCount(endpoints, 1, "smoke");
             var endpoint = endpoints[0];
             var serviceName = CreateServiceName(label, "smoke");
-            var serviceId = RegisterSingleEndpoint(endpoint, CreateRequest(label, servicePort, serviceName, null));
+            var request = CreateRequest(label, servicePort, serviceName, null);
+            request.HeartbeatIntervalSeconds = GetHeartbeatIntervalSeconds();
+            var serviceId = RegisterSingleEndpoint(endpoint, request);
             var serviceClient = CreateServiceClient(endpoint);
             var discoveryClient = CreateDiscoveryClient(endpoints);
+            HeartbeatWebSocketHandle heartbeat = null;
             try
             {
                 Console.WriteLine("[{0}] baseUrl={1}", label, endpoint.BaseUrl);
-                serviceClient.Heartbeat(serviceId);
-                Console.WriteLine("[{0}] heartbeat ok", label);
+                heartbeat = new HeartbeatWebSocketHandle(endpoint.BaseUrl, serviceId);
+                Assert(heartbeat.WaitFirstHeartbeat(TimeSpan.FromSeconds(10)), "smoke 未收到中心服务心跳请求");
+                Console.WriteLine("[{0}] websocket heartbeat ok", label);
 
                 var listed = discoveryClient.List(serviceName);
                 var listedCount = listed == null || listed.Services == null ? 0 : listed.Services.Length;
@@ -108,6 +113,11 @@ namespace CentralService.DotNetE2eShared
             }
             finally
             {
+                if (heartbeat != null)
+                {
+                    heartbeat.Dispose();
+                }
+
                 TryDeregister(serviceClient, serviceId);
                 discoveryClient.Dispose();
                 serviceClient.Dispose();
@@ -120,8 +130,10 @@ namespace CentralService.DotNetE2eShared
             var serviceName = CreateServiceName(label, "fanout");
             var sharedServiceId = CreateStableServiceId(label, "fanout");
             var request = CreateRequest(label, servicePort, serviceName, sharedServiceId);
+            request.HeartbeatIntervalSeconds = GetHeartbeatIntervalSeconds();
             var serviceClients = endpoints.Select(CreateServiceClient).ToList();
             var discoveryClients = endpoints.Select(CreateSingleEndpointDiscoveryClient).ToList();
+            var heartbeatHandles = new List<HeartbeatWebSocketHandle>();
             try
             {
                 foreach (var serviceClient in serviceClients)
@@ -131,11 +143,13 @@ namespace CentralService.DotNetE2eShared
                     Console.WriteLine("[{0}] register endpoint serviceId={1}", label, response.Id);
                 }
 
-                foreach (var serviceClient in serviceClients)
+                foreach (var endpoint in endpoints)
                 {
-                    serviceClient.Heartbeat(sharedServiceId);
+                    var handle = new HeartbeatWebSocketHandle(endpoint.BaseUrl, sharedServiceId);
+                    heartbeatHandles.Add(handle);
+                    Assert(handle.WaitFirstHeartbeat(TimeSpan.FromSeconds(10)), "service_fanout 未收到中心服务心跳请求");
                 }
-                Console.WriteLine("[{0}] fanout heartbeat ok", label);
+                Console.WriteLine("[{0}] fanout websocket heartbeat ok", label);
 
                 foreach (var discoveryClient in discoveryClients)
                 {
@@ -149,6 +163,11 @@ namespace CentralService.DotNetE2eShared
             }
             finally
             {
+                foreach (var handle in heartbeatHandles)
+                {
+                    handle.Dispose();
+                }
+
                 foreach (var serviceClient in serviceClients)
                 {
                     TryDeregister(serviceClient, sharedServiceId);
@@ -344,8 +363,8 @@ namespace CentralService.DotNetE2eShared
                 PublicIp = "127.0.0.1",
                 Port = servicePort,
                 ServiceType = "Web",
-                HealthCheckType = "Http",
                 HealthCheckUrl = "/health",
+                HeartbeatIntervalSeconds = 0,
                 Weight = 1,
                 Metadata = new Dictionary<string, string>
                 {
@@ -366,9 +385,9 @@ namespace CentralService.DotNetE2eShared
                 PublicIp = source.PublicIp,
                 Port = source.Port,
                 ServiceType = source.ServiceType,
-                HealthCheckType = source.HealthCheckType,
                 HealthCheckUrl = source.HealthCheckUrl,
                 HealthCheckPort = source.HealthCheckPort,
+                HeartbeatIntervalSeconds = source.HeartbeatIntervalSeconds,
                 Weight = source.Weight,
                 Metadata = source.Metadata == null
                     ? new Dictionary<string, string>()
@@ -463,6 +482,18 @@ namespace CentralService.DotNetE2eShared
             return TimeSpan.FromMilliseconds(milliseconds);
         }
 
+        private static int GetHeartbeatIntervalSeconds()
+        {
+            var env = Environment.GetEnvironmentVariable("CENTRAL_SERVICE_HEARTBEAT_INTERVAL_SECONDS");
+            int seconds;
+            if (!int.TryParse(env, out seconds) || seconds < 1)
+            {
+                seconds = 30;
+            }
+
+            return seconds;
+        }
+
         private static string GetBaseUrl()
         {
             var env = Environment.GetEnvironmentVariable("CENTRAL_SERVICE_BASEURL");
@@ -497,6 +528,43 @@ namespace CentralService.DotNetE2eShared
             }
             catch
             {
+            }
+        }
+
+        private sealed class HeartbeatWebSocketHandle : IDisposable
+        {
+            private readonly Service.CentralServiceHeartbeatWebSocketClient _client;
+            private readonly CancellationTokenSource _cts;
+            private readonly Task _runTask;
+            private readonly ManualResetEventSlim _firstHeartbeatReceived = new ManualResetEventSlim(false);
+
+            public HeartbeatWebSocketHandle(string baseUrl, string serviceId)
+            {
+                _client = new Service.CentralServiceHeartbeatWebSocketClient(baseUrl, serviceId, ignoreSslErrors: false);
+                _client.HeartbeatRequested += _ => _firstHeartbeatReceived.Set();
+
+                _cts = new CancellationTokenSource();
+                _runTask = Task.Run(() => _client.RunAsync(_cts.Token));
+            }
+
+            public bool WaitFirstHeartbeat(TimeSpan timeout)
+            {
+                return _firstHeartbeatReceived.Wait(timeout);
+            }
+
+            public void Dispose()
+            {
+                _cts.Cancel();
+                try
+                {
+                    _runTask.Wait(TimeSpan.FromSeconds(2));
+                }
+                catch
+                {
+                }
+
+                _cts.Dispose();
+                _firstHeartbeatReceived.Dispose();
             }
         }
 

@@ -105,7 +105,7 @@
 - `status` int（常见值：0 / 1 / 2）
 - `healthCheckUrl` string
 - `healthCheckPort` int
-- `healthCheckType` string
+- `heartbeatIntervalSeconds` int，可选；为 `0` 时表示不发送心跳请求
 - `registerTime` string
 - `lastHeartbeatTime` string
 - `weight` int

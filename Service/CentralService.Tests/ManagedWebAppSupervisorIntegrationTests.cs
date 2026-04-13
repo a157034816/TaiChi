@@ -102,7 +102,11 @@ public sealed class ManagedWebAppSupervisorIntegrationTests
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Fail($"Login failed: {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
+        }
     }
 
     /// <summary>
@@ -194,24 +198,38 @@ public sealed class ManagedWebAppSupervisorIntegrationTests
         return """
 param([int]$Port)
 
-$listener = [System.Net.HttpListener]::new()
-$listener.Prefixes.Add("http://127.0.0.1:$Port/")
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
 $listener.Start()
 
 try {
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $buffer = [System.Text.Encoding]::UTF8.GetBytes("ok")
-        $context.Response.StatusCode = 200
-        $context.Response.ContentType = "text/plain; charset=utf-8"
-        $context.Response.OutputStream.Write($buffer, 0, $buffer.Length)
-        $context.Response.OutputStream.Close()
-        $context.Response.Close()
-    }
+    while ($true) {
+        $client = $listener.AcceptTcpClient()
+
+        try {
+            $stream = $client.GetStream()
+            $stream.ReadTimeout = 1000
+
+            # 尝试读取并丢弃请求头，避免某些客户端在未发送/未读取时出现异常行为。
+            $buffer = New-Object byte[] 4096
+            try { $null = $stream.Read($buffer, 0, $buffer.Length) } catch { }
+
+            $body = "ok"
+            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+            $headers = "HTTP/1.1 200 OK`r`n" +
+                       "Content-Type: text/plain; charset=utf-8`r`n" +
+                       "Content-Length: $($bodyBytes.Length)`r`n" +
+                       "Connection: close`r`n`r`n"
+            $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($headers)
+            $stream.Write($headerBytes, 0, $headerBytes.Length)
+            $stream.Write($bodyBytes, 0, $bodyBytes.Length)
+        }
+        finally {
+            $client.Close()
+        }
+   }
 }
 finally {
     $listener.Stop()
-    $listener.Close()
 }
 """;
     }

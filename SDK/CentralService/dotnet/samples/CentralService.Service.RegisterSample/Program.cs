@@ -2,7 +2,7 @@ using CentralService.Service;
 using CentralService.Service.Models;
 
 // 用法:
-// 1) 启动中心服务（确保 /api/Service/register、/api/Service/heartbeat、/api/Service/deregister 可访问）
+// 1) 启动中心服务（确保 /api/Service/register、/api/Service/heartbeat/ws、/api/Service/deregister 可访问）
 // 2) 设置环境变量 CENTRAL_SERVICE_BASE_URL 或直接修改 baseUrl
 // 3) 运行本示例
 //
@@ -12,6 +12,7 @@ using CentralService.Service.Models;
 // - CENTRAL_SERVICE_SERVICE_OPERATOR_IP
 // - CENTRAL_SERVICE_SERVICE_PUBLIC_IP
 // - CENTRAL_SERVICE_SERVICE_PORT
+// - CENTRAL_SERVICE_HEARTBEAT_INTERVAL_SECONDS
 
 var baseUrl = Environment.GetEnvironmentVariable("CENTRAL_SERVICE_BASE_URL");
 if (string.IsNullOrWhiteSpace(baseUrl))
@@ -52,6 +53,15 @@ if (!string.IsNullOrWhiteSpace(portText)
     port = parsedPort;
 }
 
+var heartbeatIntervalSecondsText = Environment.GetEnvironmentVariable("CENTRAL_SERVICE_HEARTBEAT_INTERVAL_SECONDS");
+var heartbeatIntervalSeconds = 10;
+if (!string.IsNullOrWhiteSpace(heartbeatIntervalSecondsText)
+    && int.TryParse(heartbeatIntervalSecondsText, out var parsedHeartbeatIntervalSeconds)
+    && parsedHeartbeatIntervalSeconds >= 0)
+{
+    heartbeatIntervalSeconds = parsedHeartbeatIntervalSeconds;
+}
+
 var options = new CentralServiceSdkOptions(baseUrl)
 {
     Timeout = TimeSpan.FromSeconds(5),
@@ -74,8 +84,8 @@ try
         PublicIp = publicIp,
         Port = port,
         ServiceType = "Web",
-        HealthCheckType = "Http",
         HealthCheckUrl = "/health",
+        HeartbeatIntervalSeconds = heartbeatIntervalSeconds,
         Weight = 1,
         Metadata = new Dictionary<string, string>
         {
@@ -102,20 +112,14 @@ Console.CancelKeyPress += (_, e) =>
 
 try
 {
-    while (!cts.IsCancellationRequested)
-    {
-        try
-        {
-            client.Heartbeat(serviceId);
-            Console.WriteLine($"Heartbeat ok: {DateTimeOffset.Now:O} id={serviceId}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Heartbeat failed: {ex.Message}");
-        }
+    var heartbeatClient = new CentralServiceHeartbeatWebSocketClient(baseUrl, serviceId, ignoreSslErrors: true);
+    heartbeatClient.HeartbeatRequested += atUtc =>
+        Console.WriteLine($"Heartbeat requested: {DateTimeOffset.Now:O} ackAtUtc={atUtc:O} id={serviceId}");
 
-        await Task.Delay(TimeSpan.FromSeconds(10), cts.Token);
-    }
+    Console.WriteLine($"Heartbeat websocket: {CentralServiceHeartbeatWebSocketProtocol.HeartbeatWebSocketPath}?serviceId={serviceId}");
+    Console.WriteLine($"HeartbeatIntervalSeconds: {heartbeatIntervalSeconds}");
+
+    await heartbeatClient.RunAsync(cts.Token);
 }
 catch (OperationCanceledException)
 {

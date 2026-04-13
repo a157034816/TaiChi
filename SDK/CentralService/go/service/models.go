@@ -34,8 +34,8 @@ type ServiceRegistrationRequest struct {
 	HealthCheckUrl string `json:"healthCheckUrl"`
 	// HealthCheckPort 是健康检查端口。
 	HealthCheckPort int `json:"healthCheckPort"`
-	// HealthCheckType 表示健康检查方式。
-	HealthCheckType string `json:"healthCheckType"`
+	// HeartbeatIntervalSeconds 表示中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）；为 0 时表示不发送。
+	HeartbeatIntervalSeconds int `json:"heartbeatIntervalSeconds,omitempty"`
 	// Weight 表示加权发现时使用的权重。
 	Weight int `json:"weight"`
 	// Metadata 保存附加元数据。
@@ -82,8 +82,8 @@ type ServiceInfo struct {
 	HealthCheckUrl string `json:"healthCheckUrl"`
 	// HealthCheckPort 是健康检查端口。
 	HealthCheckPort int `json:"healthCheckPort"`
-	// HealthCheckType 表示健康检查方式。
-	HealthCheckType string `json:"healthCheckType"`
+	// HeartbeatIntervalSeconds 表示中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）；为 0 时表示不发送。
+	HeartbeatIntervalSeconds int `json:"heartbeatIntervalSeconds,omitempty"`
 	// RegisterTime 是服务注册时间。
 	RegisterTime string `json:"registerTime"`
 	// LastHeartbeatTime 是最近一次心跳时间。

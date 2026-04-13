@@ -10,7 +10,7 @@ namespace CentralService.Service
     /// 面向服务注册侧的中心服务 SDK 客户端。
     /// </summary>
     /// <remarks>
-    /// 该客户端负责调用注册、心跳与注销接口，不包含服务发现相关能力。
+    /// 该客户端负责调用注册与注销接口，不包含服务发现相关能力。
     /// 调用方需要自行保存服务 ID，并根据自身场景处理重试或续约策略。
     /// </remarks>
     public sealed class CentralServiceServiceClient : IDisposable
@@ -63,34 +63,6 @@ namespace CentralService.Service
             }
 
             return parsed.Data;
-        }
-
-        /// <summary>
-        /// 发送服务心跳。
-        /// </summary>
-        /// <param name="serviceId">已注册服务实例的唯一标识，不能为空白。</param>
-        /// <exception cref="ArgumentNullException">当 <paramref name="serviceId"/> 为空或仅包含空白字符时抛出。</exception>
-        /// <exception cref="CentralServiceException">
-        /// 当服务端返回非 2xx，或 2xx 响应体显式声明 <c>ApiResponse.success=false</c> 时抛出。
-        /// </exception>
-        public void Heartbeat(string serviceId)
-        {
-            if (string.IsNullOrWhiteSpace(serviceId)) throw new ArgumentNullException("serviceId");
-
-            var url = _http.BuildUrl("/api/Service/heartbeat");
-            var body = CentralServiceJson.Serialize(new ServiceHeartbeatRequest { Id = serviceId });
-            var resp = _http.Send("POST", url, body);
-
-            if (!IsSuccess(resp.StatusCode))
-            {
-                throw new CentralServiceException(CentralServiceErrorParser.Parse("POST", url, resp.StatusCode, resp.Body));
-            }
-
-            var parsed = CentralServiceJson.Deserialize<ApiResponse<object>>(resp.Body);
-            if (parsed != null && !parsed.Success)
-            {
-                throw new CentralServiceException(new CentralServiceError(resp.StatusCode, "POST", url, CentralServiceErrorKind.ApiResponse, parsed.ErrorMessage, parsed.ErrorCode, resp.Body));
-            }
         }
 
         /// <summary>

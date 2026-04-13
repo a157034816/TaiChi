@@ -2,7 +2,7 @@
 
 ## 定位
 
-`erp-centralservice-service` 是 CentralService SDK 的 Python 服务端接入包，对应仓库目录 `TaiChi/SDK/CentralService/python/service`，用于封装服务注册、心跳续约与注销流程。
+`erp-centralservice-service` 是 CentralService SDK 的 Python 服务端接入包，对应仓库目录 `TaiChi/SDK/CentralService/python/service`，用于封装服务注册与注销流程；心跳检测使用 WebSocket 通道。
 
 ## 包名 / 模块名
 
@@ -50,13 +50,12 @@ try:
             "serviceType": "Web",
             "healthCheckUrl": "/health",
             "healthCheckPort": 0,
-            "healthCheckType": "Http",
+            "heartbeatIntervalSeconds": 0,
             "weight": 100,
             "metadata": {"sdk": "python"},
         }
     )
 
-    client.heartbeat(registered["id"])
     client.deregister(registered["id"])
 except CentralServiceError as exc:
     print(exc)

@@ -23,8 +23,6 @@ public final class ServiceRegistrationRequest {
     public String healthCheckUrl;
     /** 健康检查端口。 */
     public int healthCheckPort;
-    /** 健康检查方式。 */
-    public String healthCheckType;
     /** 路由或调度权重。 */
     public int weight;
     /** 扩展元数据。 */
@@ -44,7 +42,6 @@ public final class ServiceRegistrationRequest {
         m.put("serviceType", serviceType);
         m.put("healthCheckUrl", healthCheckUrl);
         m.put("healthCheckPort", healthCheckPort);
-        m.put("healthCheckType", healthCheckType);
         m.put("weight", weight);
         m.put("metadata", metadata);
         return m;

@@ -36,8 +36,8 @@ internal static class Program
             PublicIp = "127.0.0.1",
             Port = 18085,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 0,
             Weight = 1,
             Metadata = new Dictionary<string, string>
             {
@@ -47,9 +47,6 @@ internal static class Program
 
         var reg = serviceClient.Register(request);
         Console.WriteLine("[net40] registered id=" + reg.Id);
-
-        serviceClient.Heartbeat(reg.Id);
-        Console.WriteLine("[net40] heartbeat ok");
 
         var list = discoveryClient.List("SdkE2E");
         var count = (list != null && list.Services != null) ? list.Services.Length : 0;

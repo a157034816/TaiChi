@@ -6,7 +6,7 @@ use centralservice_client::{
 use centralservice_service::{
     CentralServiceCircuitBreakerOptions as ServiceCircuitBreakerOptions,
     CentralServiceEndpointOptions as ServiceEndpointOptions, ServiceClient,
-    ServiceClientOptions, ServiceHeartbeatRequest, ServiceRegistrationRequest,
+    ServiceClientOptions, ServiceRegistrationRequest,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -125,12 +125,6 @@ fn run_smoke(endpoints: &[EndpointConfig], timeout: Duration) -> Result<(), Stri
     );
 
     let result = (|| -> Result<(), String> {
-        service
-            .heartbeat(&ServiceHeartbeatRequest {
-                id: response.id.clone(),
-            })
-            .map_err(|error| format!("[rust-e2e] smoke heartbeat 失败: {error}"))?;
-
         let list = discovery
             .list(Some(&request.name))
             .map_err(|error| format!("[rust-e2e] smoke list 失败: {error}"))?;
@@ -207,17 +201,6 @@ fn run_service_fanout(endpoints: &[EndpointConfig], timeout: Duration) -> Result
             response.id == shared_id,
             "service_fanout register 未复用同一 serviceId",
         )?;
-
-        service
-            .heartbeat(&ServiceHeartbeatRequest {
-                id: shared_id.clone(),
-            })
-            .map_err(|error| {
-                format!(
-                    "[rust-e2e] service_fanout heartbeat 失败: endpoint={} {error}",
-                    endpoint.base_url
-                )
-            })?;
 
         let list = discovery.list(Some(&request.name)).map_err(|error| {
             format!(
@@ -508,7 +491,6 @@ fn create_registration_request(service_name: &str) -> ServiceRegistrationRequest
         service_type: "Web".to_string(),
         health_check_url: "/health".to_string(),
         health_check_port: 0,
-        health_check_type: "Http".to_string(),
         weight: 1,
         metadata,
     }

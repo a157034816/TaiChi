@@ -42,7 +42,11 @@ public sealed class CentralServiceSdkInteropIntegrationTests
     private static async Task LoginAsync(HttpClient client, string username, string password)
     {
         var resp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync();
+            Assert.Fail($"Login failed: {(int)resp.StatusCode} {resp.StatusCode}. Body: {body}");
+        }
     }
 
     /// <summary>
@@ -109,7 +113,7 @@ public sealed class CentralServiceSdkInteropIntegrationTests
     {
         using var factory = new CentralServiceWebApplicationFactory();
         using var serviceSdk = CreateServiceSdk(factory);
-        _ = serviceSdk.Register(new CentralService.Service.Models.ServiceRegistrationRequest
+        var register = serviceSdk.Register(new CentralService.Service.Models.ServiceRegistrationRequest
         {
             Name = "SdkAccessService",
             Host = "127.0.0.1",
@@ -118,10 +122,13 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18101,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, register.Id);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         using var sdk = CreateSdk(factory, "sdk-client-ok");
         var value = await sdk.AccessAsync(
@@ -149,13 +156,16 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18301,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
 
         var serviceId = register.Id;
         Assert.False(string.IsNullOrWhiteSpace(serviceId));
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         var apiClient = factory.CreateClient(ClientOptions());
 
@@ -164,8 +174,7 @@ public sealed class CentralServiceSdkInteropIntegrationTests
         Assert.False(string.IsNullOrWhiteSpace(before.LastHeartbeatTime));
         var beforeHeartbeat = DateTimeOffset.Parse(before.LastHeartbeatTime);
 
-        await Task.Delay(100);
-        serviceSdk.Heartbeat(serviceId);
+        await Task.Delay(TimeSpan.FromSeconds(1));
 
         var afterList = await ListServiceInstancesAsync(apiClient, "SdkHeartbeatService");
         var after = Assert.Single(afterList);
@@ -198,12 +207,12 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18111,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 10,
         });
 
-        _ = serviceSdk.Register(new CentralService.Service.Models.ServiceRegistrationRequest
+        var registerB = serviceSdk.Register(new CentralService.Service.Models.ServiceRegistrationRequest
         {
             Name = "SdkFailoverService",
             Host = "127.0.0.1",
@@ -212,12 +221,17 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18112,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
 
         var serviceIdA = registerA.Id;
+
+        await using var heartbeatWsA = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, registerA.Id);
+        await using var heartbeatWsB = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, registerB.Id);
+        _ = await heartbeatWsA.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
+        _ = await heartbeatWsB.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         var adminClient = factory.CreateClient(ClientOptions());
         await LoginAsync(adminClient, factory.AdminUsername, factory.AdminPassword);
@@ -267,12 +281,15 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18401,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
 
         var serviceId = register.Id;
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         var adminClient = factory.CreateClient(ClientOptions());
         await LoginAsync(adminClient, factory.AdminUsername, factory.AdminPassword);
@@ -318,12 +335,15 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18201,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
 
         var serviceId = register.Id;
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         var adminClient = factory.CreateClient(ClientOptions());
         await LoginAsync(adminClient, factory.AdminUsername, factory.AdminPassword);
@@ -367,11 +387,14 @@ public sealed class CentralServiceSdkInteropIntegrationTests
             PublicIp = "127.0.0.1",
             Port = 18501,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 1,
             Weight = 1,
         });
         var serviceId = register.Id;
+
+        await using var heartbeatWs = await ServiceHeartbeatWebSocketTestClient.StartAsync(factory, serviceId);
+        _ = await heartbeatWs.FirstHeartbeatHandled.WaitAsync(TimeSpan.FromSeconds(2));
 
         var adminClient = factory.CreateClient(ClientOptions());
         await LoginAsync(adminClient, factory.AdminUsername, factory.AdminPassword);

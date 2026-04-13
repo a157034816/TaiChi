@@ -2,14 +2,14 @@
 
 ## 定位
 
-- 面向服务提供方的 Go SDK，用于向中心服务注册实例、发送心跳、主动注销。
+- 面向服务提供方的 Go SDK，用于向中心服务注册实例并主动注销；心跳检测使用 WebSocket 通道。
 - 发现、列表查询与网络评估能力不在当前包中，请使用 `../client/README.md`。
 
 ## 包名
 
 - Module path：`ensoai.local/centralservice-service`
 - Package name：`centralservice`
-- 主要入口类型：`Options`、`ServiceClient`、`ServiceRegistrationRequest`、`ServiceHeartbeatRequest`
+- 主要入口类型：`Options`、`ServiceClient`、`ServiceRegistrationRequest`
 
 ## 环境要求
 
@@ -58,7 +58,7 @@ func main() {
         ServiceType:     "Web",
         HealthCheckUrl:  "/health",
         HealthCheckPort: 0,
-        HealthCheckType: "Http",
+        HeartbeatIntervalSeconds: 0,
         Weight:          1,
         Metadata:        map[string]string{"sdk": "go"},
     })
@@ -66,9 +66,6 @@ func main() {
         panic(err)
     }
 
-    if err := svc.Heartbeat(ctx, reg.Id); err != nil {
-        panic(err)
-    }
     if err := svc.Deregister(ctx, reg.Id); err != nil {
         panic(err)
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
@@ -64,10 +65,11 @@ namespace CentralService.Client.Models
         public int HealthCheckPort { get; set; }
 
         /// <summary>
-        /// 获取或设置健康检查类型。
+        /// 获取或设置中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）。
+        /// 为 0 时表示不发送心跳请求。
         /// </summary>
-        [DataMember(Name = "healthCheckType", Order = 10, EmitDefaultValue = false)]
-        public string HealthCheckType { get; set; }
+        [DataMember(Name = "heartbeatIntervalSeconds", Order = 10, EmitDefaultValue = false)]
+        public int HeartbeatIntervalSeconds { get; set; }
 
         /// <summary>
         /// 获取或设置注册时间。

@@ -2,7 +2,7 @@
 
 ## 定位
 
-`@ensoai/erp-centralservice-service` 是 CentralService SDK 的 JavaScript 服务端接入包，对应仓库目录 `TaiChi/SDK/CentralService/javascript/service`，用于封装服务注册、心跳续约与注销流程。
+`@ensoai/erp-centralservice-service` 是 CentralService SDK 的 JavaScript 服务端接入包，对应仓库目录 `TaiChi/SDK/CentralService/javascript/service`，用于封装服务注册与注销流程；心跳检测使用 WebSocket 通道。
 
 ## 包名 / 模块名
 
@@ -51,12 +51,11 @@ async function main() {
       serviceType: "Web",
       healthCheckUrl: "/health",
       healthCheckPort: 0,
-      healthCheckType: "Http",
+      heartbeatIntervalSeconds: 0,
       weight: 100,
       metadata: { sdk: "javascript" },
     });
 
-    await client.heartbeat(registered.id);
     await client.deregister(registered.id);
   } catch (error) {
     if (error instanceof CentralServiceError) {

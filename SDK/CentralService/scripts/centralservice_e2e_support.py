@@ -415,7 +415,7 @@ def register_seed_service(context: ScenarioContext, endpoint_base_url: str, serv
         "serviceType": "Web",
         "healthCheckUrl": "/health",
         "healthCheckPort": 0,
-        "healthCheckType": "Http",
+        "heartbeatIntervalSeconds": 0,
         "weight": 1,
         "metadata": {"sdk": sdk_label, "scenario": context.scenario},
     }
@@ -423,7 +423,7 @@ def register_seed_service(context: ScenarioContext, endpoint_base_url: str, serv
     if not response or not response.get("success") or not response.get("data", {}).get("id"):
         raise RuntimeError(f"Failed to seed service '{service_name}' on {endpoint_base_url}")
     service_id = str(response["data"]["id"])
-    invoke_centralservice_api(endpoint_base_url, "POST", "/api/service/heartbeat", {"id": service_id})
+    # WebSocket 心跳模式下：当 heartbeatIntervalSeconds 为 0 时注册即在线，无需额外心跳请求。
     seed = SeededService(endpoint_base_url=endpoint_base_url, service_id=service_id, service_name=service_name)
     context.seeded_services.append(seed)
     return seed

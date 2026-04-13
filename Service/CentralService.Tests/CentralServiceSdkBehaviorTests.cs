@@ -246,8 +246,8 @@ public sealed class CentralServiceSdkBehaviorTests
             PublicIp = string.Empty,
             Port = 5288,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
+            HeartbeatIntervalSeconds = 0,
             Weight = 1,
             Metadata = new Dictionary<string, string>(),
         });
@@ -264,11 +264,10 @@ public sealed class CentralServiceSdkBehaviorTests
     {
         const string sharedServiceId = "shared-service-id";
         var registerBodies = new List<string>();
-        var heartbeatBodies = new List<string>();
         var deregisterPaths = new List<string>();
 
-        using var primaryServer = CreateRegistrationServer(sharedServiceId, registerBodies, heartbeatBodies, deregisterPaths);
-        using var backupServer = CreateRegistrationServer(sharedServiceId, registerBodies, heartbeatBodies, deregisterPaths);
+        using var primaryServer = CreateRegistrationServer(sharedServiceId, registerBodies, deregisterPaths);
+        using var backupServer = CreateRegistrationServer(sharedServiceId, registerBodies, deregisterPaths);
 
         var clients = new[]
         {
@@ -288,8 +287,8 @@ public sealed class CentralServiceSdkBehaviorTests
                 PublicIp = string.Empty,
                 Port = 5288,
                 ServiceType = "Web",
-                HealthCheckType = "Http",
                 HealthCheckUrl = "/health",
+                HeartbeatIntervalSeconds = 0,
                 Weight = 1,
                 Metadata = new Dictionary<string, string>(),
             };
@@ -302,7 +301,6 @@ public sealed class CentralServiceSdkBehaviorTests
 
             foreach (var client in clients)
             {
-                client.Heartbeat(sharedServiceId);
                 client.Deregister(sharedServiceId);
             }
         }
@@ -316,8 +314,6 @@ public sealed class CentralServiceSdkBehaviorTests
 
         Assert.Equal(2, registerBodies.Count);
         Assert.All(registerBodies, body => Assert.Contains(sharedServiceId, body));
-        Assert.Equal(2, heartbeatBodies.Count);
-        Assert.All(heartbeatBodies, body => Assert.Contains(sharedServiceId, body));
         Assert.Equal(2, deregisterPaths.Count);
         Assert.All(deregisterPaths, path => Assert.EndsWith("/" + sharedServiceId, path));
     }
@@ -434,7 +430,6 @@ public sealed class CentralServiceSdkBehaviorTests
     private static LoopbackHttpServer CreateRegistrationServer(
         string sharedServiceId,
         ICollection<string> registerBodies,
-        ICollection<string> heartbeatBodies,
         ICollection<string> deregisterPaths)
     {
         return new LoopbackHttpServer((request, _) =>
@@ -452,18 +447,6 @@ public sealed class CentralServiceSdkBehaviorTests
                             Id = sharedServiceId,
                             RegisterTimestamp = 123L,
                         },
-                    }));
-            }
-
-            if (request.PathAndQuery == "/api/Service/heartbeat")
-            {
-                heartbeatBodies.Add(request.Body);
-                return LoopbackHttpResponse.Json(
-                    HttpStatusCode.OK,
-                    SerializeServiceModel(new ServiceModels.ApiResponse<object>
-                    {
-                        Success = true,
-                        Data = null,
                     }));
             }
 
@@ -544,7 +527,6 @@ public sealed class CentralServiceSdkBehaviorTests
             Host = "127.0.0.1",
             Port = 5288,
             ServiceType = "Web",
-            HealthCheckType = "Http",
             HealthCheckUrl = "/health",
             Url = "http://127.0.0.1:5288",
             RegisterTime = DateTime.UtcNow.ToString("O"),

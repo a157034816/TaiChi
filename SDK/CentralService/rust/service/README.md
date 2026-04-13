@@ -2,14 +2,14 @@
 
 ## 定位
 
-- 面向服务提供方的 Rust SDK，用于注册服务实例、发送心跳、主动注销。
+- 面向服务提供方的 Rust SDK，用于注册服务实例并主动注销；心跳检测使用 WebSocket 通道。
 - 读取服务列表、执行服务发现、查询网络评估结果请使用 `../client/README.md`。
 
 ## 包名
 
 - crate：`centralservice_service`
 - 主要入口类型：`ServiceClient`
-- 主要模型：`ServiceRegistrationRequest`、`ServiceHeartbeatRequest`、`ServiceRegistrationResponse`
+- 主要模型：`ServiceRegistrationRequest`、`ServiceRegistrationResponse`
 
 ## 环境要求
 
@@ -28,7 +28,7 @@ centralservice_service = { path = "../service" }
 
 ```rust
 use centralservice_service::{
-    ServiceClient, ServiceHeartbeatRequest, ServiceRegistrationRequest,
+    ServiceClient, ServiceRegistrationRequest,
 };
 ```
 
@@ -36,7 +36,7 @@ use centralservice_service::{
 
 ```rust
 use centralservice_service::{
-    ServiceClient, ServiceHeartbeatRequest, ServiceRegistrationRequest,
+    ServiceClient, ServiceRegistrationRequest,
 };
 use std::collections::BTreeMap;
 
@@ -54,12 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         service_type: "Web".to_string(),
         health_check_url: "/health".to_string(),
         health_check_port: 0,
-        health_check_type: "Http".to_string(),
         weight: 1,
         metadata,
     })?;
 
-    service.heartbeat(&ServiceHeartbeatRequest { id: reg.id.clone() })?;
     service.deregister(&reg.id)?;
     Ok(())
 }

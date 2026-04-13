@@ -71,10 +71,6 @@ func runSmoke(timeout time.Duration, endpoints []endpointConfig) error {
 	fmt.Printf("[go] smoke registered id=%s\n", reg.Id)
 	defer safeDeregister(ctx, svc, reg.Id)
 
-	if err := svc.Heartbeat(ctx, reg.Id); err != nil {
-		return fmt.Errorf("smoke heartbeat 失败: %w", err)
-	}
-
 	listed, err := client.List(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("smoke list 失败: %w", err)
@@ -132,9 +128,6 @@ func runServiceFanout(timeout time.Duration, endpoints []endpointConfig) error {
 		}
 		if reg.Id != serviceID {
 			return fmt.Errorf("service_fanout 注册返回了不同 serviceId endpoint=%s got=%s want=%s", endpoint.BaseURL, reg.Id, serviceID)
-		}
-		if err := client.Heartbeat(ctx, serviceID); err != nil {
-			return fmt.Errorf("service_fanout heartbeat 失败 endpoint=%s: %w", endpoint.BaseURL, err)
 		}
 	}
 
@@ -332,7 +325,6 @@ func registerFanoutToHealthyEndpoints(ctx context.Context, endpoints []endpointC
 		}
 		if reg.Id == request.Id {
 			successCount++
-			_ = client.Heartbeat(ctx, reg.Id)
 		}
 	}
 	if successCount == 0 {
@@ -435,7 +427,7 @@ func newRegistrationRequest(serviceID string, sdkLabel string) servicesdk.Servic
 		ServiceType:     "Web",
 		HealthCheckUrl:  "/health",
 		HealthCheckPort: 0,
-		HealthCheckType: "Http",
+		HeartbeatIntervalSeconds: 0,
 		Weight:          1,
 		Metadata:        map[string]string{"sdk": sdkLabel},
 	}

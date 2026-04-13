@@ -158,7 +158,7 @@ def get_dotnet_package_variants(kind: str) -> list[dict[str, str]]:
     assembly_name = get_dotnet_assembly_name(kind)
     title = "CentralService Service" if kind == "service" else "CentralService Client"
     description = (
-        "CentralService service project (register/heartbeat/deregister)."
+        "CentralService service project (register/websocket-heartbeat/deregister)."
         if kind == "service"
         else "CentralService client project (list/discover/network)."
     )
@@ -309,7 +309,7 @@ def pack_python_kind(sdk_root: Path, dist_path: Path, version: str, kind: str) -
     package_dir = "erp_centralservice_service" if kind == "service" else "erp_centralservice_client"
     project_name = "erp-centralservice-service" if kind == "service" else "erp-centralservice-client"
     summary = (
-        "CentralService service project (register/heartbeat/deregister)."
+        "CentralService service project (register/websocket-heartbeat/deregister)."
         if kind == "service"
         else "CentralService client project (list/discover/network)."
     )

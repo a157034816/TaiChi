@@ -95,7 +95,7 @@ cargo run --release -p centralservice_sdk_e2e
 - `circuit_recovery`
 - `half_open_reopen`
 
-其中 `service_fanout` 会在示例层对所有端点复用同一个 `serviceId` 执行 `register / heartbeat / deregister`，SDK 本身不会自动广播注册。
+其中 `service_fanout` 会在示例层对所有端点复用同一个 `serviceId` 执行 `register / list-discover 验证 / deregister`，SDK 本身不会自动广播注册。
 
 ## 构建 / 打包 / 验证
 

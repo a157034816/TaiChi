@@ -7,7 +7,7 @@ internal static class CentralServiceServiceContractMapper
 {
     public static ServiceApiInfo ToApiModel(ServiceInfo service)
     {
-        return new ServiceApiInfo
+        var api = new ServiceApiInfo
         {
             Id = service.Id,
             Name = service.Name,
@@ -21,12 +21,14 @@ internal static class CentralServiceServiceContractMapper
             Status = service.Status,
             HealthCheckUrl = service.HealthCheckUrl,
             HealthCheckPort = service.HealthCheckPort,
-            HealthCheckType = service.HealthCheckType,
+            HeartbeatIntervalSeconds = service.HeartbeatIntervalSeconds,
             RegisterTime = service.RegisterTime == default ? null : service.RegisterTime.ToString("O"),
             LastHeartbeatTime = service.LastHeartbeatTime == default ? null : service.LastHeartbeatTime.ToString("O"),
             Weight = service.Weight,
             Metadata = service.Metadata,
             IsLocalNetwork = service.IsLocalNetwork
         };
+
+        return api;
     }
 }

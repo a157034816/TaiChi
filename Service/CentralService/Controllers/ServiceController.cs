@@ -1,5 +1,6 @@
 using CentralService.Internal;
 using CentralService.Models;
+using CentralService.Service;
 using CentralService.Service.Models;
 using CentralService.Services;
 using CentralService.Services.ServiceCircuiting;
@@ -11,6 +12,8 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Net.WebSockets;
+using System.Text;
 
 /*
  * 这个控制器负责服务的其他服务的主动注册,退出注销,均衡负载,客户端自动定向
@@ -83,9 +86,9 @@ namespace CentralService.Controllers
                     return BadRequest(ApiResponseFactory.Error<object>("无效的服务类型"));
                 }
 
-                if (!IsValidHealthCheckType(request.HealthCheckType))
+                if (request.HeartbeatIntervalSeconds < 0)
                 {
-                    return BadRequest(ApiResponseFactory.Error<object>("无效的健康检查类型"));
+                    return BadRequest(ApiResponseFactory.Error<object>("心跳频率不能小于 0"));
                 }
 
                 var isReachable = await CheckHostPortReachableAsync(localIp, request.Port);
@@ -124,7 +127,7 @@ namespace CentralService.Controllers
                     ServiceType = request.ServiceType,
                     HealthCheckUrl = BuildFullHealthCheckUrl(request, localIp),
                     HealthCheckPort = request.HealthCheckPort > 0 ? request.HealthCheckPort : request.Port,
-                    HealthCheckType = request.HealthCheckType,
+                    HeartbeatIntervalSeconds = request.HeartbeatIntervalSeconds,
                     Weight = request.Weight,
                     Metadata = request.Metadata ?? new Dictionary<string, string>(),
                 };
@@ -197,29 +200,222 @@ namespace CentralService.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Heartbeat([FromBody] ServiceHeartbeatRequest request)
         {
+            await Task.CompletedTask;
+            return StatusCode(
+                StatusCodes.Status410Gone,
+                ApiResponseFactory.Error<object>("心跳接口已废弃，请使用 WebSocket 心跳通道。", StatusCodes.Status410Gone));
+        }
+
+        /// <summary>
+        /// 服务心跳 WebSocket 通道（由周边服务主动连接）。
+        /// 中心服务会按照服务注册时的 <see cref="ServiceRegistrationRequest.HeartbeatIntervalSeconds"/> 周期向服务端发送心跳请求，
+        /// 周边服务收到请求后需回复 <see cref="CentralServiceHeartbeatWebSocketProtocol.HeartbeatResponseMessage"/>。
+        /// </summary>
+        [HttpGet("heartbeat/ws")]
+        public async Task HeartbeatWebSocket(CancellationToken cancellationToken)
+        {
+            if (!HttpContext.WebSockets.IsWebSocketRequest)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            var serviceId = HttpContext.Request.Query[CentralServiceHeartbeatWebSocketProtocol.ServiceIdQueryKey].ToString();
+            if (string.IsNullOrWhiteSpace(serviceId))
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            var service = _serviceRegistry.GetServiceById(serviceId);
+            if (service == null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var intervalSeconds = Math.Max(0, service.HeartbeatIntervalSeconds);
+            var interval = intervalSeconds <= 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(intervalSeconds);
+
+            using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
+            if (interval <= TimeSpan.Zero)
+            {
+                _serviceRegistry.UpdateHeartbeat(serviceId);
+            }
+
+            var responseTimeout = TimeSpan.FromSeconds(5);
+            var pendingAckSync = new object();
+            TaskCompletionSource<bool>? pendingAck = null;
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var linkedToken = linkedCts.Token;
+
+            var receiveTask = ReceiveHeartbeatLoopAsync(
+                serviceId,
+                webSocket,
+                () =>
+                {
+                    TaskCompletionSource<bool>? toComplete;
+                    lock (pendingAckSync)
+                    {
+                        toComplete = pendingAck;
+                    }
+
+                    toComplete?.TrySetResult(true);
+                },
+                linkedToken);
+
+            var sendTask = interval <= TimeSpan.Zero
+                ? Task.Delay(Timeout.InfiniteTimeSpan, linkedToken)
+                : SendHeartbeatLoopAsync(
+                    serviceId,
+                    webSocket,
+                    interval,
+                    responseTimeout,
+                    () =>
+                    {
+                        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        lock (pendingAckSync)
+                        {
+                            pendingAck = tcs;
+                        }
+
+                        return tcs.Task;
+                    },
+                    () =>
+                    {
+                        lock (pendingAckSync)
+                        {
+                            pendingAck = null;
+                        }
+                    },
+                    linkedToken);
+
             try
             {
-                if (request == null || string.IsNullOrEmpty(request.Id))
-                {
-                    return BadRequest(ApiResponseFactory.Error<object>("服务ID不能为空"));
-                }
-
-                var success = _serviceRegistry.UpdateHeartbeat(request.Id);
-                if (!success)
-                {
-                    return NotFound(ApiResponseFactory.Error<object>("服务不存在或心跳更新失败", 404));
-                }
-
-                await _serviceCircuitStore.TouchServiceAsync(
-                    _serviceRegistry.GetServiceById(request.Id),
-                    _serviceCircuitDefaults.Defaults);
-                return Ok(ApiResponseFactory.Success<object>(new { Message = "心跳更新成功" }));
+                await Task.WhenAny(receiveTask, sendTask).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            finally
             {
-                _logger.LogError(ex, "服务心跳更新过程中发生错误");
-                return StatusCode(500, ApiResponseFactory.Error<object>($"心跳更新失败: {ex.Message}"));
+                linkedCts.Cancel();
+
+                try
+                {
+                    await Task.WhenAll(receiveTask, sendTask).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+
+                var current = _serviceRegistry.GetServiceById(serviceId);
+                if (current == null || current.Status != 2)
+                {
+                    _serviceRegistry.MarkOffline(serviceId);
+                }
             }
+        }
+
+        private async Task ReceiveHeartbeatLoopAsync(
+            string serviceId,
+            WebSocket webSocket,
+            Action heartbeatAckReceived,
+            CancellationToken cancellationToken)
+        {
+            var buffer = new byte[4 * 1024];
+            while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+            {
+                var message = await ReceiveTextMessageAsync(webSocket, buffer, cancellationToken).ConfigureAwait(false);
+                if (message == null)
+                {
+                    return;
+                }
+
+                if (!string.Equals(message, CentralServiceHeartbeatWebSocketProtocol.HeartbeatResponseMessage, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                _serviceRegistry.UpdateHeartbeat(serviceId);
+                heartbeatAckReceived();
+            }
+        }
+
+        private async Task SendHeartbeatLoopAsync(
+            string serviceId,
+            WebSocket webSocket,
+            TimeSpan interval,
+            TimeSpan responseTimeout,
+            Func<Task> registerPendingAck,
+            Action clearPendingAck,
+            CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+            {
+                var ackTask = registerPendingAck();
+                try
+                {
+                    await SendTextMessageAsync(webSocket, CentralServiceHeartbeatWebSocketProtocol.HeartbeatRequestMessage, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch
+                {
+                    clearPendingAck();
+                    return;
+                }
+
+                try
+                {
+                    var timeoutTask = Task.Delay(responseTimeout, cancellationToken);
+                    var completed = await Task.WhenAny(ackTask, timeoutTask).ConfigureAwait(false);
+                    if (completed != ackTask)
+                    {
+                        _serviceRegistry.MarkFault(serviceId);
+                        return;
+                    }
+                }
+                finally
+                {
+                    clearPendingAck();
+                }
+
+                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private static async Task<string?> ReceiveTextMessageAsync(
+            WebSocket webSocket,
+            byte[] buffer,
+            CancellationToken cancellationToken)
+        {
+            WebSocketReceiveResult result;
+            var builder = new StringBuilder();
+
+            do
+            {
+                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken).ConfigureAwait(false);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    return null;
+                }
+
+                if (result.MessageType != WebSocketMessageType.Text)
+                {
+                    return null;
+                }
+
+                if (result.Count > 0)
+                {
+                    builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                }
+            } while (!result.EndOfMessage);
+
+            return builder.ToString();
+        }
+
+        private static Task SendTextMessageAsync(WebSocket webSocket, string message, CancellationToken cancellationToken)
+        {
+            var payload = Encoding.UTF8.GetBytes(message ?? string.Empty);
+            return webSocket.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true, cancellationToken);
         }
 
         /// <summary>
@@ -339,15 +535,6 @@ namespace CentralService.Controllers
 
             string[] validTypes = { "Web", "Socket" };
             return validTypes.Contains(serviceType, StringComparer.OrdinalIgnoreCase);
-        }
-
-        private bool IsValidHealthCheckType(string healthCheckType)
-        {
-            if (string.IsNullOrEmpty(healthCheckType))
-                return false;
-
-            string[] validTypes = { "Http", "Socket" };
-            return validTypes.Contains(healthCheckType, StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
