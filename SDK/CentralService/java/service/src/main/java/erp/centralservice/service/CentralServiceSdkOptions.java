@@ -8,13 +8,13 @@ import java.util.List;
 /**
  * Central Service 服务端 SDK 的基础配置。
  *
- * <p>配置既支持旧版单 {@code baseUrl} 构造，也支持多端点 {@code endpoints} 配置。
+ * <p>配置同时支持单 {@code baseUrl} 构造与多端点 {@code endpoints} 配置。
  * service 侧会复用相同的多端点 transport 规则，但不会自动广播注册；广播注册由上层调用方自行编排。</p>
  */
 public final class CentralServiceSdkOptions {
     private static final int DEFAULT_MAX_ATTEMPTS = 2;
 
-    /** 首个中心服务根地址，保留该属性用于兼容旧调用方式。 */
+    /** 首个中心服务根地址（与 {@link #endpoints} 的首项等价）。 */
     public final String baseUrl;
     /** 按优先级归一化后的中心服务端点列表。 */
     public final List<CentralServiceEndpointOptions> endpoints;

@@ -5,7 +5,6 @@ import erp.centralservice.service.internal.CentralServiceErrorParser;
 import erp.centralservice.service.internal.CentralServiceHttpClient;
 import erp.centralservice.service.internal.CentralServiceJson;
 import erp.centralservice.service.models.ApiResponse;
-import erp.centralservice.service.models.ServiceHeartbeatRequest;
 import erp.centralservice.service.models.ServiceRegistrationRequest;
 import erp.centralservice.service.models.ServiceRegistrationResponse;
 
@@ -53,30 +52,6 @@ public final class CentralServiceServiceClient {
                     response));
         }
         return api.data;
-    }
-
-    public void heartbeat(String serviceId) {
-        if (serviceId == null || serviceId.trim().isEmpty()) throw new IllegalArgumentException("serviceId is required");
-
-        ServiceHeartbeatRequest request = new ServiceHeartbeatRequest();
-        request.id = serviceId;
-        CentralServiceHttpClient.Response response = send(
-            "POST",
-            "/api/Service/heartbeat",
-            CentralServiceJson.stringify(request.toJson()));
-
-        ApiResponse<Object> api = parseApiResponse(response.body, new ApiResponseDataParser<Object>() {
-            @Override
-            public Object parse(Object data) {
-                return data;
-            }
-        });
-        if (api != null && !api.success) {
-            throw new CentralServiceException(
-                CentralServiceHttpClient.appendTransportContext(
-                    CentralServiceErrorParser.parse("POST", response.url, response.statusCode, response.body),
-                    response));
-        }
     }
 
     public void deregister(String serviceId) {

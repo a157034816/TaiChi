@@ -54,7 +54,6 @@ TaiChi/SDK/CentralService/
   contract/
     service-api.md
     discovery-api.md
-    centralservice-api.md
     examples/
   scripts/
     sdk.py
@@ -194,7 +193,6 @@ python -X utf8 "scripts/sdk.py" -Build -Languages "python" -SdkKinds "service"
 
 - 服务端契约：[`contract/service-api.md`](./contract/service-api.md)
 - 客户端契约：[`contract/discovery-api.md`](./contract/discovery-api.md)
-- 兼容入口：[`contract/centralservice-api.md`](./contract/centralservice-api.md)
 - 契约样例：[`contract/examples/`](./contract/examples/)
 - 服务实现基准：`TaiChi/Service/CentralService/Controllers/ServiceController.cs`
 - 发现实现基准：`TaiChi/Service/CentralService/Controllers/ServiceDiscoveryController.cs`

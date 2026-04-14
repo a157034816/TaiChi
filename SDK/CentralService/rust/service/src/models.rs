@@ -125,22 +125,6 @@ impl ServiceRegistrationResponse {
     }
 }
 
-/// 服务心跳请求。
-#[derive(Debug, Clone)]
-pub struct ServiceHeartbeatRequest {
-    /// 需要续约的服务实例 ID。
-    pub id: String,
-}
-
-impl ServiceHeartbeatRequest {
-    /// 将心跳请求序列化为 JSON 对象。
-    pub fn to_json(&self) -> JsonValue {
-        let mut obj = BTreeMap::new();
-        obj.insert("id".to_string(), JsonValue::String(self.id.clone()));
-        JsonValue::Object(obj)
-    }
-}
-
 /// 服务列表查询结果。
 #[derive(Debug, Clone)]
 pub struct ServiceListResponse {

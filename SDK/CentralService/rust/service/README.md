@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 多中心端点配置
 
-`ServiceClient::new(base_url)` 仍保留单中心兼容入口；如需统一的多中心配置模型，请使用 `ServiceClientOptions`：
+`ServiceClient::new(base_url)` 提供单中心快捷入口；如需统一的多中心配置模型，请使用 `ServiceClientOptions`：
 
 ```rust
 use centralservice_service::{

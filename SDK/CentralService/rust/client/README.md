@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 多中心端点配置
 
-`DiscoveryClient::new(base_url)` 仍保留单中心兼容入口；如需多中心、优先级、单端点最大尝试次数和熔断配置，请使用 `DiscoveryClientOptions`：
+`DiscoveryClient::new(base_url)` 提供单中心快捷入口；如需多中心、优先级、单端点最大尝试次数和熔断配置，请使用 `DiscoveryClientOptions`：
 
 ```rust
 use centralservice_client::{

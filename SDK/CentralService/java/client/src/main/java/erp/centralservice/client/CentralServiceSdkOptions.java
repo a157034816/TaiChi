@@ -8,13 +8,13 @@ import java.util.List;
 /**
  * Central Service 发现侧 SDK 的基础配置。
  *
- * <p>配置既支持旧版单 {@code baseUrl} 构造，也支持多端点 {@code endpoints} 配置。
+ * <p>配置同时支持单 {@code baseUrl} 构造与多端点 {@code endpoints} 配置。
  * discovery 侧会按优先级顺序请求端点，并在发生传输层异常时按单端点最大尝试次数与熔断状态切换备用。</p>
  */
 public final class CentralServiceSdkOptions {
     private static final int DEFAULT_MAX_ATTEMPTS = 2;
 
-    /** 首个中心服务根地址，保留该属性用于兼容旧调用方式。 */
+    /** 首个中心服务根地址（与 {@link #endpoints} 的首项等价）。 */
     public final String baseUrl;
     /** 按优先级归一化后的中心服务端点列表。 */
     public final List<CentralServiceEndpointOptions> endpoints;

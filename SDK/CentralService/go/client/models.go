@@ -44,12 +44,6 @@ type ServiceRegistrationResponse struct {
 	RegisterTimestamp int64 `json:"registerTimestamp"`
 }
 
-// ServiceHeartbeatRequest 表示心跳请求体。
-type ServiceHeartbeatRequest struct {
-	// Id 是需要续约的服务实例标识。
-	Id string `json:"id"`
-}
-
 // ServiceListResponse 表示服务列表查询结果。
 type ServiceListResponse struct {
 	// Services 包含当前查询命中的服务实例。

@@ -1,7 +1,7 @@
 //! `centralservice_client` 为服务消费方提供轻量级 Rust SDK。
 //!
 //! 该 crate 面向需要查询注册列表、执行服务发现以及读取网络评估结果的调用方。
-//! 如果调用方的职责是向中心服务注册自身、发送心跳或主动注销实例，
+//! 如果调用方的职责是向中心服务注册自身或主动注销实例，
 //! 应使用配套的 `centralservice_service` crate，而不是本 crate。
 //!
 //! 对外 API 由以下几类组成：
@@ -30,6 +30,6 @@ pub use options::{
 pub use json::{JsonNumber, JsonValue};
 /// 发现与网络评估协议使用的共享模型。
 pub use models::{
-    ApiResponse, ServiceHeartbeatRequest, ServiceInfo, ServiceListResponse,
-    ServiceNetworkStatus, ServiceRegistrationRequest, ServiceRegistrationResponse,
+    ApiResponse, ServiceInfo, ServiceListResponse, ServiceNetworkStatus, ServiceRegistrationRequest,
+    ServiceRegistrationResponse,
 };

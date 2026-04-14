@@ -6,7 +6,7 @@ import (
 	"net/url"
 )
 
-// ServiceClient 封装中心服务注册与续约相关接口。
+// ServiceClient 封装中心服务注册与注销相关接口。
 type ServiceClient struct {
 	http *httpClient
 }
@@ -38,20 +38,6 @@ func (c *ServiceClient) Register(ctx context.Context, req ServiceRegistrationReq
 		return ServiceRegistrationResponse{}, parsed
 	}
 	return api.Data, nil
-}
-
-// Heartbeat 为指定服务实例发送一次心跳续约。
-func (c *ServiceClient) Heartbeat(ctx context.Context, serviceId string) error {
-	result, err := c.http.send(ctx, "POST", "/api/Service/heartbeat", ServiceHeartbeatRequest{Id: serviceId})
-	if err != nil {
-		return newTransportError("POST", "/api/Service/heartbeat", err)
-	}
-	if result.StatusCode < 200 || result.StatusCode > 299 {
-		parsed := parseError("POST", result.URL, result.StatusCode, result.Body)
-		parsed.Message = appendTransportContext(parsed.Message, result)
-		return parsed
-	}
-	return nil
 }
 
 // Deregister 从中心服务注销指定服务实例。

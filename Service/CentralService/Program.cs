@@ -180,6 +180,9 @@ public class Program
         // 启用跨域（默认策略 + [EnableCors] 覆盖）
         app.UseCors();
 
+        // 启用 WebSocket（用于周边服务心跳通道 /api/Service/heartbeat/ws）。
+        app.UseWebSockets();
+
         if (!app.Environment.IsDevelopment() && httpsRedirectionEnabled)
         {
             app.UseWhen(

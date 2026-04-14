@@ -11,7 +11,7 @@ namespace CentralService.Service
     /// </summary>
     /// <remarks>
     /// 该客户端负责调用注册与注销接口，不包含服务发现相关能力。
-    /// 调用方需要自行保存服务 ID，并根据自身场景处理重试或续约策略。
+    /// 调用方需要自行保存服务 ID，并根据自身场景处理重试策略；心跳机制使用 WebSocket 通道，本客户端不提供 HTTP 心跳接口。
     /// </remarks>
     public sealed class CentralServiceServiceClient : IDisposable
     {

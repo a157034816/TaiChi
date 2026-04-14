@@ -26,7 +26,7 @@ namespace CentralService.Client.Internal
 
             if (ignoreSslErrors)
             {
-                // 旧版 HttpWebRequest 只能通过全局证书回调忽略校验，SDK 保持该行为以兼容现有调用方式。
+                // HttpWebRequest 只能通过全局证书回调忽略校验，这里沿用该方式以保持现有行为一致。
                 ServicePointManager.ServerCertificateValidationCallback += delegate { return true; };
             }
         }

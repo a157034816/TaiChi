@@ -2,7 +2,7 @@ use crate::error::{Result, SdkError};
 use crate::http::url_encode_component;
 use crate::json::JsonValue;
 use crate::models::{
-    ApiResponse, ServiceHeartbeatRequest, ServiceRegistrationRequest,
+    ApiResponse, ServiceRegistrationRequest,
     ServiceRegistrationResponse,
 };
 use crate::options::ServiceClientOptions;
@@ -10,7 +10,7 @@ use crate::transport::{MultiEndpointTransport, TransportResponse};
 
 /// 面向服务提供方的中心服务客户端。
 ///
-/// 该类型负责调用注册、心跳和注销接口，不包含服务发现相关能力。
+/// 该类型负责调用注册与注销接口，不包含服务发现相关能力。
 #[derive(Debug, Clone)]
 pub struct ServiceClient {
     transport: MultiEndpointTransport,
@@ -43,19 +43,6 @@ impl ServiceClient {
         )?;
         parse_api_response(&response, ServiceRegistrationResponse::from_json)
             .and_then(|api| ok_or_api_error(api, "register", &response))
-    }
-
-    /// 发送服务心跳。
-    pub fn heartbeat(&self, request: &ServiceHeartbeatRequest) -> Result<ApiResponse<JsonValue>> {
-        let body = request.to_json().to_string();
-        let response = self.transport.send(
-            "POST",
-            "/api/Service/heartbeat",
-            Some(body.as_bytes()),
-            Some("application/json"),
-        )?;
-        let api = parse_api_response(&response, |value| Ok(value.clone()))?;
-        ensure_api_success(api, "heartbeat", &response)
     }
 
     /// 按服务实例 ID 注销一个已注册的节点。

@@ -193,20 +193,6 @@ namespace CentralService.Controllers
         }
 
         /// <summary>
-        /// 服务心跳
-        /// </summary>
-        [HttpPost("heartbeat")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Heartbeat([FromBody] ServiceHeartbeatRequest request)
-        {
-            await Task.CompletedTask;
-            return StatusCode(
-                StatusCodes.Status410Gone,
-                ApiResponseFactory.Error<object>("心跳接口已废弃，请使用 WebSocket 心跳通道。", StatusCodes.Status410Gone));
-        }
-
-        /// <summary>
         /// 服务心跳 WebSocket 通道（由周边服务主动连接）。
         /// 中心服务会按照服务注册时的 <see cref="ServiceRegistrationRequest.HeartbeatIntervalSeconds"/> 周期向服务端发送心跳请求，
         /// 周边服务收到请求后需回复 <see cref="CentralServiceHeartbeatWebSocketProtocol.HeartbeatResponseMessage"/>。

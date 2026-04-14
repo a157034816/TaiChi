@@ -44,7 +44,7 @@ namespace CentralService.Client
         }
 
         /// <summary>
-        /// 获取首个中心服务根地址，保留该属性用于兼容旧调用方式。
+        /// 获取首个中心服务根地址（与 <see cref="Endpoints"/> 的首项等价）。
         /// </summary>
         public string BaseUrl { get; private set; }
 

@@ -34,7 +34,7 @@ namespace CentralService.Shared.Internal
 
             if (ignoreSslErrors)
             {
-                // 保持与旧版 SDK 一致：在需要忽略证书错误时使用全局回调。
+                // 保持与既有 SDK 行为一致：在需要忽略证书错误时使用全局回调。
                 ServicePointManager.ServerCertificateValidationCallback += delegate { return true; };
             }
         }

@@ -59,12 +59,6 @@ class CentralServiceServiceClient:
             raise create_parsed_error("POST", transport, parse_error("POST", transport.url, transport.status_code, transport.body_text))
         return api.get("data")
 
-    def heartbeat(self, service_id: str) -> None:
-        transport = self._send("POST", "/api/Service/heartbeat", {"id": service_id})
-        api = json.loads(transport.body_text or "{}")
-        if "success" in api and not api.get("success"):
-            raise create_parsed_error("POST", transport, parse_error("POST", transport.url, transport.status_code, transport.body_text))
-
     def deregister(self, service_id: str) -> None:
         self._send("DELETE", f"/api/Service/deregister/{urllib.parse.quote(service_id)}", None)
 

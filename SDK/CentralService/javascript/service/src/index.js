@@ -38,14 +38,6 @@ class CentralServiceServiceClient {
     return apiResponse.data;
   }
 
-  async heartbeat(serviceId) {
-    const transport = await this.#send("POST", "/api/Service/heartbeat", { id: serviceId });
-    const apiResponse = JSON.parse(transport.bodyText || "{}");
-    if (apiResponse && Object.prototype.hasOwnProperty.call(apiResponse, "success") && apiResponse.success === false) {
-      throw createParsedError("POST", transport, parseError("POST", transport.url, transport.statusCode, transport.bodyText));
-    }
-  }
-
   async deregister(serviceId) {
     await this.#send("DELETE", "/api/Service/deregister/" + encodeURIComponent(serviceId), null);
   }
