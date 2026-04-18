@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputDirectory = "release",
     [string]$CentralServiceSourceImage = "central-service-centralservice:latest",
     [string]$AdminSiteSourceImage = "central-service-admin-site:latest",
