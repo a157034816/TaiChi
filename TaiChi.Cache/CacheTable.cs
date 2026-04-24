@@ -33,6 +33,16 @@ namespace TaiChi.Cache
         private readonly Dictionary<TPk, TEntity> _byKey = new Dictionary<TPk, TEntity>();
 
         /// <summary>
+        /// 缓存的只读快照（写入时失效）。
+        /// </summary>
+        /// <remarks>
+        /// 设计意图：为高频读取路径提供“稳定引用”的列表快照，避免每次读取都复制 <see cref="_items"/>。
+        /// - 快照只复制列表结构（顺序/数量），不对实体对象做深拷贝；
+        /// - 一旦表发生结构性变更（增删改/重排），需要将快照失效并在下次读取时重建。
+        /// </remarks>
+        private IReadOnlyList<TEntity>? _cachedSnapshot;
+
+        /// <summary>
         /// 本地记录的最大更新时间（用于增量拉取阈值）。
         /// </summary>
         public DateTimeOffset? LastMaxUpdatedAt { get; set; }
@@ -61,6 +71,33 @@ namespace TaiChi.Cache
         /// 按主键有序的实体列表（只读视图）。
         /// </summary>
         public IReadOnlyList<TEntity> Items => _items;
+
+        /// <summary>
+        /// 获取或创建当前表的只读快照。
+        /// </summary>
+        /// <remarks>
+        /// - 首次调用或快照失效后，会复制当前 <see cref="_items"/> 并返回只读包装；
+        /// - 在表未发生结构性变更期间，会复用同一快照引用，避免高频分配。
+        /// </remarks>
+        public IReadOnlyList<TEntity> GetOrCreateSnapshot()
+        {
+            if (_cachedSnapshot != null)
+            {
+                return _cachedSnapshot;
+            }
+
+            var copy = new List<TEntity>(_items);
+            _cachedSnapshot = copy.AsReadOnly();
+            return _cachedSnapshot;
+        }
+
+        /// <summary>
+        /// 使缓存的只读快照失效。
+        /// </summary>
+        private void InvalidateSnapshot()
+        {
+            _cachedSnapshot = null;
+        }
 
         /// <summary>
         /// 按升序排列的主键列表（只读视图）。
@@ -97,6 +134,7 @@ namespace TaiChi.Cache
             _items.Clear();
             _keys.Clear();
             _byKey.Clear();
+            InvalidateSnapshot();
             FullSnapshotReady = false;
             LastMaxUpdatedAt = null;
             LastDeleteCheckAt = null;
@@ -119,6 +157,8 @@ namespace TaiChi.Cache
                 _keys.RemoveAt(index);
                 _items.RemoveAt(index);
             }
+
+            InvalidateSnapshot();
         }
 
         /// <summary>
@@ -182,6 +222,7 @@ namespace TaiChi.Cache
             {
                 _items[index] = entity;
                 _byKey[key] = entity;
+                InvalidateSnapshot();
                 return;
             }
 
@@ -189,6 +230,7 @@ namespace TaiChi.Cache
             _keys.Insert(insertIndex, key);
             _items.Insert(insertIndex, entity);
             _byKey[key] = entity;
+            InvalidateSnapshot();
 
             InsertsSinceReorder++;
             if (reorderThreshold > 0 && InsertsSinceReorder >= reorderThreshold)
@@ -207,6 +249,8 @@ namespace TaiChi.Cache
                 InsertsSinceReorder = 0;
                 return;
             }
+
+            InvalidateSnapshot();
 
             var pairs = new List<KeyValuePair<TPk, TEntity>>(_byKey.Count);
             foreach (var kv in _byKey)

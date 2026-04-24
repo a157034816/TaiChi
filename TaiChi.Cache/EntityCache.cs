@@ -245,7 +245,7 @@ namespace TaiChi.Cache
             _rwLock.EnterReadLock();
             try
             {
-                return table.Items.ToList();
+                return table.GetOrCreateSnapshot();
             }
             finally
             {
@@ -645,6 +645,34 @@ namespace TaiChi.Cache
             var table = GetOrCreateTable();
 
             int localCount;
+            DateTimeOffset? last;
+
+            _rwLock.EnterReadLock();
+            try
+            {
+                localCount = table.Count;
+                last = table.LastDeleteCheckAt;
+            }
+            finally
+            {
+                _rwLock.ExitReadLock();
+            }
+
+            // 初次/空缓存时不做删除校验：由“count不一致→补齐/刷新”流程接管。
+            if (localCount == 0)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+
+            if (last != null && _config.DeleteCheckInterval > TimeSpan.Zero && now - last < _config.DeleteCheckInterval)
+            {
+                return;
+            }
+
+            table.LastDeleteCheckAt = now;
+
             TPk? localMin;
             TPk? localMax;
 
@@ -659,21 +687,11 @@ namespace TaiChi.Cache
                 _rwLock.ExitReadLock();
             }
 
-            // 初次/空缓存时不做删除校验：由“count不一致→补齐/刷新”流程接管。
+            // 删除校验开始后，本地可能被刷新/清空；此时无需继续校验。
             if (localCount == 0)
             {
                 return;
             }
-
-            var now = DateTimeOffset.UtcNow;
-            var last = table.LastDeleteCheckAt;
-
-            if (last != null && _config.DeleteCheckInterval > TimeSpan.Zero && now - last < _config.DeleteCheckInterval)
-            {
-                return;
-            }
-
-            table.LastDeleteCheckAt = now;
 
             var remoteStats = await GetRemoteStatsAsync(_config.NotDeletedPredicate, ct).ConfigureAwait(false);
 

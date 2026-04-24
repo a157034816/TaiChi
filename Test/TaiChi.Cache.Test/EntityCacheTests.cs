@@ -306,6 +306,55 @@ namespace TaiChi.Cache.Test
         }
 
         /// <summary>
+        /// 验证：<see cref="EntityCache{TEntity, TPk}.GetLocalSnapshot"/> 会缓存只读快照引用，且在表发生变更后失效并重建。
+        /// </summary>
+        /// <remarks>
+        /// 该行为用于高频本地读取场景：
+        /// - 连续读取不应重复分配整表列表；
+        /// - 写入/刷新后应返回新快照，同时旧快照内容保持不变。
+        /// </remarks>
+        [Fact]
+        public async Task GetLocalSnapshot_CachesSnapshotReference_AndInvalidatesOnMutation()
+        {
+            var fusionCache = CreateFusionCache();
+            var remote = new FakeRemoteStore<TestEntity, int>(x => x.Id, x => x.UpdatedAt);
+            remote.Seed(new TestEntity(1, "alpha"), new TestEntity(2, "beta"));
+
+            var db = CreateDb(
+                fusionCache,
+                options =>
+                {
+                    options.DeleteCheckInterval = TimeSpan.FromSeconds(-1);
+                }
+            );
+
+            var cache = db.For<TestEntity, int>(remote, opt => opt.WithPrimaryKey(x => x.Id));
+
+            await cache.RefreshAsync(CacheRefreshMode.Full);
+
+            var snapshot1 = cache.GetLocalSnapshot();
+            var snapshot2 = cache.GetLocalSnapshot();
+
+            Assert.Same(snapshot1, snapshot2);
+            Assert.Equal(new[] { 1, 2 }, snapshot1.Select(x => x.Id).ToArray());
+            Assert.Equal(new[] { "alpha", "beta" }, snapshot1.Select(x => x.Name).ToArray());
+
+            remote.Seed(new TestEntity(1, "alpha2"), new TestEntity(2, "beta"), new TestEntity(3, "gamma"));
+
+            await cache.RefreshAsync(CacheRefreshMode.Full);
+
+            var snapshot3 = cache.GetLocalSnapshot();
+
+            Assert.NotSame(snapshot1, snapshot3);
+            Assert.Equal(new[] { 1, 2, 3 }, snapshot3.Select(x => x.Id).ToArray());
+            Assert.Equal(new[] { "alpha2", "beta", "gamma" }, snapshot3.Select(x => x.Name).ToArray());
+
+            // 旧快照应保持不变（不随刷新后的表内容改变）。
+            Assert.Equal(new[] { 1, 2 }, snapshot1.Select(x => x.Id).ToArray());
+            Assert.Equal(new[] { "alpha", "beta" }, snapshot1.Select(x => x.Name).ToArray());
+        }
+
+        /// <summary>
         /// 验证：当实体级别覆盖启用远端统计复用窗口时，同一谓词的 stats 查询会在窗口内被复用。
         /// </summary>
         [Fact]
