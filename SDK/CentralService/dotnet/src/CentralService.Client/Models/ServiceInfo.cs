@@ -71,52 +71,33 @@ namespace CentralService.Client.Models
         public int Status { get; set; }
 
         /// <summary>
-        /// 获取或设置健康检查地址。
-        /// </summary>
-        [DataMember(Name = "healthCheckUrl", Order = 11, EmitDefaultValue = false)]
-        public string HealthCheckUrl { get; set; }
-
-        /// <summary>
-        /// 获取或设置健康检查端口。
-        /// </summary>
-        [DataMember(Name = "healthCheckPort", Order = 12, EmitDefaultValue = false)]
-        public int HealthCheckPort { get; set; }
-
-        /// <summary>
-        /// 获取或设置中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）。
-        /// 为 0 时表示不发送心跳请求。
-        /// </summary>
-        [DataMember(Name = "heartbeatIntervalSeconds", Order = 13, EmitDefaultValue = false)]
-        public int HeartbeatIntervalSeconds { get; set; }
-
-        /// <summary>
         /// 获取或设置注册时间。
         /// </summary>
-        [DataMember(Name = "registerTime", Order = 14, EmitDefaultValue = false)]
+        [DataMember(Name = "registerTime", Order = 11, EmitDefaultValue = false)]
         public string RegisterTime { get; set; }
 
         /// <summary>
         /// 获取或设置最近一次心跳时间。
         /// </summary>
-        [DataMember(Name = "lastHeartbeatTime", Order = 15, EmitDefaultValue = false)]
+        [DataMember(Name = "lastHeartbeatTime", Order = 12, EmitDefaultValue = false)]
         public string LastHeartbeatTime { get; set; }
 
         /// <summary>
         /// 获取或设置负载均衡权重。
         /// </summary>
-        [DataMember(Name = "weight", Order = 16, EmitDefaultValue = false)]
+        [DataMember(Name = "weight", Order = 13, EmitDefaultValue = false)]
         public int Weight { get; set; }
 
         /// <summary>
         /// 获取或设置附加元数据。
         /// </summary>
-        [DataMember(Name = "metadata", Order = 17, EmitDefaultValue = false)]
+        [DataMember(Name = "metadata", Order = 14, EmitDefaultValue = false)]
         public Dictionary<string, string> Metadata { get; set; }
 
         /// <summary>
         /// 获取或设置该服务是否位于本地网络。
         /// </summary>
-        [DataMember(Name = "isLocalNetwork", Order = 18, EmitDefaultValue = false)]
+        [DataMember(Name = "isLocalNetwork", Order = 15, EmitDefaultValue = false)]
         public bool IsLocalNetwork { get; set; }
     }
 }

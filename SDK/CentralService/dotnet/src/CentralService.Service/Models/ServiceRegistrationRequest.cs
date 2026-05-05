@@ -59,18 +59,6 @@ namespace CentralService.Service.Models
         public string ServiceType { get; set; } = "Web";
 
         /// <summary>
-        /// 获取或设置健康检查地址。
-        /// </summary>
-        [DataMember(Name = "healthCheckUrl", Order = 9, EmitDefaultValue = false)]
-        public string HealthCheckUrl { get; set; } = string.Empty;
-
-        /// <summary>
-        /// 获取或设置健康检查端口。
-        /// </summary>
-        [DataMember(Name = "healthCheckPort", Order = 10, EmitDefaultValue = false)]
-        public int HealthCheckPort { get; set; }
-
-        /// <summary>
         /// 获取或设置中心服务通过 WebSocket 向该服务发送心跳请求的频率（秒）。
         /// 为 0 时表示不发送心跳请求。
         /// </summary>
