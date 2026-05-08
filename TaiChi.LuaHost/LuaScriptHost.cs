@@ -10,6 +10,7 @@ using Lua.Loaders;
 using Lua.Standard;
 using System.Linq;
 using TaiChi.LuaHost.Proxies;
+using TaiChi.LuaHost.Exceptions;
 
 namespace TaiChi.LuaHost;
 
@@ -23,6 +24,10 @@ public sealed class LuaScriptHost : IDisposable
     /// Lua 全局 <c>static</c> 根表（静态类型代理入口）。
     /// </summary>
     private readonly LuaTable _staticRoot;
+    /// <summary>
+    /// Lua 全局工厂函数所使用的类型注册表（白名单 + 自动解析回退）。
+    /// </summary>
+    private readonly LuaFactoryTypeRegistry _factoryRegistry;
     private static readonly MethodInfo? CompositeModuleLoaderArrayFactory =
         typeof(CompositeModuleLoader).GetMethod("Create", new[] { typeof(ILuaModuleLoader[]) });
     private bool _disposed;
@@ -36,6 +41,8 @@ public sealed class LuaScriptHost : IDisposable
         _options = options ?? new LuaScriptHostOptions();
         State = CreateState(_options);
         _staticRoot = LuaStaticProxyTableFactory.EnsureStaticRoot(State, _options);
+        _factoryRegistry = new LuaFactoryTypeRegistry();
+        RegisterFactoryFunctionIfEnabled();
     }
 
     /// <summary>
@@ -225,6 +232,37 @@ public sealed class LuaScriptHost : IDisposable
     }
 
     /// <summary>
+    /// 将指定类型登记到 Lua 全局工厂函数（默认 <c>create</c>）的白名单。
+    /// </summary>
+    /// <remarks>
+    /// 登记后，Lua 侧可通过类型 <see cref="System.Type.FullName"/>、<see cref="System.MemberInfo.Name"/> 或自定义 <paramref name="alias"/> 任一名称构造该类型实例。
+    /// 此方法不会同时触碰 <c>static</c> 根表；若同时需要静态成员暴露，请额外调用 <see cref="RegisterStaticType(System.Type, string?)"/>。
+    /// </remarks>
+    /// <param name="type">目标类型。必须是非抽象、非接口、非未闭合泛型的可实例化类型。</param>
+    /// <param name="alias">Lua 侧使用的可选别名，默认为空（仅按 Name/FullName 索引）。</param>
+    public void RegisterFactoryType(Type type, string? alias = null)
+    {
+        EnsureNotDisposed();
+
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        _factoryRegistry.Register(type, alias);
+    }
+
+    /// <summary>
+    /// <see cref="RegisterFactoryType(System.Type, string?)"/> 的泛型便捷重载。
+    /// </summary>
+    /// <typeparam name="T">目标类型。</typeparam>
+    /// <param name="alias">Lua 侧使用的可选别名。</param>
+    public void RegisterFactoryType<T>(string? alias = null)
+    {
+        RegisterFactoryType(typeof(T), alias);
+    }
+
+    /// <summary>
     /// 尝试从 Lua 全局环境读取指定变量。
     /// </summary>
     /// <param name="name">全局变量名。</param>
@@ -384,5 +422,54 @@ public sealed class LuaScriptHost : IDisposable
         {
             throw new ObjectDisposedException(nameof(LuaScriptHost));
         }
+    }
+
+    /// <summary>
+    /// 若配置允许（<see cref="LuaScriptHostOptions.FactoryFunctionName"/> 非空白），则向 Lua 全局环境注册工厂函数。
+    /// </summary>
+    private void RegisterFactoryFunctionIfEnabled()
+    {
+        var name = _options.FactoryFunctionName;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        var trimmed = name.Trim();
+        State.Environment[trimmed] = new LuaFunction(trimmed, FactoryInvokeAsync);
+    }
+
+    /// <summary>
+    /// Lua 全局工厂函数的统一入口：解析类型名、选择构造器并将结果包装为代理壳返回。
+    /// </summary>
+    private ValueTask<int> FactoryInvokeAsync(LuaFunctionExecutionContext context, CancellationToken token)
+    {
+        if (!context.HasArgument(0))
+        {
+            throw new LuaMappingException($"{_options.FactoryFunctionName} 至少需要 1 个参数（类型名字符串）。");
+        }
+
+        string typeName;
+        try
+        {
+            typeName = context.GetArgument<string>(0);
+        }
+        catch (Exception ex)
+        {
+            throw new LuaMappingException($"{_options.FactoryFunctionName} 第一个参数必须是类型名字符串。", ex);
+        }
+
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            throw new LuaMappingException($"{_options.FactoryFunctionName} 第一个参数（类型名）不能为空白字符串。");
+        }
+
+        if (!_factoryRegistry.TryResolve(typeName, _options.EnableFactoryAutoResolve, out var type))
+        {
+            throw new LuaMappingException($"无法解析类型名 \"{typeName}\"。请通过 LuaScriptHost.RegisterFactoryType 显式登记，或确认类型已加载且名称正确。");
+        }
+
+        var table = LuaObjectFactory.Create(State, type, context, token, firstArgIndex: 1);
+        return new ValueTask<int>(LuaProxyReturnHelper.Return(context, table));
     }
 }

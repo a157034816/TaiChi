@@ -33,6 +33,18 @@ public sealed class LuaScriptHostOptions
     public bool EnableStaticAutoRegister { get; set; } = true;
 
     /// <summary>
+    /// 获取或设置是否在工厂函数（默认 <c>create</c>）中启用未注册类型的全程序集自动解析。
+    /// 默认启用；关闭后只能创建通过 <see cref="LuaScriptHost.RegisterFactoryType(System.Type, string?)"/> 显式登记或可被 <see cref="System.Type.GetType(string)"/> 解析到的类型。
+    /// </summary>
+    public bool EnableFactoryAutoResolve { get; set; } = true;
+
+    /// <summary>
+    /// 获取或设置 Lua 全局工厂函数的名称，默认为 <c>create</c>。
+    /// 设置为空白将抑制工厂函数注册。
+    /// </summary>
+    public string FactoryFunctionName { get; set; } = "create";
+
+    /// <summary>
     /// 获取或设置 Lua 平台描述，可用于替换文件系统等底层行为。
     /// </summary>
     public LuaPlatform? Platform { get; set; }

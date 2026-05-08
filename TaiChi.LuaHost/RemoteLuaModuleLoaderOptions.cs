@@ -38,5 +38,5 @@ public sealed class RemoteLuaModuleLoaderOptions
     /// <summary>
     /// 获取或设置要追加到所有远程请求 Header 的字符串 Key。
     /// </summary>
-    public string? RemoteStringKey { get; set; }
+    public string? RemoteDomainKey { get; set; }
 }

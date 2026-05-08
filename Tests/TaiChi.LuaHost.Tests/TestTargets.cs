@@ -303,3 +303,90 @@ public static class LuaHostAutoStaticUnique
     /// </summary>
     public static int Value { get; set; } = 10;
 }
+
+/// <summary>
+/// 用于验证 Lua 全局工厂函数（默认 <c>create</c>）按构造器重载选择并返回代理壳的示例目标类型。
+/// </summary>
+public sealed class FactoryTarget
+{
+    /// <summary>
+    /// 公开字段，便于 Lua 代理直接读取。
+    /// </summary>
+    public string Name = string.Empty;
+
+    /// <summary>
+    /// 公开字段，便于 Lua 代理直接读取数值。
+    /// </summary>
+    public int Value;
+
+    /// <summary>
+    /// 关联的引用对象，用于验证 LuaTable→代理对象解包到构造器参数。
+    /// </summary>
+    public ProxyTestPerson? Owner;
+
+    /// <summary>
+    /// 标识本次构造命中的重载，用于断言。
+    /// </summary>
+    public string Origin = string.Empty;
+
+    /// <summary>
+    /// 默认构造器。
+    /// </summary>
+    public FactoryTarget()
+    {
+        Origin = "()";
+    }
+
+    /// <summary>
+    /// 单参数构造器。
+    /// </summary>
+    /// <param name="name">名称。</param>
+    public FactoryTarget(string name)
+    {
+        Name = name;
+        Origin = "(string)";
+    }
+
+    /// <summary>
+    /// 双参数构造器。
+    /// </summary>
+    /// <param name="name">名称。</param>
+    /// <param name="value">数值。</param>
+    public FactoryTarget(string name, int value)
+    {
+        Name = name;
+        Value = value;
+        Origin = "(string,int)";
+    }
+
+    /// <summary>
+    /// 接收引用类型参数的构造器，用于验证代理解包到 .NET 对象。
+    /// </summary>
+    /// <param name="owner">关联的人对象。</param>
+    public FactoryTarget(ProxyTestPerson owner)
+    {
+        Owner = owner;
+        Name = owner?.Name ?? string.Empty;
+        Origin = "(ProxyTestPerson)";
+    }
+}
+
+/// <summary>
+/// 仅有一个非默认构造器的工厂目标，验证「无可匹配重载」分支的异常文案。
+/// </summary>
+public sealed class FactorySingleCtorTarget
+{
+    /// <summary>
+    /// 输入值。
+    /// </summary>
+    public int A;
+
+    /// <summary>
+    /// 必须传入 1 个 int 参数的构造器。
+    /// </summary>
+    /// <param name="a">参数 a。</param>
+    public FactorySingleCtorTarget(int a)
+    {
+        A = a;
+    }
+}

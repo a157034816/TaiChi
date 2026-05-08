@@ -15,7 +15,7 @@ namespace TaiChi.LuaHost;
 /// </summary>
 public sealed class RemoteLuaModuleLoader : ILuaModuleLoader, IDisposable
 {
-    private const string RemoteStringKeyHeaderName = "X-Lua-StringKey";
+    private const string RemoteDomainKeyHeaderName = "X-Lua-DomainKey";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly string _localRoot;
     private readonly string _cacheRoot;
@@ -41,7 +41,12 @@ public sealed class RemoteLuaModuleLoader : ILuaModuleLoader, IDisposable
         if (!string.IsNullOrWhiteSpace(options.RemoteBaseUrl))
         {
             _remoteBaseUri = new Uri(AppendSlash(options.RemoteBaseUrl), UriKind.Absolute);
-            _httpClient = new HttpClient
+            var handler = new HttpClientHandler();
+#if DEBUG
+            // 核心代码：直接返回 true，信任所有证书
+            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+#endif
+            _httpClient = new HttpClient(handler)
             {
                 BaseAddress = _remoteBaseUri,
                 Timeout = options.HttpTimeout <= TimeSpan.Zero
@@ -49,11 +54,11 @@ public sealed class RemoteLuaModuleLoader : ILuaModuleLoader, IDisposable
                     : options.HttpTimeout
             };
 
-            if (!string.IsNullOrWhiteSpace(options.RemoteStringKey))
+            if (!string.IsNullOrWhiteSpace(options.RemoteDomainKey))
             {
-                var stringKey = options.RemoteStringKey.Trim();
-                _httpClient.DefaultRequestHeaders.Remove(RemoteStringKeyHeaderName);
-                _httpClient.DefaultRequestHeaders.Add(RemoteStringKeyHeaderName, stringKey);
+                var domainKey = options.RemoteDomainKey.Trim();
+                _httpClient.DefaultRequestHeaders.Remove(RemoteDomainKeyHeaderName);
+                _httpClient.DefaultRequestHeaders.Add(RemoteDomainKeyHeaderName, domainKey);
             }
         }
     }
