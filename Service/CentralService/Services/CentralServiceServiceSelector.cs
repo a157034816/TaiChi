@@ -88,28 +88,62 @@ public sealed class CentralServiceServiceSelector
 
         try
         {
-            var statuses = await Task.WhenAll(
-                candidates.Select(async candidate =>
-                {
-                    var status = await _networkEvaluator.EvaluateServiceNetworkAsync(candidate.Service.Id);
-                    return new { Candidate = candidate, Status = status };
-                }));
+            var prioritized = new List<(CandidateService Candidate, ServiceNetworkStatus Status)>(candidates.Count);
+            var cacheMissCandidates = new List<CandidateService>();
 
-            var available = statuses
-                .Where(x => x.Status != null && x.Status.IsAvailable)
-                .OrderByDescending(x => x.Status!.CalculateScore())
+            foreach (var candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 心跳状态优先：发现阶段只优先处理“在线”实例。
+                if (candidate.Service.Status != 1)
+                {
+                    continue;
+                }
+
+                var cachedStatus = _networkEvaluator.GetServiceNetworkStatus(candidate.Service.Id);
+                if (cachedStatus != null)
+                {
+                    prioritized.Add((candidate, NormalizeStatusWithHeartbeat(candidate.Service, cachedStatus)));
+                    continue;
+                }
+
+                cacheMissCandidates.Add(candidate);
+            }
+
+            if (cacheMissCandidates.Count > 0)
+            {
+                // 缓存缺失时走轻量评估（仅基于心跳数据/状态合成，不执行实时 Ping）。
+                var missingStatuses = await Task.WhenAll(
+                    cacheMissCandidates.Select(async candidate =>
+                    {
+                        var evaluated = await _networkEvaluator.EvaluateServiceNetworkAsync(candidate.Service.Id);
+                        return new
+                        {
+                            Candidate = candidate,
+                            Status = evaluated == null
+                                ? BuildFallbackStatusFromHeartbeat(candidate.Service)
+                                : NormalizeStatusWithHeartbeat(candidate.Service, evaluated),
+                        };
+                    }));
+
+                prioritized.AddRange(missingStatuses.Select(x => (x.Candidate, x.Status)));
+            }
+
+            var available = prioritized
+                .Where(x => x.Candidate.Service.Status == 1 && x.Status.IsAvailable)
+                .OrderByDescending(x => x.Status.CalculateScore())
                 .ThenByDescending(x => x.Candidate.EffectiveWeight)
                 .Select(x => x.Candidate.Service)
                 .ToList();
 
-            var remaining = statuses
-                .Where(x => x.Status == null || !x.Status.IsAvailable)
-                .Select(x => x.Candidate)
+            var remaining = candidates
+                .Where(candidate => available.All(x => !string.Equals(x.Id, candidate.Service.Id, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
             if (available.Count == 0)
             {
-                return RotateCandidates(serviceName, remaining)
+                return RotateCandidates(serviceName, remaining.Count > 0 ? remaining : candidates)
                     .Select(x => x.Service)
                     .ToArray();
             }
@@ -284,6 +318,113 @@ public sealed class CentralServiceServiceSelector
         {
             return false;
         }
+    }
+
+    private static ServiceNetworkStatus NormalizeStatusWithHeartbeat(ServiceInfo service, ServiceNetworkStatus status)
+    {
+        if (service == null)
+        {
+            return status ?? new ServiceNetworkStatus
+            {
+                ServiceId = string.Empty,
+                ResponseTime = 3000,
+                PacketLoss = 100,
+                LastCheckTime = DateTime.Now,
+                ConsecutiveSuccesses = 0,
+                ConsecutiveFailures = 1,
+                IsAvailable = false,
+            };
+        }
+
+        if (status == null)
+        {
+            return BuildFallbackStatusFromHeartbeat(service);
+        }
+
+        if (service.Status == 1)
+        {
+            return new ServiceNetworkStatus
+            {
+                ServiceId = service.Id,
+                ResponseTime = status.ResponseTime > 0 ? status.ResponseTime : BuildFallbackStatusFromHeartbeat(service).ResponseTime,
+                PacketLoss = 0,
+                LastCheckTime = DateTime.Now,
+                ConsecutiveSuccesses = status.ConsecutiveSuccesses > 0 ? status.ConsecutiveSuccesses : 1,
+                ConsecutiveFailures = 0,
+                IsAvailable = true,
+            };
+        }
+
+        return new ServiceNetworkStatus
+        {
+            ServiceId = service.Id,
+            ResponseTime = status.ResponseTime > 0 ? status.ResponseTime : 3000,
+            PacketLoss = 100,
+            LastCheckTime = DateTime.Now,
+            ConsecutiveSuccesses = 0,
+            ConsecutiveFailures = status.ConsecutiveFailures > 0 ? status.ConsecutiveFailures : 1,
+            IsAvailable = false,
+        };
+    }
+
+    private static ServiceNetworkStatus BuildFallbackStatusFromHeartbeat(ServiceInfo service)
+    {
+        if (service == null)
+        {
+            return new ServiceNetworkStatus
+            {
+                ServiceId = string.Empty,
+                ResponseTime = 3000,
+                PacketLoss = 100,
+                LastCheckTime = DateTime.Now,
+                ConsecutiveSuccesses = 0,
+                ConsecutiveFailures = 1,
+                IsAvailable = false,
+            };
+        }
+
+        if (service.Status != 1)
+        {
+            return new ServiceNetworkStatus
+            {
+                ServiceId = service.Id,
+                ResponseTime = 3000,
+                PacketLoss = 100,
+                LastCheckTime = DateTime.Now,
+                ConsecutiveSuccesses = 0,
+                ConsecutiveFailures = 1,
+                IsAvailable = false,
+            };
+        }
+
+        var responseTime = 200L;
+        if (service.LastHeartbeatTime > DateTime.MinValue)
+        {
+            var elapsed = DateTime.Now - service.LastHeartbeatTime;
+            if (elapsed > TimeSpan.Zero)
+            {
+                responseTime = (long)Math.Ceiling(elapsed.TotalMilliseconds);
+                if (responseTime <= 0)
+                {
+                    responseTime = 1;
+                }
+                else if (responseTime > 3000)
+                {
+                    responseTime = 3000;
+                }
+            }
+        }
+
+        return new ServiceNetworkStatus
+        {
+            ServiceId = service.Id,
+            ResponseTime = responseTime,
+            PacketLoss = 0,
+            LastCheckTime = DateTime.Now,
+            ConsecutiveSuccesses = 1,
+            ConsecutiveFailures = 0,
+            IsAvailable = true,
+        };
     }
 
     private static ServiceInfo CloneWithEntryHost(ServiceInfo service, string entryHost)

@@ -2,3 +2,4 @@
 
 # CentralService runtime SQLite database
 /data/*.db*
+.ace-tool/

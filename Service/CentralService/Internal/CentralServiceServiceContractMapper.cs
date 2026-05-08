@@ -19,8 +19,6 @@ internal static class CentralServiceServiceContractMapper
             Url = service.Url,
             ServiceType = service.ServiceType,
             Status = service.Status,
-            HealthCheckUrl = service.HealthCheckUrl,
-            HealthCheckPort = service.HealthCheckPort,
             HeartbeatIntervalSeconds = service.HeartbeatIntervalSeconds,
             RegisterTime = service.RegisterTime == default ? null : service.RegisterTime.ToString("O"),
             LastHeartbeatTime = service.LastHeartbeatTime == default ? null : service.LastHeartbeatTime.ToString("O"),

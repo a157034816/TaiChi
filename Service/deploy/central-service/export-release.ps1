@@ -93,6 +93,8 @@ if (-not $SkipBuild)
 
 Ensure-Image -SourceImage $CentralServiceSourceImage -TargetImage $CentralServiceTargetImage
 Ensure-Image -SourceImage $AdminSiteSourceImage -TargetImage $AdminSiteTargetImage
+Write-Info "拉取基础镜像: $CaddyImage"
+Invoke-Docker @("pull", $CaddyImage)
 Ensure-Image -SourceImage $CaddyImage -TargetImage $CaddyImage
 
 Write-Info "导出镜像归档: $imageArchivePath"

@@ -8,6 +8,7 @@ using ApiResponseFactory = CentralService.Internal.CentralServiceApiResponseFact
 using RuntimeServiceInfo = CentralService.Models.ServiceInfo;
 using ServiceApiListResponse = CentralService.Service.Models.ServiceListResponse;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -33,6 +34,7 @@ namespace CentralService.Controllers
         private readonly ServiceCircuitJsonStore _serviceCircuitStore;
         private readonly ServiceCircuitTomlStore _serviceCircuitDefaults;
         private readonly ServiceAccessService _serviceAccessService;
+        private readonly ServiceNetworkEvaluator _networkEvaluator;
         private readonly ILogger<ServiceController> _logger;
 
         public ServiceController(
@@ -40,12 +42,14 @@ namespace CentralService.Controllers
             ServiceCircuitJsonStore serviceCircuitStore,
             ServiceCircuitTomlStore serviceCircuitDefaults,
             ServiceAccessService serviceAccessService,
+            ServiceNetworkEvaluator networkEvaluator,
             ILogger<ServiceController> logger)
         {
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _serviceCircuitStore = serviceCircuitStore ?? throw new ArgumentNullException(nameof(serviceCircuitStore));
             _serviceCircuitDefaults = serviceCircuitDefaults ?? throw new ArgumentNullException(nameof(serviceCircuitDefaults));
             _serviceAccessService = serviceAccessService ?? throw new ArgumentNullException(nameof(serviceAccessService));
+            _networkEvaluator = networkEvaluator ?? throw new ArgumentNullException(nameof(networkEvaluator));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -125,8 +129,6 @@ namespace CentralService.Controllers
                     PublicIp = publicIp,
                     Port = request.Port,
                     ServiceType = request.ServiceType,
-                    HealthCheckUrl = BuildFullHealthCheckUrl(request, localIp),
-                    HealthCheckPort = request.HealthCheckPort > 0 ? request.HealthCheckPort : request.Port,
                     HeartbeatIntervalSeconds = request.HeartbeatIntervalSeconds,
                     Weight = request.Weight,
                     Metadata = request.Metadata ?? new Dictionary<string, string>(),
@@ -275,6 +277,7 @@ namespace CentralService.Controllers
                             pendingAck = null;
                         }
                     },
+                    rttMs => _networkEvaluator.UpdateNetworkStatusFromHeartbeat(serviceId, rttMs),
                     linkedToken);
 
             try
@@ -298,6 +301,8 @@ namespace CentralService.Controllers
                 {
                     _serviceRegistry.MarkOffline(serviceId);
                 }
+
+                _networkEvaluator.MarkServiceUnavailable(serviceId);
             }
         }
 
@@ -333,11 +338,13 @@ namespace CentralService.Controllers
             TimeSpan responseTimeout,
             Func<Task> registerPendingAck,
             Action clearPendingAck,
+            Action<long> heartbeatRttMeasured,
             CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
             {
                 var ackTask = registerPendingAck();
+                var heartbeatStopwatch = Stopwatch.StartNew();
                 try
                 {
                     await SendTextMessageAsync(webSocket, CentralServiceHeartbeatWebSocketProtocol.HeartbeatRequestMessage, cancellationToken)
@@ -356,8 +363,12 @@ namespace CentralService.Controllers
                     if (completed != ackTask)
                     {
                         _serviceRegistry.MarkFault(serviceId);
+                        _networkEvaluator.MarkServiceUnavailable(serviceId);
                         return;
                     }
+
+                    heartbeatStopwatch.Stop();
+                    heartbeatRttMeasured(heartbeatStopwatch.ElapsedMilliseconds);
                 }
                 finally
                 {
@@ -598,29 +609,6 @@ namespace CentralService.Controllers
                 _logger.LogError(ex, "检查主机 {Host}:{Port} 可达性时发生错误", host, port);
                 return false;
             }
-        }
-
-        /// <summary>
-        /// 构建完整的健康检查URL
-        /// </summary>
-        private string BuildFullHealthCheckUrl(ServiceRegistrationRequest request, string host)
-        {
-            if (string.IsNullOrEmpty(request.HealthCheckUrl))
-            {
-                return string.Empty;
-            }
-
-            if (request.HealthCheckUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-                || request.HealthCheckUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                return request.HealthCheckUrl;
-            }
-
-            var healthCheckPath = request.HealthCheckUrl.StartsWith("/")
-                ? request.HealthCheckUrl
-                : $"/{request.HealthCheckUrl}";
-
-            return $"http://{host}:{request.Port}{healthCheckPath}";
         }
     }
 }
