@@ -42,6 +42,7 @@ public sealed class LuaScriptHost : IDisposable
         State = CreateState(_options);
         _staticRoot = LuaStaticProxyTableFactory.EnsureStaticRoot(State, _options);
         _factoryRegistry = new LuaFactoryTypeRegistry();
+        RegisterSafePrintFunction();
         RegisterFactoryFunctionIfEnabled();
     }
 
@@ -437,6 +438,41 @@ public sealed class LuaScriptHost : IDisposable
 
         var trimmed = name.Trim();
         State.Environment[trimmed] = new LuaFunction(trimmed, FactoryInvokeAsync);
+    }
+
+    /// <summary>
+    /// 覆盖标准库 <c>print</c>，避免 LuaCSharp 内置输出在大文本或 UTF-8 文本下触发缓冲区不足异常。
+    /// </summary>
+    private void RegisterSafePrintFunction()
+    {
+        RegisterFunction("print", PrintAsync);
+    }
+
+    /// <summary>
+    /// 以稳定的 .NET 字符串输出替代 Lua 标准库的 <c>print</c>。
+    /// </summary>
+    /// <param name="context">Lua 调用上下文。</param>
+    /// <param name="token">取消标记。</param>
+    /// <remarks>
+    /// 保留 Lua 的基础行为：将所有参数按制表符连接后输出一行。
+    /// </remarks>
+    private ValueTask<int> PrintAsync(LuaFunctionExecutionContext context, CancellationToken token)
+    {
+        if (context.ArgumentCount <= 0)
+        {
+            Console.WriteLine();
+            return new ValueTask<int>(context.Return());
+        }
+
+        var values = new string[context.ArgumentCount];
+        for (var i = 0; i < values.Length; i++)
+        {
+            var value = context.GetArgument(i);
+            values[i] = value.Type == LuaValueType.Nil ? "nil" : value.ToString();
+        }
+
+        Console.WriteLine(string.Join('\t', values));
+        return new ValueTask<int>(context.Return());
     }
 
     /// <summary>
